@@ -65,8 +65,47 @@ fun SmartFlightRoot(
     state: SmartFlightUiState,
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit,
+    onRefreshAccessChecks: () -> Unit,
+    onOpenUsageAccessSettings: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenBatteryOptimizationSettings: () -> Unit,
 ) {
     var destination by rememberSaveable { mutableStateOf(SmartFlightDestination.Home) }
+
+    if (!state.accessGateState.canEnterApp) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("自动飞行", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "SmartFlight",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                )
+            },
+        ) { innerPadding ->
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) {
+                AccessGateScreen(
+                    state = state.accessGateState,
+                    onRefresh = onRefreshAccessChecks,
+                    onOpenUsageAccessSettings = onOpenUsageAccessSettings,
+                    onOpenNotificationSettings = onOpenNotificationSettings,
+                    onOpenBatteryOptimizationSettings = onOpenBatteryOptimizationSettings,
+                    onEnterApp = onRefreshAccessChecks,
+                )
+            }
+        }
+        return
+    }
 
     Scaffold(
         topBar = {
@@ -320,16 +359,18 @@ private fun PlaceholderScreen(
             )
         }
         lines.forEach { line ->
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
-            ) {
-                Text(
-                    text = line,
-                    modifier = Modifier.padding(20.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ),
+                ) {
+                    Text(
+                        text = line,
+                        modifier = Modifier.padding(20.dp),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
             }
         }
     }
