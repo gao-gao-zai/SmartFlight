@@ -41,19 +41,20 @@ class ShizukuExecutorValidator @Inject constructor(
         }
 
         val commandResult = shizukuExecutorCommandRunner.run(
-            ExecutorCommand(
-                rawCommand = "id",
-                purpose = "验证 Shizuku UserService 是否可执行只读命令",
-            ),
+            ExecutorReadonlyCommands.ReadAirplaneModeState,
         )
 
         return ExecutorValidationResult(
             executorType = ExecutorType.Shizuku,
-            isReady = commandResult.executed && commandResult.exitCode == 0,
-            summary = if (commandResult.executed && commandResult.exitCode == 0) {
-                "Shizuku 执行器已通过只读命令验证"
+            isReady = commandResult.executed &&
+                commandResult.exitCode == 0 &&
+                (commandResult.stdout == "0" || commandResult.stdout == "1"),
+            summary = if (commandResult.executed && commandResult.exitCode == 0 &&
+                (commandResult.stdout == "0" || commandResult.stdout == "1")
+            ) {
+                "Shizuku 执行器已读取飞行模式状态"
             } else {
-                "Shizuku 执行器尚未通过只读命令验证"
+                "Shizuku 执行器未能读取飞行模式状态"
             },
             detail = buildString {
                 append(commandResult.stdout.ifBlank { commandResult.summary })
@@ -63,6 +64,8 @@ class ShizukuExecutorValidator @Inject constructor(
                     append(if (remoteUid == 0) "（ROOT）" else if (remoteUid == 2000) "（ADB）" else "")
                 }
             },
+            command = ExecutorReadonlyCommands.ReadAirplaneModeState.rawCommand,
+            commandOutput = commandResult.stdout.ifBlank { commandResult.stderr.ifBlank { null } },
         )
     }
 }

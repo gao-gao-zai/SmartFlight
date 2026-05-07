@@ -7,6 +7,13 @@ data class ExecutorCommand(
     val purpose: String,
 )
 
+object ExecutorReadonlyCommands {
+    val ReadAirplaneModeState = ExecutorCommand(
+        rawCommand = "settings get global airplane_mode_on",
+        purpose = "读取飞行模式状态",
+    )
+}
+
 data class ExecutorCommandResult(
     val executorType: ExecutorType,
     val executed: Boolean,

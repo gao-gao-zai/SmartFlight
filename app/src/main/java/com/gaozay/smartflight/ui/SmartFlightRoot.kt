@@ -51,6 +51,7 @@ import com.gaozay.smartflight.SmartFlightUiState
 import com.gaozay.smartflight.apps.AppFilter
 import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.domain.model.AppListStatus
+import com.gaozay.smartflight.ExecutorDiagnosticItem
 import java.text.DateFormat
 import java.util.Date
 
@@ -442,6 +443,65 @@ private fun DiagnosticsScreen(
                         )
                     }
                 }
+            }
+        }
+        items(state.executorDiagnostics.size) { index ->
+            ExecutorDiagnosticCard(item = state.executorDiagnostics[index])
+        }
+    }
+}
+
+@Composable
+private fun ExecutorDiagnosticCard(item: ExecutorDiagnosticItem) {
+    val accent = if (item.ready) Color(0xFF1FA971) else Color(0xFFE55D87)
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(accent),
+                )
+                Spacer(modifier = Modifier.size(10.dp))
+                Text(
+                    text = item.executor,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = item.summary,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            if (item.command.isNotBlank()) {
+                Text(
+                    text = "命令：${item.command}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (item.output.isNotBlank()) {
+                Text(
+                    text = "输出：${item.output}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (item.detail.isNotBlank()) {
+                Text(
+                    text = item.detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

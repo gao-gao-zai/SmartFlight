@@ -9,6 +9,7 @@ import com.gaozay.smartflight.apps.InstalledAppRepository
 import com.gaozay.smartflight.apps.status
 import com.gaozay.smartflight.domain.model.AppListStatus
 import com.gaozay.smartflight.domain.model.ExecutionResult
+import com.gaozay.smartflight.executor.ExecutorValidationService
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.permission.AccessGateState
 import com.gaozay.smartflight.permission.AccessRepository
@@ -31,11 +32,13 @@ class MainViewModel @Inject constructor(
     private val installedAppRepository: InstalledAppRepository,
     executionLogRepository: ExecutionLogRepository,
     private val accessRepository: AccessRepository,
+    private val executorValidationService: ExecutorValidationService,
 ) : ViewModel() {
     private val appQuery = MutableStateFlow("")
     private val appFilter = MutableStateFlow(AppFilter.All)
     private val appScanning = MutableStateFlow(false)
     private val appLastScanSummary = MutableStateFlow("尚未扫描")
+    private val diagnosticsState = MutableStateFlow<List<ExecutorDiagnosticItem>>(emptyList())
 
     val uiState: StateFlow<SmartFlightUiState> = combine(
         settingsRepository.settings,
@@ -55,6 +58,7 @@ class MainViewModel @Inject constructor(
             runtimeLastCheck = runtimeSnapshot.lastActionReason,
             runtimeLastResult = runtimeSnapshot.lastActionResult.label,
             runtimeUpdatedAtMillis = runtimeSnapshot.updatedAtMillis,
+            executorDiagnostics = diagnosticsState.value,
             triggerSummary = buildString {
                 append(runtimeSnapshot.lastActionReason)
                 append(" · Apps: ")
@@ -114,6 +118,16 @@ class MainViewModel @Inject constructor(
     fun refreshAccessChecks() {
         viewModelScope.launch {
             accessRepository.refresh()
+            diagnosticsState.value = executorValidationService.validateAll().map { result ->
+                ExecutorDiagnosticItem(
+                    executor = result.executorType.label,
+                    summary = result.summary,
+                    detail = result.detail.orEmpty(),
+                    command = result.command.orEmpty(),
+                    output = result.commandOutput.orEmpty(),
+                    ready = result.isReady,
+                )
+            }
         }
     }
 
@@ -169,5 +183,16 @@ data class SmartFlightUiState(
     val runtimeLastCheck: String = "尚未执行自检",
     val runtimeLastResult: String = ExecutionResult.Pending.label,
     val runtimeUpdatedAtMillis: Long = 0,
+    val executorDiagnostics: List<ExecutorDiagnosticItem> = emptyList(),
     val triggerSummary: String = "项目已初始化，运行时引擎待接入。",
+)
+
+@Immutable
+data class ExecutorDiagnosticItem(
+    val executor: String,
+    val summary: String,
+    val detail: String,
+    val command: String,
+    val output: String,
+    val ready: Boolean,
 )

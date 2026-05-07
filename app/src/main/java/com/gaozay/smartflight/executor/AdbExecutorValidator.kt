@@ -15,15 +15,16 @@ class AdbExecutorValidator @Inject constructor(
             executorType = ExecutorType.AdbBootstrapped,
             isReady = bootstrapped,
             summary = if (bootstrapped) {
-                "ADB 执行器具备初始化前提"
+                "ADB 执行器具备读取飞行模式状态的初始化前提"
             } else {
                 "ADB 执行器尚未初始化"
             },
             detail = if (bootstrapped) {
-                "当前仍缺少真实执行命令的联调，但初始化状态已记录。"
+                "初始化状态已记录，但真实的设备侧命令执行链路还未接入。"
             } else {
                 "需要先完成 ADB 初始化，执行器才会进入可用候选。"
             },
+            command = ExecutorReadonlyCommands.ReadAirplaneModeState.rawCommand,
         )
     }
 }

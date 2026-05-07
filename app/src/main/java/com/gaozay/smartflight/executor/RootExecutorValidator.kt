@@ -10,21 +10,18 @@ class RootExecutorValidator @Inject constructor(
 ) : ExecutorValidator {
     override suspend fun validate(): ExecutorValidationResult {
         val commandResult = rootExecutorCommandRunner.run(
-            ExecutorCommand(
-                rawCommand = "id",
-                purpose = "验证 Root shell 是否可执行",
-            ),
+            ExecutorReadonlyCommands.ReadAirplaneModeState,
         )
         val confirmed = commandResult.executed &&
             commandResult.exitCode == 0 &&
-            commandResult.stdout.contains("uid=0")
+            (commandResult.stdout == "0" || commandResult.stdout == "1")
         return ExecutorValidationResult(
             executorType = ExecutorType.Root,
             isReady = confirmed,
             summary = if (confirmed) {
-                "Root 执行器已通过只读命令验证"
+                "Root 执行器已读取飞行模式状态"
             } else {
-                "Root 执行器尚未通过只读命令验证"
+                "Root 执行器未能读取飞行模式状态"
             },
             detail = buildString {
                 if (commandResult.stdout.isNotBlank()) {
@@ -38,6 +35,8 @@ class RootExecutorValidator @Inject constructor(
                     append(commandResult.summary)
                 }
             },
+            command = ExecutorReadonlyCommands.ReadAirplaneModeState.rawCommand,
+            commandOutput = commandResult.stdout.ifBlank { commandResult.stderr.ifBlank { null } },
         )
     }
 }
