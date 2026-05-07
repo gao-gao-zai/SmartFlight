@@ -7,7 +7,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ShizukuExecutorValidator @Inject constructor() : ExecutorValidator {
+class ShizukuExecutorValidator @Inject constructor(
+    private val shizukuExecutorCommandRunner: ShizukuExecutorCommandRunner,
+) : ExecutorValidator {
     override suspend fun validate(): ExecutorValidationResult {
         val binderAlive = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
         if (!binderAlive) {
@@ -23,15 +25,40 @@ class ShizukuExecutorValidator @Inject constructor() : ExecutorValidator {
             Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
         }.getOrDefault(false)
         val remoteUid = runCatching { Shizuku.getUid() }.getOrNull()
+        if (!granted) {
+            return ExecutorValidationResult(
+                executorType = ExecutorType.Shizuku,
+                isReady = false,
+                summary = "Shizuku 执行器缺少授权",
+                detail = buildString {
+                    append("Binder 已连接")
+                    if (remoteUid != null) {
+                        append("，后端 UID=")
+                        append(remoteUid)
+                    }
+                },
+            )
+        }
+
+        val commandResult = shizukuExecutorCommandRunner.run(
+            ExecutorCommand(
+                rawCommand = "id",
+                purpose = "验证 Shizuku UserService 是否可执行只读命令",
+            ),
+        )
 
         return ExecutorValidationResult(
             executorType = ExecutorType.Shizuku,
-            isReady = granted,
-            summary = if (granted) "Shizuku 执行器已就绪" else "Shizuku 执行器缺少授权",
+            isReady = commandResult.executed && commandResult.exitCode == 0,
+            summary = if (commandResult.executed && commandResult.exitCode == 0) {
+                "Shizuku 执行器已通过只读命令验证"
+            } else {
+                "Shizuku 执行器尚未通过只读命令验证"
+            },
             detail = buildString {
-                append("Binder 已连接")
+                append(commandResult.stdout.ifBlank { commandResult.summary })
                 if (remoteUid != null) {
-                    append("，后端 UID=")
+                    append(" · 后端 UID=")
                     append(remoteUid)
                     append(if (remoteUid == 0) "（ROOT）" else if (remoteUid == 2000) "（ADB）" else "")
                 }
