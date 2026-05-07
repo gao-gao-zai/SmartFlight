@@ -9,8 +9,12 @@ import com.gaozay.smartflight.data.local.dao.ExecutionLogDao
 import com.gaozay.smartflight.data.local.dao.InstalledAppDao
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.logs.RoomExecutionLogRepository
+import com.gaozay.smartflight.permission.AdbBootstrapRepository
 import com.gaozay.smartflight.permission.AccessRepository
+import com.gaozay.smartflight.permission.DataStoreAdbBootstrapRepository
+import com.gaozay.smartflight.permission.DataStoreRootAccessProbeRepository
 import com.gaozay.smartflight.permission.DefaultAccessRepository
+import com.gaozay.smartflight.permission.RootAccessProbeRepository
 import com.gaozay.smartflight.runtime.DataStoreRuntimeStatusRepository
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import com.gaozay.smartflight.settings.DataStoreSettingsRepository
@@ -77,4 +81,16 @@ abstract class RepositoryModule {
     abstract fun bindAccessRepository(
         repository: DefaultAccessRepository,
     ): AccessRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAdbBootstrapRepository(
+        repository: DataStoreAdbBootstrapRepository,
+    ): AdbBootstrapRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRootAccessProbeRepository(
+        repository: DataStoreRootAccessProbeRepository,
+    ): RootAccessProbeRepository
 }

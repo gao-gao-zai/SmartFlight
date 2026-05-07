@@ -16,11 +16,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Rule
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.Rule
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,7 +57,7 @@ private enum class SmartFlightDestination(
 ) {
     Home("首页", Icons.Rounded.Home),
     Apps("应用", Icons.Rounded.Apps),
-    Rules("规则", Icons.Rounded.Rule),
+    Rules("规则", Icons.AutoMirrored.Rounded.Rule),
     Theme("主题", Icons.Rounded.Palette),
     Diagnostics("诊断", Icons.Rounded.BugReport),
 }
@@ -74,6 +74,9 @@ fun SmartFlightRoot(
     onRefreshApps: () -> Unit,
     onSetAppListStatus: (String, AppListStatus) -> Unit,
     onRefreshAccessChecks: () -> Unit,
+    onRequestShizukuPermission: () -> Unit,
+    onProbeRootAccess: () -> Unit,
+    onSetAdbBootstrapped: (Boolean) -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenBatteryOptimizationSettings: () -> Unit,
@@ -105,10 +108,12 @@ fun SmartFlightRoot(
                 AccessGateScreen(
                     state = state.accessGateState,
                     onRefresh = onRefreshAccessChecks,
+                    onRequestShizukuPermission = onRequestShizukuPermission,
+                    onProbeRootAccess = onProbeRootAccess,
+                    onSetAdbBootstrapped = onSetAdbBootstrapped,
                     onOpenUsageAccessSettings = onOpenUsageAccessSettings,
                     onOpenNotificationSettings = onOpenNotificationSettings,
                     onOpenBatteryOptimizationSettings = onOpenBatteryOptimizationSettings,
-                    onEnterApp = onRefreshAccessChecks,
                 )
             }
         }

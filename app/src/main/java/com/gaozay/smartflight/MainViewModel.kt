@@ -112,6 +112,18 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun setAdbBootstrapped(bootstrapped: Boolean) {
+        viewModelScope.launch {
+            accessRepository.setAdbBootstrapped(bootstrapped)
+        }
+    }
+
+    fun probeRootAccess() {
+        viewModelScope.launch {
+            accessRepository.probeRootAccess()
+        }
+    }
+
     fun updateAppQuery(query: String) {
         appQuery.value = query
     }
@@ -150,4 +162,3 @@ data class SmartFlightUiState(
     val foregroundApp: String = "尚未连接",
     val triggerSummary: String = "项目已初始化，运行时引擎待接入。",
 )
-

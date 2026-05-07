@@ -29,13 +29,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.permission.AccessActionType
 import com.gaozay.smartflight.permission.AccessCheckResult
 import com.gaozay.smartflight.permission.AccessGateState
 
@@ -43,10 +46,12 @@ import com.gaozay.smartflight.permission.AccessGateState
 fun AccessGateScreen(
     state: AccessGateState,
     onRefresh: () -> Unit,
+    onRequestShizukuPermission: () -> Unit,
+    onProbeRootAccess: () -> Unit,
+    onSetAdbBootstrapped: (Boolean) -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenBatteryOptimizationSettings: () -> Unit,
-    onEnterApp: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -63,7 +68,7 @@ fun AccessGateScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "自动化功能需要至少一种高级执行能力，并授予使用情况访问权限。",
+                    text = "自动化功能至少需要一种高级执行能力，并授予使用情况访问权限。通知和电池优化先作为建议项展示。",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -77,6 +82,9 @@ fun AccessGateScreen(
                 title = "高级执行能力",
                 icon = Icons.Rounded.Security,
                 checks = state.advancedAccess.checks,
+                onRequestShizukuPermission = onRequestShizukuPermission,
+                onProbeRootAccess = onProbeRootAccess,
+                onSetAdbBootstrapped = onSetAdbBootstrapped,
             )
         }
         item {
@@ -111,12 +119,12 @@ fun AccessGateScreen(
                 ) {
                     Text("重新检测")
                 }
-                OutlinedButton(
-                    onClick = onEnterApp,
-                    enabled = state.canEnterApp,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (state.canEnterApp) "进入应用" else "等待满足接入条件")
+                if (state.advisoryChecks.isNotEmpty()) {
+                    Text(
+                        text = "建议项未完成：${state.advisoryChecks.joinToString { it.title }}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -152,7 +160,11 @@ private fun AccessSummaryCard(state: AccessGateState) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "当前执行器：${state.advancedAccess.selectedExecutorType.label}",
+                    text = if (state.canEnterApp) {
+                        "当前执行器：${state.advancedAccess.selectedExecutorType.label}"
+                    } else {
+                        "阻塞项剩余 ${state.blockingChecks.size} 个，建议项 ${state.advisoryChecks.size} 个"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -166,7 +178,11 @@ private fun AccessSectionCard(
     title: String,
     icon: ImageVector,
     checks: List<AccessCheckResult>,
+    onRequestShizukuPermission: () -> Unit,
+    onProbeRootAccess: () -> Unit,
+    onSetAdbBootstrapped: (Boolean) -> Unit,
 ) {
+    val clipboardManager = LocalClipboardManager.current
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -187,6 +203,31 @@ private fun AccessSectionCard(
             }
             checks.forEach { result ->
                 AccessResultRow(result = result)
+                if (result.title == "Shizuku" && result.actionType == AccessActionType.RequestPermission) {
+                    OutlinedButton(onClick = onRequestShizukuPermission) {
+                        Text("请求 Shizuku 授权")
+                    }
+                }
+                if (result.title == "Root" && result.actionType == AccessActionType.RequestPermission) {
+                    OutlinedButton(onClick = onProbeRootAccess) {
+                        Text("测试 Root 授权")
+                    }
+                }
+                if (result.title == "ADB 初始化") {
+                    result.copyText?.let { copyText ->
+                        OutlinedButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(copyText))
+                            },
+                        ) {
+                            Text(result.copyLabel ?: "复制命令")
+                        }
+                    }
+                    val markAsReady = !result.satisfiesRequirement
+                    OutlinedButton(onClick = { onSetAdbBootstrapped(markAsReady) }) {
+                        Text(if (markAsReady) "我已完成 ADB 初始化" else "重置 ADB 初始化状态")
+                    }
+                }
             }
         }
     }
@@ -229,7 +270,11 @@ private fun AccessCheckCard(
 
 @Composable
 private fun AccessResultRow(result: AccessCheckResult) {
-    val color = if (result.available) Color(0xFF1FA971) else Color(0xFFE55D87)
+    val color = when {
+        result.satisfiesRequirement -> Color(0xFF1FA971)
+        result.isBlocking -> Color(0xFFE55D87)
+        else -> Color(0xFFF5A623)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -247,7 +292,7 @@ private fun AccessResultRow(result: AccessCheckResult) {
         Spacer(modifier = Modifier.size(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = result.summary,
+                text = "${result.summary} · ${result.statusLabel}",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
             )
@@ -257,6 +302,14 @@ private fun AccessResultRow(result: AccessCheckResult) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            result.detail?.let { detail ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -6,4 +6,8 @@ interface AccessRepository {
     val accessGateState: StateFlow<AccessGateState>
 
     suspend fun refresh()
+
+    suspend fun setAdbBootstrapped(bootstrapped: Boolean)
+
+    suspend fun probeRootAccess()
 }

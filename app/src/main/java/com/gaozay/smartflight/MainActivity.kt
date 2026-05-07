@@ -7,21 +7,33 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gaozay.smartflight.ui.SmartFlightRoot
 import com.gaozay.smartflight.ui.theme.SmartFlightTheme
 import dagger.hilt.android.AndroidEntryPoint
+import rikka.shizuku.Shizuku
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private companion object {
+        const val SHIZUKU_REQUEST_CODE = 1001
+    }
+
+    private val viewModel: MainViewModel by viewModels()
+    private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, _ ->
+        if (requestCode == SHIZUKU_REQUEST_CODE) {
+            viewModel.refreshAccessChecks()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
         enableEdgeToEdge()
         setContent {
-            val viewModel: MainViewModel = hiltViewModel()
             val uiState = viewModel.uiState.collectAsStateWithLifecycle()
             val appsUiState = viewModel.appsUiState.collectAsStateWithLifecycle()
             val (darkMode, setDarkMode) = rememberSaveable { mutableStateOf(false) }
@@ -36,6 +48,15 @@ class MainActivity : ComponentActivity() {
                     onRefreshApps = viewModel::refreshInstalledApps,
                     onSetAppListStatus = viewModel::setAppListStatus,
                     onRefreshAccessChecks = viewModel::refreshAccessChecks,
+                    onRequestShizukuPermission = {
+                        runCatching {
+                            Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
+                        }.onFailure {
+                            viewModel.refreshAccessChecks()
+                        }
+                    },
+                    onProbeRootAccess = viewModel::probeRootAccess,
+                    onSetAdbBootstrapped = viewModel::setAdbBootstrapped,
                     onOpenUsageAccessSettings = {
                         startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
                     },
@@ -52,5 +73,15 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshAccessChecks()
+    }
+
+    override fun onDestroy() {
+        Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
+        super.onDestroy()
     }
 }

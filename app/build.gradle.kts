@@ -59,6 +59,7 @@ android {
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
+    val shizukuVersion = "13.1.5"
 
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -78,6 +79,8 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     implementation("com.google.dagger:hilt-android:2.52")
+    implementation("dev.rikka.shizuku:api:$shizukuVersion")
+    implementation("dev.rikka.shizuku:provider:$shizukuVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     ksp("androidx.room:room-compiler:2.6.1")
@@ -90,4 +93,3 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
-
