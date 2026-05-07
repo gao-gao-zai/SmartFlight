@@ -18,6 +18,10 @@ class ExecutorValidationService @Inject constructor(
 
     suspend fun selectBestExecutor(): ExecutorValidationResult {
         val results = validateAll()
+        return selectBestExecutor(results)
+    }
+
+    fun selectBestExecutor(results: List<ExecutorValidationResult>): ExecutorValidationResult {
         return results.firstOrNull { it.isReady }
             ?: ExecutorValidationResult(
                 executorType = ExecutorType.Unavailable,

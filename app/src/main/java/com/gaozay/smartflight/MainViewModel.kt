@@ -8,6 +8,7 @@ import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.apps.InstalledAppRepository
 import com.gaozay.smartflight.apps.status
 import com.gaozay.smartflight.domain.model.AppListStatus
+import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.permission.AccessGateState
 import com.gaozay.smartflight.permission.AccessRepository
@@ -50,6 +51,10 @@ class MainViewModel @Inject constructor(
             foregroundApp = runtimeSnapshot.currentForegroundAppLabel
                 ?: runtimeSnapshot.currentForegroundPackageName
                 ?: "Not connected yet",
+            runtimeExecutor = runtimeSnapshot.activeExecutorType.label,
+            runtimeLastCheck = runtimeSnapshot.lastActionReason,
+            runtimeLastResult = runtimeSnapshot.lastActionResult.label,
+            runtimeUpdatedAtMillis = runtimeSnapshot.updatedAtMillis,
             triggerSummary = buildString {
                 append(runtimeSnapshot.lastActionReason)
                 append(" · Apps: ")
@@ -160,5 +165,9 @@ data class SmartFlightUiState(
     val advancedAccess: String = "需要 Shizuku / ADB / Root",
     val currentMode: String = "飞行模式",
     val foregroundApp: String = "尚未连接",
+    val runtimeExecutor: String = "不可用",
+    val runtimeLastCheck: String = "尚未执行自检",
+    val runtimeLastResult: String = ExecutionResult.Pending.label,
+    val runtimeUpdatedAtMillis: Long = 0,
     val triggerSummary: String = "项目已初始化，运行时引擎待接入。",
 )

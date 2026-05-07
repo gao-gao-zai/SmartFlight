@@ -17,7 +17,9 @@ class AdvancedAccessChecker @Inject constructor(
         val shizuku = shizukuAccessChecker.check()
         val adbBootstrapped = adbAccessChecker.check()
         val checks = listOf(root, shizuku, adbBootstrapped)
-        val selectedExecutorType = executorValidationService.selectBestExecutor().executorType
+        val selectedExecutorType = executorValidationService.selectBestExecutor(
+            executorValidationService.validateAll(),
+        ).executorType
         return AdvancedAccessState(
             selectedExecutorType = selectedExecutorType,
             checks = checks,

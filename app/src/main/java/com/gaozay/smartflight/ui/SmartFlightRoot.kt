@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -50,6 +51,8 @@ import com.gaozay.smartflight.SmartFlightUiState
 import com.gaozay.smartflight.apps.AppFilter
 import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.domain.model.AppListStatus
+import java.text.DateFormat
+import java.util.Date
 
 private enum class SmartFlightDestination(
     val label: String,
@@ -186,13 +189,9 @@ fun SmartFlightRoot(
                     innerPadding = innerPadding,
                 )
 
-                SmartFlightDestination.Diagnostics -> PlaceholderScreen(
-                    title = "诊断",
-                    lines = listOf(
-                        "高级权限接入检查",
-                        "服务状态和电池优化检查",
-                        "执行日志和执行器健康状态",
-                    ),
+                SmartFlightDestination.Diagnostics -> DiagnosticsScreen(
+                    state = state,
+                    onRefreshAccessChecks = onRefreshAccessChecks,
                     innerPadding = innerPadding,
                 )
             }
@@ -345,6 +344,105 @@ private fun StatusCard(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticsScreen(
+    state: SmartFlightUiState,
+    onRefreshAccessChecks: () -> Unit,
+    innerPadding: PaddingValues,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "诊断",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "查看权限门槛、推荐执行器和最近一次执行器自检结果。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedButton(onClick = onRefreshAccessChecks) {
+                    Text("重新检测")
+                }
+            }
+        }
+        item {
+            StatusCard(
+                title = "当前推荐执行器",
+                value = state.runtimeExecutor,
+                accent = Color(0xFF5BA5D0),
+            )
+        }
+        item {
+            StatusCard(
+                title = "最近自检结果",
+                value = state.runtimeLastResult,
+                accent = Color(0xFF1FA971),
+            )
+        }
+        item {
+            StatusCard(
+                title = "最近自检摘要",
+                value = state.runtimeLastCheck,
+                accent = Color(0xFFE55D87),
+            )
+        }
+        item {
+            StatusCard(
+                title = "最近刷新时间",
+                value = state.runtimeUpdatedAtMillis.takeIf { it > 0L }?.let {
+                    DateFormat.getDateTimeInstance().format(Date(it))
+                } ?: "尚未记录",
+                accent = Color(0xFFF5A623),
+            )
+        }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = "接入项详情",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    state.accessGateState.advancedAccess.checks.forEach { result ->
+                        Text(
+                            text = "${result.title} · ${result.summary}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = result.detail ?: result.recommendation,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }

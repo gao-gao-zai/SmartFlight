@@ -34,7 +34,8 @@ class DefaultAccessRepository @Inject constructor(
         )
         mutableAccessGateState.value = state
 
-        val bestExecutor = executorValidationService.selectBestExecutor()
+        val allExecutors = executorValidationService.validateAll()
+        val bestExecutor = executorValidationService.selectBestExecutor(allExecutors)
         runtimeStatusRepository.updateSnapshot { snapshot ->
             snapshot.copy(
                 activeExecutorType = advancedAccess.selectedExecutorType,
@@ -47,6 +48,10 @@ class DefaultAccessRepository @Inject constructor(
                         append(" · ")
                         append(it)
                     }
+                    append(" | 全部结果：")
+                    append(allExecutors.joinToString(separator = "；") { result ->
+                        "${result.executorType.label}:${result.summary}"
+                    })
                 },
                 updatedAtMillis = System.currentTimeMillis(),
             )
