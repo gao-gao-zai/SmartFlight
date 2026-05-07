@@ -143,6 +143,22 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun probeAirplaneModeState() {
+        viewModelScope.launch {
+            accessRepository.probeAirplaneModeState()
+            diagnosticsState.value = executorValidationService.validateAll().map { result ->
+                ExecutorDiagnosticItem(
+                    executor = result.executorType.label,
+                    summary = result.summary,
+                    detail = result.detail.orEmpty(),
+                    command = result.command.orEmpty(),
+                    output = result.commandOutput.orEmpty(),
+                    ready = result.isReady,
+                )
+            }
+        }
+    }
+
     fun updateAppQuery(query: String) {
         appQuery.value = query
     }

@@ -10,4 +10,6 @@ interface AccessRepository {
     suspend fun setAdbBootstrapped(bootstrapped: Boolean)
 
     suspend fun probeRootAccess()
+
+    suspend fun probeAirplaneModeState()
 }

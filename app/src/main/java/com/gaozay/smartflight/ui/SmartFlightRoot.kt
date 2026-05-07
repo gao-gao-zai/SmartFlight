@@ -78,6 +78,7 @@ fun SmartFlightRoot(
     onRefreshApps: () -> Unit,
     onSetAppListStatus: (String, AppListStatus) -> Unit,
     onRefreshAccessChecks: () -> Unit,
+    onProbeAirplaneModeState: () -> Unit,
     onRequestShizukuPermission: () -> Unit,
     onProbeRootAccess: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
@@ -193,6 +194,7 @@ fun SmartFlightRoot(
                 SmartFlightDestination.Diagnostics -> DiagnosticsScreen(
                     state = state,
                     onRefreshAccessChecks = onRefreshAccessChecks,
+                    onProbeAirplaneModeState = onProbeAirplaneModeState,
                     innerPadding = innerPadding,
                 )
             }
@@ -353,6 +355,7 @@ private fun StatusCard(
 private fun DiagnosticsScreen(
     state: SmartFlightUiState,
     onRefreshAccessChecks: () -> Unit,
+    onProbeAirplaneModeState: () -> Unit,
     innerPadding: PaddingValues,
 ) {
     LazyColumn(
@@ -383,6 +386,14 @@ private fun DiagnosticsScreen(
                 OutlinedButton(onClick = onRefreshAccessChecks) {
                     Text("重新检测")
                 }
+            }
+        }
+        item {
+            OutlinedButton(
+                onClick = onProbeAirplaneModeState,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("探测飞行模式状态")
             }
         }
         item {

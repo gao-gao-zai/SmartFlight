@@ -2,6 +2,7 @@ package com.gaozay.smartflight.permission
 
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
+import com.gaozay.smartflight.executor.ExecutorProbeService
 import com.gaozay.smartflight.executor.ExecutorValidationService
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,7 @@ class DefaultAccessRepository @Inject constructor(
     private val systemPermissionChecker: SystemPermissionChecker,
     private val adbBootstrapRepository: AdbBootstrapRepository,
     private val rootAccessChecker: RootAccessChecker,
+    private val executorProbeService: ExecutorProbeService,
     private val executorValidationService: ExecutorValidationService,
     private val runtimeStatusRepository: RuntimeStatusRepository,
 ) : AccessRepository {
@@ -66,5 +68,41 @@ class DefaultAccessRepository @Inject constructor(
     override suspend fun probeRootAccess() {
         rootAccessChecker.probeAuthorization()
         refresh()
+    }
+
+    override suspend fun probeAirplaneModeState() {
+        val result = executorProbeService.probeAirplaneModeState()
+        runtimeStatusRepository.updateSnapshot { snapshot ->
+            snapshot.copy(
+                activeExecutorType = result.executorType,
+                lastAction = ExecutionAction.DoNothing,
+                lastActionResult = if (result.executed && result.exitCode == 0) {
+                    ExecutionResult.Success
+                } else {
+                    ExecutionResult.Failed
+                },
+                lastActionReason = buildString {
+                    append("飞行模式状态探测：")
+                    append(
+                        when (result.stdout.trim()) {
+                            "1" -> "已开启"
+                            "0" -> "已关闭"
+                            else -> result.summary
+                        },
+                    )
+                    append(" · 执行器：")
+                    append(result.executorType.label)
+                    if (result.stdout.isNotBlank() && result.stdout.trim() !in setOf("0", "1")) {
+                        append(" · 输出：")
+                        append(result.stdout.trim())
+                    }
+                    if (result.stderr.isNotBlank()) {
+                        append(" · 错误：")
+                        append(result.stderr.trim())
+                    }
+                },
+                updatedAtMillis = System.currentTimeMillis(),
+            )
+        }
     }
 }

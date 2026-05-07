@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
                     onRefreshApps = viewModel::refreshInstalledApps,
                     onSetAppListStatus = viewModel::setAppListStatus,
                     onRefreshAccessChecks = viewModel::refreshAccessChecks,
+                    onProbeAirplaneModeState = viewModel::probeAirplaneModeState,
                     onRequestShizukuPermission = {
                         runCatching {
                             Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
