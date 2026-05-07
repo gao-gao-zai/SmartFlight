@@ -2,6 +2,7 @@ package com.gaozay.smartflight.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
 import kotlinx.coroutines.flow.Flow
@@ -10,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 interface InstalledAppDao {
     @Query("SELECT * FROM installed_apps ORDER BY label COLLATE NOCASE ASC")
     fun observeAll(): Flow<List<InstalledAppEntity>>
+
+    @Query("SELECT * FROM installed_apps")
+    suspend fun getAll(): List<InstalledAppEntity>
 
     @Query("SELECT * FROM installed_apps WHERE listStatus = :listStatus ORDER BY label COLLATE NOCASE ASC")
     fun observeByListStatus(listStatus: String): Flow<List<InstalledAppEntity>>
@@ -22,6 +26,14 @@ interface InstalledAppDao {
 
     @Upsert
     suspend fun upsertAll(apps: List<InstalledAppEntity>)
+
+    @Transaction
+    suspend fun replaceScannedApps(apps: List<InstalledAppEntity>) {
+        upsertAll(apps)
+        if (apps.isNotEmpty()) {
+            deleteMissing(apps.map { it.packageName })
+        }
+    }
 
     @Query("UPDATE installed_apps SET listStatus = :listStatus WHERE packageName = :packageName")
     suspend fun updateListStatus(packageName: String, listStatus: String)

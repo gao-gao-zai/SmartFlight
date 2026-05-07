@@ -34,13 +34,13 @@ class SystemPermissionChecker @Inject constructor(
         }
         val granted = mode == AppOpsManager.MODE_ALLOWED
         return AccessCheckResult(
-            title = "Usage access",
+            title = "使用情况访问权限",
             available = granted,
-            summary = if (granted) "Usage access granted" else "Usage access not granted",
+            summary = if (granted) "已授予使用情况访问权限" else "未授予使用情况访问权限",
             recommendation = if (granted) {
-                "Foreground app detection can be enabled."
+                "已满足前台应用检测的基础条件。"
             } else {
-                "Open system settings and grant usage access to SmartFlight."
+                "请在系统设置中找到 SmartFlight，并打开使用情况访问权限。"
             },
         )
     }
@@ -56,13 +56,13 @@ class SystemPermissionChecker @Inject constructor(
             notificationManager.areNotificationsEnabled()
         }
         return AccessCheckResult(
-            title = "Notification permission",
+            title = "通知权限",
             available = granted,
-            summary = if (granted) "Notifications available" else "Notifications disabled or not granted",
+            summary = if (granted) "通知权限可用" else "通知被关闭或未授权",
             recommendation = if (granted) {
-                "Foreground service notifications can be shown."
+                "前台服务可以正常显示运行通知。"
             } else {
-                "Grant notification permission before enabling the foreground service."
+                "启用后台监听服务前，建议先授予通知权限。"
             },
         )
     }
@@ -71,13 +71,13 @@ class SystemPermissionChecker @Inject constructor(
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val ignored = powerManager.isIgnoringBatteryOptimizations(context.packageName)
         return AccessCheckResult(
-            title = "Battery optimization",
+            title = "电池优化",
             available = ignored,
-            summary = if (ignored) "Battery optimization ignored" else "Battery optimization still active",
+            summary = if (ignored) "已忽略电池优化" else "电池优化仍在限制应用",
             recommendation = if (ignored) {
-                "Background survival is less likely to be restricted by battery optimization."
+                "后台监听被系统限制的概率会降低。"
             } else {
-                "Allow SmartFlight to ignore battery optimization for better background reliability."
+                "建议允许 SmartFlight 忽略电池优化，以提升后台稳定性。"
             },
         )
     }

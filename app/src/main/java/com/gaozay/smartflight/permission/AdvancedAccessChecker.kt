@@ -40,11 +40,11 @@ class AdvancedAccessChecker @Inject constructor(
         return AccessCheckResult(
             title = "Root",
             available = suExists,
-            summary = if (suExists) "Root binary detected" else "Root binary not detected",
+            summary = if (suExists) "已检测到 Root 二进制文件" else "未检测到 Root 二进制文件",
             recommendation = if (suExists) {
-                "Root execution can be used after authorization is confirmed."
+                "后续接入 Root 执行器后，需要在授权弹窗中允许 SmartFlight。"
             } else {
-                "Use Root only on devices where you intentionally granted root access."
+                "如果设备没有 Root，请优先使用 Shizuku 或 ADB 初始化方案。"
             },
         )
     }
@@ -56,21 +56,21 @@ class AdvancedAccessChecker @Inject constructor(
         return AccessCheckResult(
             title = "Shizuku",
             available = installed,
-            summary = if (installed) "Shizuku app detected" else "Shizuku app not detected",
+            summary = if (installed) "已检测到 Shizuku 应用" else "未检测到 Shizuku 应用",
             recommendation = if (installed) {
-                "Start Shizuku and grant SmartFlight access when executor integration is enabled."
+                "请先启动 Shizuku。后续接入执行器后，在 Shizuku 授权弹窗中允许 SmartFlight。"
             } else {
-                "Install and start Shizuku to use the recommended non-root executor path."
+                "推荐安装并启动 Shizuku，这是非 Root 设备上更稳定的高级权限方案。"
             },
         )
     }
 
     private fun checkAdbBootstrapped(): AccessCheckResult {
         return AccessCheckResult(
-            title = "ADB Bootstrapped",
+            title = "ADB 初始化",
             available = false,
-            summary = "ADB initialization state is not configured yet",
-            recommendation = "This path will be enabled after the initialization chain is implemented.",
+            summary = "尚未完成 ADB 初始化",
+            recommendation = "教程：1. 打开开发者选项；2. 打开 USB 调试；3. 电脑连接设备并执行 adb devices，确认设备为 device；4. 后续会在这里提供一键初始化命令，用于授予 SmartFlight 所需的高级控制能力。",
         )
     }
 }

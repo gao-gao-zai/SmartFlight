@@ -1,23 +1,23 @@
 package com.gaozay.smartflight.domain.model
 
 enum class AppListStatus(val label: String) {
-    Candidate("Candidate"),
-    Whitelist("Whitelist"),
-    Blacklist("Blacklist"),
-    Ignored("Ignored"),
+    Candidate("候选"),
+    Whitelist("白名单"),
+    Blacklist("黑名单"),
+    Ignored("忽略"),
 }
 
 enum class NetworkControlMode(val label: String) {
-    AirplaneMode("Airplane Mode"),
-    MobileData("Mobile Data"),
+    AirplaneMode("飞行模式"),
+    MobileData("移动数据"),
 }
 
 enum class ExecutorType(val label: String) {
-    Auto("Auto"),
+    Auto("自动选择"),
     Shizuku("Shizuku"),
-    AdbBootstrapped("ADB Bootstrapped"),
+    AdbBootstrapped("ADB 初始化"),
     Root("Root"),
-    Unavailable("Unavailable"),
+    Unavailable("不可用"),
 }
 
 enum class ThemeMode(val label: String) {

@@ -10,6 +10,7 @@ import javax.inject.Singleton
 @Singleton
 class RoomInstalledAppRepository @Inject constructor(
     private val installedAppDao: InstalledAppDao,
+    private val installedAppScanner: InstalledAppScanner,
 ) : InstalledAppRepository {
     override fun observeApps(): Flow<List<InstalledAppEntity>> = installedAppDao.observeAll()
 
@@ -20,6 +21,20 @@ class RoomInstalledAppRepository @Inject constructor(
 
     override suspend fun getApp(packageName: String): InstalledAppEntity? =
         installedAppDao.getByPackageName(packageName)
+
+    override suspend fun refreshInstalledApps(): Int {
+        val existingByPackageName = installedAppDao.getAll().associateBy { it.packageName }
+        val scannedApps = installedAppScanner.scanInstalledApps().map { scanned ->
+            val existing = existingByPackageName[scanned.packageName]
+            if (existing == null) {
+                scanned
+            } else {
+                scanned.copy(listStatus = existing.listStatus)
+            }
+        }
+        installedAppDao.replaceScannedApps(scannedApps)
+        return scannedApps.size
+    }
 
     override suspend fun upsertApps(apps: List<InstalledAppEntity>) {
         installedAppDao.upsertAll(apps)

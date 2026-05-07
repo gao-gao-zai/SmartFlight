@@ -19,22 +19,22 @@ data class AdvancedAccessState(
 data class AccessGateState(
     val advancedAccess: AdvancedAccessState = AdvancedAccessState(),
     val usageStatsAccess: AccessCheckResult = AccessCheckResult(
-        title = "Usage access",
+        title = "使用情况访问权限",
         available = false,
-        summary = "Not checked yet",
-        recommendation = "Grant usage access to allow foreground app detection.",
+        summary = "尚未检测",
+        recommendation = "授予使用情况访问权限后，SmartFlight 才能判断当前前台应用。",
     ),
     val notificationAccess: AccessCheckResult = AccessCheckResult(
-        title = "Notification permission",
+        title = "通知权限",
         available = false,
-        summary = "Not checked yet",
-        recommendation = "Grant notification permission for foreground service status.",
+        summary = "尚未检测",
+        recommendation = "授予通知权限后，前台服务才能稳定展示运行状态。",
     ),
     val batteryOptimization: AccessCheckResult = AccessCheckResult(
-        title = "Battery optimization",
+        title = "电池优化",
         available = false,
-        summary = "Not checked yet",
-        recommendation = "Allow unrestricted background execution where possible.",
+        summary = "尚未检测",
+        recommendation = "建议允许后台不受限制运行，避免系统杀掉监听服务。",
     ),
     val lastCheckedAtMillis: Long = 0,
 ) {

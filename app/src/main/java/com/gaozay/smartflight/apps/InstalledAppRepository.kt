@@ -13,6 +13,8 @@ interface InstalledAppRepository {
 
     suspend fun getApp(packageName: String): InstalledAppEntity?
 
+    suspend fun refreshInstalledApps(): Int
+
     suspend fun upsertApps(apps: List<InstalledAppEntity>)
 
     suspend fun setListStatus(packageName: String, status: AppListStatus)

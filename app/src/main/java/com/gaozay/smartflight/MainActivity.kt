@@ -23,12 +23,18 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: MainViewModel = hiltViewModel()
             val uiState = viewModel.uiState.collectAsStateWithLifecycle()
+            val appsUiState = viewModel.appsUiState.collectAsStateWithLifecycle()
             val (darkMode, setDarkMode) = rememberSaveable { mutableStateOf(false) }
             SmartFlightTheme(darkTheme = darkMode) {
                 SmartFlightRoot(
                     state = uiState.value,
+                    appsState = appsUiState.value,
                     darkMode = darkMode,
                     onToggleDarkMode = { setDarkMode(!darkMode) },
+                    onAppQueryChange = viewModel::updateAppQuery,
+                    onAppFilterChange = viewModel::updateAppFilter,
+                    onRefreshApps = viewModel::refreshInstalledApps,
+                    onSetAppListStatus = viewModel::setAppListStatus,
                     onRefreshAccessChecks = viewModel::refreshAccessChecks,
                     onOpenUsageAccessSettings = {
                         startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))

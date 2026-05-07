@@ -47,24 +47,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.gaozay.smartflight.SmartFlightUiState
+import com.gaozay.smartflight.apps.AppFilter
+import com.gaozay.smartflight.apps.AppsUiState
+import com.gaozay.smartflight.domain.model.AppListStatus
 
 private enum class SmartFlightDestination(
     val label: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
 ) {
-    Home("Home", Icons.Rounded.Home),
-    Apps("Apps", Icons.Rounded.Apps),
-    Rules("Rules", Icons.Rounded.Rule),
-    Theme("Theme", Icons.Rounded.Palette),
-    Diagnostics("Logs", Icons.Rounded.BugReport),
+    Home("首页", Icons.Rounded.Home),
+    Apps("应用", Icons.Rounded.Apps),
+    Rules("规则", Icons.Rounded.Rule),
+    Theme("主题", Icons.Rounded.Palette),
+    Diagnostics("诊断", Icons.Rounded.BugReport),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmartFlightRoot(
     state: SmartFlightUiState,
+    appsState: AppsUiState,
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit,
+    onAppQueryChange: (String) -> Unit,
+    onAppFilterChange: (AppFilter) -> Unit,
+    onRefreshApps: () -> Unit,
+    onSetAppListStatus: (String, AppListStatus) -> Unit,
     onRefreshAccessChecks: () -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
@@ -144,42 +152,41 @@ fun SmartFlightRoot(
                     innerPadding = innerPadding,
                 )
 
-                SmartFlightDestination.Apps -> PlaceholderScreen(
-                    title = "App Lists",
-                    lines = listOf(
-                        "Candidate online apps",
-                        "Whitelist and blacklist editing",
-                        "Install/uninstall triggered refresh",
-                    ),
+                SmartFlightDestination.Apps -> AppManagementScreen(
+                    state = appsState,
                     innerPadding = innerPadding,
+                    onQueryChange = onAppQueryChange,
+                    onFilterChange = onAppFilterChange,
+                    onRefreshApps = onRefreshApps,
+                    onSetListStatus = onSetAppListStatus,
                 )
 
                 SmartFlightDestination.Rules -> PlaceholderScreen(
-                    title = "Rule Engine",
+                    title = "规则引擎",
                     lines = listOf(
-                        "Screen-off delay before disconnect",
-                        "Per-app reconnect handling",
-                        "Wi-Fi exception and state preservation toggles",
+                        "息屏后延迟断网",
+                        "目标应用启动后的恢复联网",
+                        "Wi-Fi 例外和状态保持开关",
                     ),
                     innerPadding = innerPadding,
                 )
 
                 SmartFlightDestination.Theme -> PlaceholderScreen(
-                    title = "Theme",
+                    title = "主题",
                     lines = listOf(
-                        "Brand palette scaffolded",
-                        "Light and dark modes ready",
-                        "User-selectable themes can plug in here",
+                        "品牌色板已搭建",
+                        "浅色和深色模式已就绪",
+                        "后续可在这里接入用户可选主题",
                     ),
                     innerPadding = innerPadding,
                 )
 
                 SmartFlightDestination.Diagnostics -> PlaceholderScreen(
-                    title = "Diagnostics",
+                    title = "诊断",
                     lines = listOf(
-                        "Advanced access gate",
-                        "Service and battery optimization checks",
-                        "Execution logs and executor health",
+                        "高级权限接入检查",
+                        "服务状态和电池优化检查",
+                        "执行日志和执行器健康状态",
                     ),
                     innerPadding = innerPadding,
                 )
@@ -218,16 +225,16 @@ private fun HomeScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     AssistChip(
                         onClick = {},
-                        label = { Text("Advanced-only access") },
+                        label = { Text("高级权限专用") },
                     )
                     Text(
-                        text = "A high-permission automation shell for SmartFlight.",
+                        text = "面向高级权限用户的自动联网控制工具。",
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "Project skeleton initialized with Compose, Hilt, Room, DataStore, and multi-page navigation.",
+                        text = "已接入 Compose、Hilt、Room、DataStore、权限检查和应用扫描基础能力。",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.88f),
                     )
@@ -236,28 +243,28 @@ private fun HomeScreen(
         }
         item {
             StatusCard(
-                title = "Execution access",
+                title = "执行权限",
                 value = state.advancedAccess,
                 accent = Color(0xFF5BA5D0),
             )
         }
         item {
             StatusCard(
-                title = "Current mode",
+                title = "当前模式",
                 value = state.currentMode,
                 accent = Color(0xFF1FA971),
             )
         }
         item {
             StatusCard(
-                title = "Foreground app",
+                title = "前台应用",
                 value = state.foregroundApp,
                 accent = Color(0xFFF5A623),
             )
         }
         item {
             StatusCard(
-                title = "Status summary",
+                title = "状态摘要",
                 value = state.triggerSummary,
                 accent = Color(0xFFE55D87),
             )
@@ -276,13 +283,13 @@ private fun HomeScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Dark theme",
+                            text = "深色主题",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Theme settings are scaffolded. Persisted preferences can attach next.",
+                            text = "主题设置入口已搭建，后续会接入持久化偏好。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
