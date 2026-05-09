@@ -52,6 +52,8 @@ class MainActivity : ComponentActivity() {
                     onRefreshAccessChecks = viewModel::refreshAccessChecks,
                     onProbeAirplaneModeState = viewModel::probeAirplaneModeState,
                     onToggleAirplaneModeState = viewModel::toggleAirplaneModeState,
+                    onSimulateScreenOff = viewModel::simulateScreenOff,
+                    onSimulateScreenOn = viewModel::simulateScreenOn,
                     onClearExecutionLogs = viewModel::clearExecutionLogs,
                     onRequestShizukuPermission = {
                         runCatching {

@@ -17,6 +17,7 @@ import com.gaozay.smartflight.MainActivity
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.InstalledAppRepository
 import com.gaozay.smartflight.domain.model.AppListStatus
+import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
@@ -56,18 +57,26 @@ class AutomationForegroundService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var automationJob: Job? = null
+    private var screenOffDisconnectJob: Job? = null
     private var lastTargetAppActive: Boolean? = null
     private var whitelistPackages: Set<String> = emptySet()
     private var currentScreenState: ScreenState = ScreenState.Unknown
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            currentScreenState = when (intent?.action) {
+            val action = intent?.action
+            currentScreenState = when (action) {
                 Intent.ACTION_SCREEN_OFF -> ScreenState.ScreenOff
                 Intent.ACTION_USER_PRESENT -> ScreenState.Unlocked
                 Intent.ACTION_SCREEN_ON -> ScreenState.ScreenOn
                 else -> currentScreenState
             }
             serviceScope.launch {
+                when (action) {
+                    Intent.ACTION_SCREEN_OFF -> scheduleScreenOffDisconnectIfNeeded()
+                    Intent.ACTION_SCREEN_ON -> cancelScreenOffDisconnect()
+
+                    Intent.ACTION_USER_PRESENT -> cancelScreenOffDisconnect()
+                }
                 runtimeStatusRepository.updateSnapshot { snapshot ->
                     snapshot.copy(
                         screenState = currentScreenState,
@@ -94,17 +103,47 @@ class AutomationForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_DEBUG_SCREEN_OFF -> {
+                currentScreenState = ScreenState.ScreenOff
+                serviceScope.launch {
+                    scheduleScreenOffDisconnectIfNeeded()
+                    runtimeStatusRepository.updateSnapshot { snapshot ->
+                        snapshot.copy(
+                            screenState = currentScreenState,
+                            updatedAtMillis = System.currentTimeMillis(),
+                        )
+                    }
+                }
+            }
+
+            ACTION_DEBUG_SCREEN_ON -> {
+                currentScreenState = ScreenState.ScreenOn
+                serviceScope.launch {
+                    cancelScreenOffDisconnect()
+                    runtimeStatusRepository.updateSnapshot { snapshot ->
+                        snapshot.copy(
+                            screenState = currentScreenState,
+                            updatedAtMillis = System.currentTimeMillis(),
+                        )
+                    }
+                }
+            }
+        }
         startAutomationLoopIfNeeded()
         return START_STICKY
     }
 
     override fun onDestroy() {
         automationJob?.cancel()
+        screenOffDisconnectJob?.cancel()
         unregisterReceiver(screenStateReceiver)
         runBlocking {
             runtimeStatusRepository.updateSnapshot { snapshot ->
                 snapshot.copy(
                     isForegroundServiceRunning = false,
+                    isScreenOffDisconnectScheduled = false,
+                    pendingScreenOffDisconnectAtMillis = null,
                     screenState = currentScreenState,
                     updatedAtMillis = System.currentTimeMillis(),
                 )
@@ -130,7 +169,7 @@ class AutomationForegroundService : Service() {
                 snapshot.copy(
                     isForegroundServiceRunning = true,
                     screenState = currentScreenState,
-                    lastActionReason = "自动化前台服务已启动，正在监控白名单前台应用",
+                    lastTriggerSource = TriggerSource.ServiceRestored,
                     updatedAtMillis = System.currentTimeMillis(),
                 )
             }
@@ -145,6 +184,7 @@ class AutomationForegroundService : Service() {
                 }.onFailure { throwable ->
                     runtimeStatusRepository.updateSnapshot { snapshot ->
                         snapshot.copy(
+                            lastTriggerSource = TriggerSource.ServiceRestored,
                             lastActionResult = ExecutionResult.Failed,
                             lastActionReason = "自动化轮询失败：${throwable.message ?: "未知错误"}",
                             updatedAtMillis = System.currentTimeMillis(),
@@ -164,7 +204,6 @@ class AutomationForegroundService : Service() {
                 snapshot.copy(
                     screenState = currentScreenState,
                     isForegroundServiceRunning = true,
-                    lastActionReason = "屏幕已熄灭，已按设置暂停前台应用监听",
                     updatedAtMillis = System.currentTimeMillis(),
                 )
             }
@@ -202,6 +241,75 @@ class AutomationForegroundService : Service() {
                 enabled = true,
                 triggerSource = TriggerSource.AppForegroundChanged,
                 reason = "白名单应用已离开前台",
+            )
+        }
+    }
+
+    private suspend fun scheduleScreenOffDisconnectIfNeeded() {
+        val settings = settingsRepository.settings.first()
+        if (!settings.automationEnabled || !settings.screenOffDisconnectEnabled) {
+            cancelScreenOffDisconnect()
+            return
+        }
+        if (screenOffDisconnectJob?.isActive == true) {
+            return
+        }
+        val delayMillis = settings.screenOffDelaySeconds.coerceAtLeast(0) * 1_000L
+        val executeAtMillis = System.currentTimeMillis() + delayMillis
+        runtimeStatusRepository.updateSnapshot { snapshot ->
+            snapshot.copy(
+                isScreenOffDisconnectScheduled = true,
+                pendingScreenOffDisconnectAtMillis = executeAtMillis,
+                lastAction = ExecutionAction.ScheduleDisconnect,
+                lastTriggerSource = TriggerSource.ScreenOff,
+                lastActionResult = ExecutionResult.Pending,
+                updatedAtMillis = System.currentTimeMillis(),
+            )
+        }
+        screenOffDisconnectJob = serviceScope.launch {
+            if (delayMillis > 0L) {
+                delay(delayMillis)
+            }
+            val latestSettings = settingsRepository.settings.first()
+            val shouldDisconnect = latestSettings.automationEnabled &&
+                latestSettings.screenOffDisconnectEnabled &&
+                currentScreenState == ScreenState.ScreenOff
+            runtimeStatusRepository.updateSnapshot { snapshot ->
+                snapshot.copy(
+                    isScreenOffDisconnectScheduled = false,
+                    pendingScreenOffDisconnectAtMillis = null,
+                    updatedAtMillis = System.currentTimeMillis(),
+                )
+            }
+            screenOffDisconnectJob = null
+            if (!shouldDisconnect) {
+                return@launch
+            }
+            accessRepository.setAirplaneModeState(
+                enabled = true,
+                triggerSource = TriggerSource.ScreenOff,
+                reason = "息屏延迟 ${latestSettings.screenOffDelaySeconds} 秒后执行断网",
+            )
+        }
+    }
+
+    private suspend fun cancelScreenOffDisconnect() {
+        val job = screenOffDisconnectJob
+        val wasScheduled = job?.isActive == true
+        job?.cancel()
+        screenOffDisconnectJob = null
+        runtimeStatusRepository.updateSnapshot { snapshot ->
+            snapshot.copy(
+                isScreenOffDisconnectScheduled = false,
+                pendingScreenOffDisconnectAtMillis = null,
+                lastAction = ExecutionAction.CancelScheduledDisconnect,
+                lastTriggerSource = when (currentScreenState) {
+                    ScreenState.Unlocked -> TriggerSource.UserUnlocked
+                    ScreenState.ScreenOn -> TriggerSource.ScreenOn
+                    else -> TriggerSource.Manual
+                },
+                lastActionResult = if (wasScheduled) ExecutionResult.Success else ExecutionResult.Skipped,
+                updatedAtMillis = System.currentTimeMillis(),
             )
         }
     }
@@ -265,5 +373,7 @@ class AutomationForegroundService : Service() {
         private const val SCREEN_OFF_IDLE_POLL_INTERVAL_MILLIS = 30_000L
 
         const val ACTION_START = "com.gaozay.smartflight.runtime.action.START"
+        const val ACTION_DEBUG_SCREEN_OFF = "com.gaozay.smartflight.runtime.action.DEBUG_SCREEN_OFF"
+        const val ACTION_DEBUG_SCREEN_ON = "com.gaozay.smartflight.runtime.action.DEBUG_SCREEN_ON"
     }
 }

@@ -83,6 +83,8 @@ fun SmartFlightRoot(
     onRefreshAccessChecks: () -> Unit,
     onProbeAirplaneModeState: () -> Unit,
     onToggleAirplaneModeState: () -> Unit,
+    onSimulateScreenOff: () -> Unit,
+    onSimulateScreenOn: () -> Unit,
     onClearExecutionLogs: () -> Unit,
     onRequestShizukuPermission: () -> Unit,
     onProbeRootAccess: () -> Unit,
@@ -203,6 +205,8 @@ fun SmartFlightRoot(
                     onRefreshAccessChecks = onRefreshAccessChecks,
                     onProbeAirplaneModeState = onProbeAirplaneModeState,
                     onToggleAirplaneModeState = onToggleAirplaneModeState,
+                    onSimulateScreenOff = onSimulateScreenOff,
+                    onSimulateScreenOn = onSimulateScreenOn,
                     onClearExecutionLogs = onClearExecutionLogs,
                     innerPadding = innerPadding,
                 )
@@ -440,6 +444,8 @@ private fun DiagnosticsScreen(
     onRefreshAccessChecks: () -> Unit,
     onProbeAirplaneModeState: () -> Unit,
     onToggleAirplaneModeState: () -> Unit,
+    onSimulateScreenOff: () -> Unit,
+    onSimulateScreenOn: () -> Unit,
     onClearExecutionLogs: () -> Unit,
     innerPadding: PaddingValues,
 ) {
@@ -487,6 +493,22 @@ private fun DiagnosticsScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("手动切换飞行模式")
+            }
+        }
+        item {
+            OutlinedButton(
+                onClick = onSimulateScreenOff,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("模拟息屏")
+            }
+        }
+        item {
+            OutlinedButton(
+                onClick = onSimulateScreenOn,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("模拟亮屏 / 取消延迟断网")
             }
         }
         item {

@@ -21,4 +21,18 @@ class AutomationServiceController @Inject constructor(
             context.stopService(Intent(context, AutomationForegroundService::class.java))
         }
     }
+
+    fun simulateScreenOff() {
+        val intent = Intent(context, AutomationForegroundService::class.java).apply {
+            action = AutomationForegroundService.ACTION_DEBUG_SCREEN_OFF
+        }
+        ContextCompat.startForegroundService(context, intent)
+    }
+
+    fun simulateScreenOn() {
+        val intent = Intent(context, AutomationForegroundService::class.java).apply {
+            action = AutomationForegroundService.ACTION_DEBUG_SCREEN_ON
+        }
+        ContextCompat.startForegroundService(context, intent)
+    }
 }

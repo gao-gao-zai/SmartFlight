@@ -12,6 +12,7 @@ import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.ScreenState
+import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.domain.model.UnifiedNetworkState
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -40,15 +41,21 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
                 value = preferences[Keys.UnifiedNetworkState],
                 default = UnifiedNetworkState.Unknown,
             ),
+            isAirplaneModeEnabled = preferences[Keys.IsAirplaneModeEnabled],
             isWifiConnected = preferences[Keys.IsWifiConnected] ?: false,
             isWifiEnabled = preferences[Keys.IsWifiEnabled] ?: false,
             isBluetoothEnabled = preferences[Keys.IsBluetoothEnabled] ?: false,
             isForegroundServiceRunning = preferences[Keys.IsForegroundServiceRunning] ?: false,
             isScreenOffDisconnectScheduled = preferences[Keys.IsScreenOffDisconnectScheduled] ?: false,
+            pendingScreenOffDisconnectAtMillis = preferences[Keys.PendingScreenOffDisconnectAtMillis],
             isAppExitDisconnectScheduled = preferences[Keys.IsAppExitDisconnectScheduled] ?: false,
             lastAction = enumValueOrDefault(
                 value = preferences[Keys.LastAction],
                 default = ExecutionAction.DoNothing,
+            ),
+            lastTriggerSource = enumValueOrDefault(
+                value = preferences[Keys.LastTriggerSource],
+                default = TriggerSource.ServiceRestored,
             ),
             lastActionResult = enumValueOrDefault(
                 value = preferences[Keys.LastActionResult],
@@ -74,13 +81,20 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
             } ?: preferences.remove(Keys.CurrentForegroundAppLabel)
             preferences[Keys.ScreenState] = updated.screenState.name
             preferences[Keys.UnifiedNetworkState] = updated.unifiedNetworkState.name
+            updated.isAirplaneModeEnabled?.let {
+                preferences[Keys.IsAirplaneModeEnabled] = it
+            } ?: preferences.remove(Keys.IsAirplaneModeEnabled)
             preferences[Keys.IsWifiConnected] = updated.isWifiConnected
             preferences[Keys.IsWifiEnabled] = updated.isWifiEnabled
             preferences[Keys.IsBluetoothEnabled] = updated.isBluetoothEnabled
             preferences[Keys.IsForegroundServiceRunning] = updated.isForegroundServiceRunning
             preferences[Keys.IsScreenOffDisconnectScheduled] = updated.isScreenOffDisconnectScheduled
+            updated.pendingScreenOffDisconnectAtMillis?.let {
+                preferences[Keys.PendingScreenOffDisconnectAtMillis] = it
+            } ?: preferences.remove(Keys.PendingScreenOffDisconnectAtMillis)
             preferences[Keys.IsAppExitDisconnectScheduled] = updated.isAppExitDisconnectScheduled
             preferences[Keys.LastAction] = updated.lastAction.name
+            preferences[Keys.LastTriggerSource] = updated.lastTriggerSource.name
             preferences[Keys.LastActionResult] = updated.lastActionResult.name
             preferences[Keys.LastActionReason] = updated.lastActionReason
             preferences[Keys.ActiveExecutorType] = updated.activeExecutorType.name
@@ -96,13 +110,16 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
         val CurrentForegroundAppLabel = stringPreferencesKey("current_foreground_app_label")
         val ScreenState = stringPreferencesKey("screen_state")
         val UnifiedNetworkState = stringPreferencesKey("unified_network_state")
+        val IsAirplaneModeEnabled = booleanPreferencesKey("is_airplane_mode_enabled")
         val IsWifiConnected = booleanPreferencesKey("is_wifi_connected")
         val IsWifiEnabled = booleanPreferencesKey("is_wifi_enabled")
         val IsBluetoothEnabled = booleanPreferencesKey("is_bluetooth_enabled")
         val IsForegroundServiceRunning = booleanPreferencesKey("is_foreground_service_running")
         val IsScreenOffDisconnectScheduled = booleanPreferencesKey("is_screen_off_disconnect_scheduled")
+        val PendingScreenOffDisconnectAtMillis = longPreferencesKey("pending_screen_off_disconnect_at_millis")
         val IsAppExitDisconnectScheduled = booleanPreferencesKey("is_app_exit_disconnect_scheduled")
         val LastAction = stringPreferencesKey("last_action")
+        val LastTriggerSource = stringPreferencesKey("last_trigger_source")
         val LastActionResult = stringPreferencesKey("last_action_result")
         val LastActionReason = stringPreferencesKey("last_action_reason")
         val ActiveExecutorType = stringPreferencesKey("active_executor_type")

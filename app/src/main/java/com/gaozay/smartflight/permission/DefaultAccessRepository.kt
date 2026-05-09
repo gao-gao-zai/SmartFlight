@@ -49,18 +49,14 @@ class DefaultAccessRepository @Inject constructor(
             snapshot.copy(
                 activeExecutorType = advancedAccess.selectedExecutorType,
                 lastAction = ExecutionAction.DoNothing,
+                lastTriggerSource = TriggerSource.ServiceRestored,
                 lastActionResult = if (bestExecutor.isReady) ExecutionResult.Success else ExecutionResult.Pending,
-                lastActionReason = buildString {
-                    append("执行器自检：")
-                    append(bestExecutor.summary)
-                    bestExecutor.detail?.takeIf { it.isNotBlank() }?.let {
-                        append(" · ")
-                        append(it)
-                    }
-                    append(" | 全部结果：")
-                    append(allExecutors.joinToString(separator = "；") { result ->
-                        "${result.executorType.label}:${result.summary}"
-                    })
+                lastActionReason = if (snapshot.lastAction == ExecutionAction.DoNothing &&
+                    snapshot.lastActionReason == "Runtime not started yet"
+                ) {
+                    bestExecutor.summary
+                } else {
+                    snapshot.lastActionReason
                 },
                 updatedAtMillis = System.currentTimeMillis(),
             )
@@ -79,43 +75,32 @@ class DefaultAccessRepository @Inject constructor(
 
     override suspend fun probeAirplaneModeState() {
         val result = executorProbeService.probeAirplaneModeState()
-        val lastActionReason = buildString {
-            append("飞行模式状态探测：")
-            append(
-                when (result.stdout.trim()) {
-                    "1" -> "已开启"
-                    "0" -> "已关闭"
-                    else -> result.summary
-                },
-            )
-            append(" · 执行器：")
-            append(result.executorType.label)
-            if (result.stdout.isNotBlank() && result.stdout.trim() !in setOf("0", "1")) {
-                append(" · 输出：")
-                append(result.stdout.trim())
-            }
-            if (result.stderr.isNotBlank()) {
-                append(" · 错误：")
-                append(result.stderr.trim())
-            }
+        val airplaneModeEnabled = parseAirplaneModeEnabled(result)
+        val executionResult = if (result.executed && result.exitCode == 0 && airplaneModeEnabled != null) {
+            ExecutionResult.Success
+        } else {
+            ExecutionResult.Failed
         }
+        val detailReason = buildProbeDetailReason(result)
         runtimeStatusRepository.updateSnapshot { snapshot ->
             snapshot.copy(
                 activeExecutorType = result.executorType,
                 lastAction = ExecutionAction.DoNothing,
-                lastActionResult = if (result.executed && result.exitCode == 0) {
-                    ExecutionResult.Success
+                lastTriggerSource = TriggerSource.Manual,
+                lastActionResult = executionResult,
+                lastActionReason = if (executionResult == ExecutionResult.Failed) {
+                    detailReason
                 } else {
-                    ExecutionResult.Failed
+                    ""
                 },
-                lastActionReason = lastActionReason,
+                isAirplaneModeEnabled = airplaneModeEnabled,
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
         addExecutionLog(
             action = ExecutionAction.DoNothing,
-            result = if (result.executed && result.exitCode == 0) ExecutionResult.Success else ExecutionResult.Failed,
-            reason = lastActionReason,
+            result = executionResult,
+            reason = detailReason,
             probeResult = result,
             triggerSource = TriggerSource.Manual,
         )
@@ -185,36 +170,73 @@ class DefaultAccessRepository @Inject constructor(
             result.executed && result.exitCode == 0 -> ExecutionResult.Success
             else -> ExecutionResult.Failed
         }
-        val lastActionReason = buildString {
-            append(reasonPrefix)
-            append("：")
-            append(result.summary)
-            append(" · 执行器：")
-            append(result.executorType.label)
-            if (result.stdout.isNotBlank() && result.stdout.trim() !in setOf("0", "1")) {
-                append(" · 输出：")
-                append(result.stdout.trim())
-            }
-            if (result.stderr.isNotBlank()) {
-                append(" · 错误：")
-                append(result.stderr.trim())
-            }
-        }
+        val airplaneModeEnabled = parseAirplaneModeEnabled(result)
+        val detailReason = buildActionDetailReason(reasonPrefix, result)
         runtimeStatusRepository.updateSnapshot { snapshot ->
             snapshot.copy(
                 activeExecutorType = result.executorType,
                 lastAction = action,
+                lastTriggerSource = triggerSource,
                 lastActionResult = executionResult,
-                lastActionReason = lastActionReason,
+                lastActionReason = if (executionResult == ExecutionResult.Failed) {
+                    detailReason
+                } else {
+                    ""
+                },
+                isAirplaneModeEnabled = airplaneModeEnabled ?: snapshot.isAirplaneModeEnabled,
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
         addExecutionLog(
             action = action,
             result = executionResult,
-            reason = lastActionReason,
+            reason = detailReason,
             probeResult = result,
             triggerSource = triggerSource,
         )
+    }
+
+    private fun parseAirplaneModeEnabled(result: ExecutorCommandResult): Boolean? =
+        when (result.stdout.trim()) {
+            "1" -> true
+            "0" -> false
+            else -> null
+        }
+
+    private fun buildProbeDetailReason(result: ExecutorCommandResult): String = buildString {
+        append("飞行模式状态探测：")
+        append(
+            when (result.stdout.trim()) {
+                "1" -> "已开启"
+                "0" -> "已关闭"
+                else -> result.summary
+            },
+        )
+        append(" · 执行器：")
+        append(result.executorType.label)
+        if (result.stdout.isNotBlank() && result.stdout.trim() !in setOf("0", "1")) {
+            append(" · 输出：")
+            append(result.stdout.trim())
+        }
+        if (result.stderr.isNotBlank()) {
+            append(" · 错误：")
+            append(result.stderr.trim())
+        }
+    }
+
+    private fun buildActionDetailReason(reasonPrefix: String, result: ExecutorCommandResult): String = buildString {
+        append(reasonPrefix)
+        append("：")
+        append(result.summary)
+        append(" · 执行器：")
+        append(result.executorType.label)
+        if (result.stdout.isNotBlank() && result.stdout.trim() !in setOf("0", "1")) {
+            append(" · 输出：")
+            append(result.stdout.trim())
+        }
+        if (result.stderr.isNotBlank()) {
+            append(" · 错误：")
+            append(result.stderr.trim())
+        }
     }
 }

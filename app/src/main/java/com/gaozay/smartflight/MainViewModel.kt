@@ -74,13 +74,13 @@ class MainViewModel @Inject constructor(
                 ?: base.runtimeSnapshot.currentForegroundPackageName
                 ?: "Not connected yet",
             runtimeExecutor = base.runtimeSnapshot.activeExecutorType.label,
-            runtimeLastCheck = base.runtimeSnapshot.lastActionReason,
+            runtimeLastCheck = buildRuntimeSummary(base.settings, base.runtimeSnapshot),
             runtimeLastResult = base.runtimeSnapshot.lastActionResult.label,
             runtimeUpdatedAtMillis = base.runtimeSnapshot.updatedAtMillis,
             executorDiagnostics = diagnosticsState.value,
             recentExecutionLogs = recentLogs.map { it.toUiItem() },
             triggerSummary = buildString {
-                append(base.runtimeSnapshot.lastActionReason)
+                append(buildRuntimeSummary(base.settings, base.runtimeSnapshot))
                 append(" · Apps: ")
                 append(base.appCount)
                 append(" · Logs: ")
@@ -216,6 +216,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun simulateScreenOff() {
+        automationServiceController.simulateScreenOff()
+    }
+
+    fun simulateScreenOn() {
+        automationServiceController.simulateScreenOn()
+    }
+
     fun updateAppQuery(query: String) {
         appQuery.value = query
     }
@@ -255,6 +263,7 @@ class MainViewModel @Inject constructor(
                 }
         }
     }
+
 }
 
 @Immutable
@@ -325,4 +334,78 @@ private fun ExecutionLogEntity.toUiItem(): ExecutionLogItem {
         result = resultLabel,
         detail = errorMessage ?: "无附加信息",
     )
+}
+
+private fun buildRuntimeSummary(
+    settings: com.gaozay.smartflight.settings.UserSettings,
+    snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
+): String {
+    if (snapshot.isScreenOffDisconnectScheduled) {
+        val pendingAt = snapshot.pendingScreenOffDisconnectAtMillis
+        val remainingSeconds = pendingAt?.let {
+            ((it - System.currentTimeMillis()).coerceAtLeast(0L) + 999L) / 1000L
+        } ?: settings.screenOffDelaySeconds.toLong()
+        return "屏幕已熄灭，将在 ${remainingSeconds} 秒后断网"
+    }
+    if (snapshot.screenState == com.gaozay.smartflight.domain.model.ScreenState.ScreenOff &&
+        !settings.monitorForegroundWhenScreenOff
+    ) {
+        return "屏幕已熄灭，已按设置暂停前台应用监听"
+    }
+    if (snapshot.lastAction == ExecutionAction.CancelScheduledDisconnect) {
+        return when (snapshot.lastActionResult) {
+            ExecutionResult.Success -> when (snapshot.lastTriggerSource) {
+                com.gaozay.smartflight.domain.model.TriggerSource.UserUnlocked ->
+                    "用户已解锁，已取消待执行的息屏延迟断网"
+
+                com.gaozay.smartflight.domain.model.TriggerSource.ScreenOn ->
+                    "屏幕已点亮，已取消待执行的息屏延迟断网"
+
+                else -> "已取消待执行的息屏延迟断网"
+            }
+
+            ExecutionResult.Skipped -> when (snapshot.lastTriggerSource) {
+                com.gaozay.smartflight.domain.model.TriggerSource.UserUnlocked ->
+                    "用户已解锁，当前没有待取消的息屏延迟断网"
+
+                com.gaozay.smartflight.domain.model.TriggerSource.ScreenOn ->
+                    "屏幕已点亮，当前没有待取消的息屏延迟断网"
+
+                else -> "当前没有待取消的息屏延迟断网"
+            }
+
+            else -> snapshot.lastActionReason
+        }
+    }
+    if (snapshot.lastAction == ExecutionAction.DoNothing &&
+        snapshot.lastTriggerSource == com.gaozay.smartflight.domain.model.TriggerSource.Manual
+    ) {
+        return when (snapshot.lastActionResult) {
+            ExecutionResult.Success -> when (snapshot.isAirplaneModeEnabled) {
+                true -> "飞行模式当前已开启"
+                false -> "飞行模式当前已关闭"
+                null -> "飞行模式状态已同步"
+            }
+
+            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { "飞行模式状态探测失败" }
+            else -> snapshot.lastActionReason.ifBlank { "飞行模式状态待确认" }
+        }
+    }
+    if (snapshot.lastAction == ExecutionAction.DisconnectNow) {
+        return when (snapshot.lastActionResult) {
+            ExecutionResult.Success -> "已开启飞行模式，当前处于断网状态"
+            ExecutionResult.Skipped -> "飞行模式原本已开启，无需重复断网"
+            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { "开启飞行模式失败" }
+            else -> snapshot.lastActionReason.ifBlank { "正在执行断网" }
+        }
+    }
+    if (snapshot.lastAction == ExecutionAction.ReconnectNow) {
+        return when (snapshot.lastActionResult) {
+            ExecutionResult.Success -> "已关闭飞行模式，当前已恢复联网"
+            ExecutionResult.Skipped -> "飞行模式原本已关闭，无需重复恢复联网"
+            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { "关闭飞行模式失败" }
+            else -> snapshot.lastActionReason.ifBlank { "正在执行恢复联网" }
+        }
+    }
+    return snapshot.lastActionReason
 }
