@@ -49,6 +49,7 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
             isScreenOffDisconnectScheduled = preferences[Keys.IsScreenOffDisconnectScheduled] ?: false,
             pendingScreenOffDisconnectAtMillis = preferences[Keys.PendingScreenOffDisconnectAtMillis],
             isAppExitDisconnectScheduled = preferences[Keys.IsAppExitDisconnectScheduled] ?: false,
+            pendingAppExitDisconnectAtMillis = preferences[Keys.PendingAppExitDisconnectAtMillis],
             lastAction = enumValueOrDefault(
                 value = preferences[Keys.LastAction],
                 default = ExecutionAction.DoNothing,
@@ -93,6 +94,9 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
                 preferences[Keys.PendingScreenOffDisconnectAtMillis] = it
             } ?: preferences.remove(Keys.PendingScreenOffDisconnectAtMillis)
             preferences[Keys.IsAppExitDisconnectScheduled] = updated.isAppExitDisconnectScheduled
+            updated.pendingAppExitDisconnectAtMillis?.let {
+                preferences[Keys.PendingAppExitDisconnectAtMillis] = it
+            } ?: preferences.remove(Keys.PendingAppExitDisconnectAtMillis)
             preferences[Keys.LastAction] = updated.lastAction.name
             preferences[Keys.LastTriggerSource] = updated.lastTriggerSource.name
             preferences[Keys.LastActionResult] = updated.lastActionResult.name
@@ -118,6 +122,7 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
         val IsScreenOffDisconnectScheduled = booleanPreferencesKey("is_screen_off_disconnect_scheduled")
         val PendingScreenOffDisconnectAtMillis = longPreferencesKey("pending_screen_off_disconnect_at_millis")
         val IsAppExitDisconnectScheduled = booleanPreferencesKey("is_app_exit_disconnect_scheduled")
+        val PendingAppExitDisconnectAtMillis = longPreferencesKey("pending_app_exit_disconnect_at_millis")
         val LastAction = stringPreferencesKey("last_action")
         val LastTriggerSource = stringPreferencesKey("last_trigger_source")
         val LastActionResult = stringPreferencesKey("last_action_result")

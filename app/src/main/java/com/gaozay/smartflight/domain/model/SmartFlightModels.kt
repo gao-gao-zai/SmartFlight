@@ -63,7 +63,8 @@ enum class TriggerSource(val label: String) {
 
 enum class ExecutionAction(val label: String) {
     DoNothing("Do Nothing"),
-    ScheduleDisconnect("Schedule Disconnect"),
+    ScheduleScreenOffDisconnect("Schedule Screen-Off Disconnect"),
+    ScheduleAppExitDisconnect("Schedule App-Exit Disconnect"),
     CancelScheduledDisconnect("Cancel Scheduled Disconnect"),
     ReconnectNow("Reconnect Now"),
     DisconnectNow("Disconnect Now"),

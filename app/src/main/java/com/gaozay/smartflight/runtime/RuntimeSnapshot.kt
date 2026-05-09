@@ -20,6 +20,7 @@ data class RuntimeSnapshot(
     val isScreenOffDisconnectScheduled: Boolean = false,
     val pendingScreenOffDisconnectAtMillis: Long? = null,
     val isAppExitDisconnectScheduled: Boolean = false,
+    val pendingAppExitDisconnectAtMillis: Long? = null,
     val lastAction: ExecutionAction = ExecutionAction.DoNothing,
     val lastTriggerSource: TriggerSource = TriggerSource.ServiceRestored,
     val lastActionResult: ExecutionResult = ExecutionResult.Pending,

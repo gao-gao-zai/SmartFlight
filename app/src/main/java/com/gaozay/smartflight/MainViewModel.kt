@@ -340,6 +340,13 @@ private fun buildRuntimeSummary(
     settings: com.gaozay.smartflight.settings.UserSettings,
     snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
 ): String {
+    if (snapshot.isAppExitDisconnectScheduled) {
+        val pendingAt = snapshot.pendingAppExitDisconnectAtMillis
+        val remainingSeconds = pendingAt?.let {
+            ((it - System.currentTimeMillis()).coerceAtLeast(0L) + 999L) / 1000L
+        } ?: settings.appExitDelaySeconds.toLong()
+        return "白名单应用已离开前台，将在 ${remainingSeconds} 秒后断网"
+    }
     if (snapshot.isScreenOffDisconnectScheduled) {
         val pendingAt = snapshot.pendingScreenOffDisconnectAtMillis
         val remainingSeconds = pendingAt?.let {
@@ -361,6 +368,9 @@ private fun buildRuntimeSummary(
                 com.gaozay.smartflight.domain.model.TriggerSource.ScreenOn ->
                     "屏幕已点亮，已取消待执行的息屏延迟断网"
 
+                com.gaozay.smartflight.domain.model.TriggerSource.AppForegroundChanged ->
+                    "白名单应用已重新进入前台，已取消待执行的离开应用延迟断网"
+
                 else -> "已取消待执行的息屏延迟断网"
             }
 
@@ -371,11 +381,20 @@ private fun buildRuntimeSummary(
                 com.gaozay.smartflight.domain.model.TriggerSource.ScreenOn ->
                     "屏幕已点亮，当前没有待取消的息屏延迟断网"
 
+                com.gaozay.smartflight.domain.model.TriggerSource.AppForegroundChanged ->
+                    "当前没有待取消的离开应用延迟断网"
+
                 else -> "当前没有待取消的息屏延迟断网"
             }
 
             else -> snapshot.lastActionReason
         }
+    }
+    if (snapshot.lastAction == ExecutionAction.ScheduleAppExitDisconnect) {
+        val remainingSeconds = snapshot.pendingAppExitDisconnectAtMillis?.let {
+            ((it - System.currentTimeMillis()).coerceAtLeast(0L) + 999L) / 1000L
+        } ?: settings.appExitDelaySeconds.toLong()
+        return "白名单应用已离开前台，将在 ${remainingSeconds} 秒后断网"
     }
     if (snapshot.lastAction == ExecutionAction.DoNothing &&
         snapshot.lastTriggerSource == com.gaozay.smartflight.domain.model.TriggerSource.Manual
