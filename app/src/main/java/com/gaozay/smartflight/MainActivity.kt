@@ -8,8 +8,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gaozay.smartflight.ui.SmartFlightRoot
 import com.gaozay.smartflight.ui.theme.SmartFlightTheme
@@ -36,17 +34,26 @@ class MainActivity : ComponentActivity() {
         setContent {
             val uiState = viewModel.uiState.collectAsStateWithLifecycle()
             val appsUiState = viewModel.appsUiState.collectAsStateWithLifecycle()
-            val (darkMode, setDarkMode) = rememberSaveable { mutableStateOf(false) }
-            SmartFlightTheme(darkTheme = darkMode) {
+            SmartFlightTheme(settings = uiState.value.settings) {
                 SmartFlightRoot(
                     state = uiState.value,
                     appsState = appsUiState.value,
-                    darkMode = darkMode,
-                    onToggleDarkMode = { setDarkMode(!darkMode) },
+                    onUpdateSettings = viewModel::updateSettings,
+                    onSetNetworkControlMode = viewModel::setNetworkControlMode,
+                    onSetPreferredExecutorType = viewModel::setPreferredExecutorType,
+                    onSetThemeMode = viewModel::setThemeMode,
+                    onSetThemePalette = viewModel::setThemePalette,
+                    onSetCustomSeedColor = viewModel::setCustomSeedColor,
+                    onSetThemeIntensity = viewModel::setThemeIntensity,
+                    onSetCornerStyle = viewModel::setCornerStyle,
                     onSetAutomationEnabled = viewModel::setAutomationEnabled,
                     onSetMonitorForegroundWhenScreenOff = viewModel::setMonitorForegroundWhenScreenOff,
                     onAppQueryChange = viewModel::updateAppQuery,
                     onAppFilterChange = viewModel::updateAppFilter,
+                    onAppInternetPermissionFilterChange = viewModel::updateAppInternetPermissionFilter,
+                    onAppTypeFilterChange = viewModel::updateAppTypeFilter,
+                    onAppLauncherFilterChange = viewModel::updateAppLauncherFilter,
+                    onClearAppAdvancedFilters = viewModel::clearAppAdvancedFilters,
                     onRefreshApps = viewModel::refreshInstalledApps,
                     onSetAppListStatus = viewModel::setAppListStatus,
                     onRefreshAccessChecks = viewModel::refreshAccessChecks,

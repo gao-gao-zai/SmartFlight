@@ -28,7 +28,8 @@ class InstalledAppScanner @Inject constructor(
                 val hasLauncherEntry = launcherPackages.contains(packageName)
                 val declaresInternetPermission = packageInfo.requestedPermissions
                     ?.contains(Manifest.permission.INTERNET) == true
-                val isSystemApp = applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0
+                val isSystemApp = applicationInfo.isSystemApp()
+                if (isSystemApp) return@mapNotNull null
                 val isCandidate = declaresInternetPermission && hasLauncherEntry
                 InstalledAppEntity(
                     packageName = packageName,
@@ -44,6 +45,10 @@ class InstalledAppScanner @Inject constructor(
             }
             .sortedBy { it.label.lowercase() }
     }
+
+    private fun ApplicationInfo.isSystemApp(): Boolean =
+        flags and ApplicationInfo.FLAG_SYSTEM != 0 ||
+            flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP != 0
 
     private fun queryInstalledPackages(packageManager: PackageManager): List<PackageInfo> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

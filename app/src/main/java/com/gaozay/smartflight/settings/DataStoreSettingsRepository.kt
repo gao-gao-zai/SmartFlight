@@ -8,8 +8,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.gaozay.smartflight.domain.model.CornerStyle
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
+import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,7 +59,16 @@ class DataStoreSettingsRepository @Inject constructor(
             ),
             themePalette = enumValueOrDefault(
                 value = preferences[Keys.ThemePalette],
-                default = ThemePalette.Brand,
+                default = ThemePalette.LogoOriginal,
+            ),
+            customSeedColorArgb = preferences[Keys.CustomSeedColorArgb] ?: ThemePalette.LogoOriginal.seedColorArgb,
+            themeIntensity = enumValueOrDefault(
+                value = preferences[Keys.ThemeIntensity],
+                default = ThemeIntensity.Standard,
+            ),
+            cornerStyle = enumValueOrDefault(
+                value = preferences[Keys.CornerStyle],
+                default = CornerStyle.Standard,
             ),
         )
     }
@@ -89,6 +100,9 @@ class DataStoreSettingsRepository @Inject constructor(
             preferences[Keys.DisableUnlockReconnect] = updated.disableUnlockReconnect
             preferences[Keys.ThemeMode] = updated.themeMode.name
             preferences[Keys.ThemePalette] = updated.themePalette.name
+            preferences[Keys.CustomSeedColorArgb] = updated.customSeedColorArgb
+            preferences[Keys.ThemeIntensity] = updated.themeIntensity.name
+            preferences[Keys.CornerStyle] = updated.cornerStyle.name
         }
     }
 
@@ -114,5 +128,8 @@ class DataStoreSettingsRepository @Inject constructor(
         val DisableUnlockReconnect = booleanPreferencesKey("disable_unlock_reconnect")
         val ThemeMode = stringPreferencesKey("theme_mode")
         val ThemePalette = stringPreferencesKey("theme_palette")
+        val CustomSeedColorArgb = intPreferencesKey("custom_seed_color_argb")
+        val ThemeIntensity = stringPreferencesKey("theme_intensity")
+        val CornerStyle = stringPreferencesKey("corner_style")
     }
 }

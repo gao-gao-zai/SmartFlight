@@ -4,14 +4,22 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gaozay.smartflight.apps.AppFilter
+import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.AppsUiState
+import com.gaozay.smartflight.apps.InternetPermissionFilter
+import com.gaozay.smartflight.apps.LauncherFilter
 import com.gaozay.smartflight.apps.InstalledAppRepository
 import com.gaozay.smartflight.apps.status
 import com.gaozay.smartflight.data.local.entity.ExecutionLogEntity
+import com.gaozay.smartflight.domain.model.CornerStyle
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.AppListStatus
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.domain.model.NetworkControlMode
+import com.gaozay.smartflight.domain.model.ThemeIntensity
+import com.gaozay.smartflight.domain.model.ThemeMode
+import com.gaozay.smartflight.domain.model.ThemePalette
 import com.gaozay.smartflight.executor.ExecutorValidationService
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.permission.AccessGateState
@@ -19,6 +27,7 @@ import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.runtime.AutomationServiceController
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import com.gaozay.smartflight.settings.SettingsRepository
+import com.gaozay.smartflight.settings.UserSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +53,9 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
     private val appQuery = MutableStateFlow("")
     private val appFilter = MutableStateFlow(AppFilter.All)
+    private val appInternetPermissionFilter = MutableStateFlow(InternetPermissionFilter.All)
+    private val appTypeFilter = MutableStateFlow(AppTypeFilter.User)
+    private val appLauncherFilter = MutableStateFlow(LauncherFilter.All)
     private val appScanning = MutableStateFlow(false)
     private val appLastScanSummary = MutableStateFlow("尚未扫描")
     private val diagnosticsState = MutableStateFlow<List<ExecutorDiagnosticItem>>(emptyList())
@@ -66,6 +78,7 @@ class MainViewModel @Inject constructor(
     }.combine(recentLogs) { base, recentLogs ->
         SmartFlightUiState(
             accessGateState = base.accessGateState,
+            settings = base.settings,
             advancedAccess = base.accessGateState.advancedAccess.selectedExecutorType.label,
             currentMode = base.settings.networkControlMode.label,
             automationEnabled = base.settings.automationEnabled,
@@ -93,35 +106,76 @@ class MainViewModel @Inject constructor(
         initialValue = SmartFlightUiState(),
     )
 
+    private val appFilterState = combine(
+        appFilter.asStateFlow(),
+        appInternetPermissionFilter.asStateFlow(),
+        appTypeFilter.asStateFlow(),
+        appLauncherFilter.asStateFlow(),
+    ) { filter, internetPermissionFilter, typeFilter, launcherFilter ->
+        AppFilterState(
+            filter = filter,
+            internetPermissionFilter = internetPermissionFilter,
+            typeFilter = typeFilter,
+            launcherFilter = launcherFilter,
+        )
+    }
+
     val appsUiState: StateFlow<AppsUiState> = combine(
         installedAppRepository.observeApps(),
         appQuery.asStateFlow(),
-        appFilter.asStateFlow(),
+        appFilterState,
         appScanning.asStateFlow(),
         appLastScanSummary.asStateFlow(),
-    ) { apps, query, filter, isScanning, lastScanSummary ->
+    ) { apps, query, filterState, isScanning, lastScanSummary ->
+        val filter = filterState.filter
+        val internetPermissionFilter = filterState.internetPermissionFilter
+        val typeFilter = filterState.typeFilter
+        val launcherFilter = filterState.launcherFilter
         val filteredApps = apps.filter { app ->
             val matchesQuery = query.isBlank() ||
                 app.label.contains(query, ignoreCase = true) ||
                 app.packageName.contains(query, ignoreCase = true)
-            val matchesFilter = when (filter) {
+            val matchesStatusFilter = when (filter) {
                 AppFilter.All -> true
                 AppFilter.Candidate -> app.status() == AppListStatus.Candidate
                 AppFilter.Whitelist -> app.status() == AppListStatus.Whitelist
                 AppFilter.Blacklist -> app.status() == AppListStatus.Blacklist
                 AppFilter.Ignored -> app.status() == AppListStatus.Ignored
             }
-            matchesQuery && matchesFilter
+            val matchesInternetPermissionFilter = when (internetPermissionFilter) {
+                InternetPermissionFilter.All -> true
+                InternetPermissionFilter.Declared -> app.declaresInternetPermission
+                InternetPermissionFilter.NotDeclared -> !app.declaresInternetPermission
+            }
+            val matchesTypeFilter = when (typeFilter) {
+                AppTypeFilter.All -> true
+                AppTypeFilter.User -> !app.isSystemApp
+                AppTypeFilter.System -> app.isSystemApp
+            }
+            val matchesLauncherFilter = when (launcherFilter) {
+                LauncherFilter.All -> true
+                LauncherFilter.HasLauncher -> app.hasLauncherEntry
+                LauncherFilter.NoLauncher -> !app.hasLauncherEntry
+            }
+            matchesQuery &&
+                matchesStatusFilter &&
+                matchesInternetPermissionFilter &&
+                matchesTypeFilter &&
+                matchesLauncherFilter
         }
         AppsUiState(
             apps = filteredApps,
             query = query,
             filter = filter,
+            internetPermissionFilter = internetPermissionFilter,
+            appTypeFilter = typeFilter,
+            launcherFilter = launcherFilter,
             totalCount = apps.size,
             candidateCount = apps.count { it.status() == AppListStatus.Candidate },
             whitelistCount = apps.count { it.status() == AppListStatus.Whitelist },
             blacklistCount = apps.count { it.status() == AppListStatus.Blacklist },
             ignoredCount = apps.count { it.status() == AppListStatus.Ignored },
+            filteredCount = filteredApps.size,
             isScanning = isScanning,
             lastScanSummary = lastScanSummary,
         )
@@ -216,6 +270,31 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun updateSettings(transform: (UserSettings) -> UserSettings) {
+        viewModelScope.launch {
+            settingsRepository.updateSettings(transform)
+        }
+    }
+
+    fun setNetworkControlMode(mode: NetworkControlMode) = updateSettings { it.copy(networkControlMode = mode) }
+
+    fun setPreferredExecutorType(type: ExecutorType) = updateSettings { it.copy(preferredExecutorType = type) }
+
+    fun setThemeMode(mode: ThemeMode) = updateSettings { it.copy(themeMode = mode) }
+
+    fun setThemePalette(palette: ThemePalette) = updateSettings { it.copy(themePalette = palette) }
+
+    fun setCustomSeedColor(seedColorArgb: Int) = updateSettings {
+        it.copy(
+            themePalette = ThemePalette.Custom,
+            customSeedColorArgb = seedColorArgb,
+        )
+    }
+
+    fun setThemeIntensity(intensity: ThemeIntensity) = updateSettings { it.copy(themeIntensity = intensity) }
+
+    fun setCornerStyle(cornerStyle: CornerStyle) = updateSettings { it.copy(cornerStyle = cornerStyle) }
+
     fun simulateScreenOff() {
         automationServiceController.simulateScreenOff()
     }
@@ -232,6 +311,24 @@ class MainViewModel @Inject constructor(
         appFilter.value = filter
     }
 
+    fun updateAppInternetPermissionFilter(filter: InternetPermissionFilter) {
+        appInternetPermissionFilter.value = filter
+    }
+
+    fun updateAppTypeFilter(filter: AppTypeFilter) {
+        appTypeFilter.value = filter
+    }
+
+    fun updateAppLauncherFilter(filter: LauncherFilter) {
+        appLauncherFilter.value = filter
+    }
+
+    fun clearAppAdvancedFilters() {
+        appInternetPermissionFilter.value = InternetPermissionFilter.All
+        appTypeFilter.value = AppTypeFilter.User
+        appLauncherFilter.value = LauncherFilter.All
+    }
+
     fun refreshInstalledApps() {
         viewModelScope.launch {
             appScanning.value = true
@@ -242,7 +339,7 @@ class MainViewModel @Inject constructor(
                 appScanning.value = false
                 return@launch
             }
-            appLastScanSummary.value = "上次扫描发现 $count 个已安装应用"
+            appLastScanSummary.value = "上次扫描发现 $count 个用户应用"
             appScanning.value = false
         }
     }
@@ -269,6 +366,7 @@ class MainViewModel @Inject constructor(
 @Immutable
 data class SmartFlightUiState(
     val accessGateState: AccessGateState = AccessGateState(),
+    val settings: UserSettings = UserSettings(),
     val advancedAccess: String = "需要 Shizuku / ADB / Root",
     val currentMode: String = "飞行模式",
     val automationEnabled: Boolean = false,
@@ -293,8 +391,15 @@ data class ExecutorDiagnosticItem(
     val ready: Boolean,
 )
 
+private data class AppFilterState(
+    val filter: AppFilter,
+    val internetPermissionFilter: InternetPermissionFilter,
+    val typeFilter: AppTypeFilter,
+    val launcherFilter: LauncherFilter,
+)
+
 private data class UiStateBase(
-    val settings: com.gaozay.smartflight.settings.UserSettings,
+    val settings: UserSettings,
     val runtimeSnapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
     val appCount: Int,
     val logCount: Int,
@@ -337,7 +442,7 @@ private fun ExecutionLogEntity.toUiItem(): ExecutionLogItem {
 }
 
 private fun buildRuntimeSummary(
-    settings: com.gaozay.smartflight.settings.UserSettings,
+    settings: UserSettings,
     snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
 ): String {
     if (snapshot.isAppExitDisconnectScheduled) {

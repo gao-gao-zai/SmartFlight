@@ -1,7 +1,9 @@
 package com.gaozay.smartflight.settings
 
+import com.gaozay.smartflight.domain.model.CornerStyle
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
+import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
 
@@ -23,5 +25,8 @@ data class UserSettings(
     val disableScreenOnReconnect: Boolean = true,
     val disableUnlockReconnect: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.System,
-    val themePalette: ThemePalette = ThemePalette.Brand,
+    val themePalette: ThemePalette = ThemePalette.LogoOriginal,
+    val customSeedColorArgb: Int = ThemePalette.LogoOriginal.seedColorArgb,
+    val themeIntensity: ThemeIntensity = ThemeIntensity.Standard,
+    val cornerStyle: CornerStyle = CornerStyle.Standard,
 )

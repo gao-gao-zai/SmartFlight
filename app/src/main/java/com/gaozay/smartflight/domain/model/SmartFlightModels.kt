@@ -21,18 +21,29 @@ enum class ExecutorType(val label: String) {
 }
 
 enum class ThemeMode(val label: String) {
-    System("Follow System"),
-    Light("Light"),
-    Dark("Dark"),
+    System("跟随系统"),
+    Light("浅色"),
+    Dark("深色"),
 }
 
-enum class ThemePalette(val label: String) {
-    Brand("Brand"),
-    Sky("Sky"),
-    Mint("Mint"),
-    Sand("Sand"),
-    Rose("Rose"),
-    Night("Night"),
+enum class ThemePalette(val label: String, val seedColorArgb: Int) {
+    LogoOriginal("Logo 原色", 0xFF545D6D.toInt()),
+    CoolGray("冷灰控制台", 0xFF657181.toInt()),
+    NightFlight("夜航深色", 0xFF2F3948.toInt()),
+    WarmPaper("暖白纸面", 0xFFA1859B.toInt()),
+    Custom("我的风格", 0xFF545D6D.toInt()),
+}
+
+enum class ThemeIntensity(val label: String) {
+    Restrained("克制"),
+    Standard("标准"),
+    HighContrast("高对比"),
+}
+
+enum class CornerStyle(val label: String) {
+    Compact("紧凑"),
+    Standard("标准"),
+    Soft("柔和"),
 }
 
 enum class ScreenState(val label: String) {
