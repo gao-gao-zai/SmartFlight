@@ -11,3 +11,6 @@ captures/
 .tmp/
 /skills/
 .windsurf/
+keystore.properties
+*.jks
+*.keystore
