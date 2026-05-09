@@ -12,10 +12,12 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.gaozay.smartflight.MainActivity
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.InstalledAppRepository
+import com.gaozay.smartflight.apps.status
 import com.gaozay.smartflight.domain.model.AppListStatus
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
@@ -35,6 +37,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -62,7 +65,7 @@ class AutomationForegroundService : Service() {
     private var screenOffDisconnectJob: Job? = null
     private var appExitDisconnectJob: Job? = null
     private var lastTargetAppActive: Boolean? = null
-    private var whitelistPackages: Set<String> = emptySet()
+    private var appRulesByPackageName: Map<String, AppRuntimeRuleInfo> = emptyMap()
     private var currentScreenState: ScreenState = ScreenState.Unknown
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -167,8 +170,13 @@ class AutomationForegroundService : Service() {
         }
         automationJob = serviceScope.launch {
             launch {
-                installedAppRepository.observeAppsByStatus(AppListStatus.Whitelist).collect { apps ->
-                    whitelistPackages = apps.mapTo(linkedSetOf()) { it.packageName }
+                installedAppRepository.observeApps().collect { apps ->
+                    appRulesByPackageName = apps.associate { app ->
+                        app.packageName to AppRuntimeRuleInfo(
+                            status = app.status(),
+                            isCandidate = app.isCandidate,
+                        )
+                    }
                 }
             }
             runtimeStatusRepository.updateSnapshot { snapshot ->
@@ -231,19 +239,29 @@ class AutomationForegroundService : Service() {
         }
 
         val packageName = foregroundApp?.packageName
+        val runtimeSnapshot = runtimeStatusRepository.snapshot.first()
+        val appRuleInfo = packageName?.let { appRulesByPackageName[it] }
+        val executorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
         val decision = automationRuleEngine.evaluateForegroundChange(
             ForegroundRuleContext(
                 settings = settings,
                 packageName = packageName,
                 appLabel = foregroundApp?.appLabel,
-                whitelistPackages = whitelistPackages,
+                appStatus = appRuleInfo?.status,
+                isCandidate = appRuleInfo?.isCandidate == true,
+                isWifiConnected = runtimeSnapshot.isWifiConnected,
+                executorAvailable = executorAvailable,
                 previousTargetAppActive = lastTargetAppActive,
             ),
         )
         lastTargetAppActive = decision.targetAppActive
 
         when (val action = decision.action) {
-            ForegroundAction.None -> Unit
+            is ForegroundAction.None -> {
+                if (decision.shouldLog) {
+                    updateSkippedForegroundDecision(decision)
+                }
+            }
             is ForegroundAction.Reconnect -> {
                 cancelAppExitDisconnect(updateRuntimeState = true)
                 accessRepository.setAirplaneModeState(
@@ -251,6 +269,7 @@ class AutomationForegroundService : Service() {
                     triggerSource = TriggerSource.AppForegroundChanged,
                     reason = action.reason,
                 )
+                showReconnectPrompt(settings)
             }
 
             is ForegroundAction.Disconnect -> {
@@ -260,6 +279,7 @@ class AutomationForegroundService : Service() {
                     triggerSource = TriggerSource.AppForegroundChanged,
                     reason = action.reason,
                 )
+                showDisconnectPrompt(settings)
             }
 
             is ForegroundAction.ScheduleDisconnect -> {
@@ -269,12 +289,31 @@ class AutomationForegroundService : Service() {
             is ForegroundAction.CancelScheduledDisconnect -> {
                 cancelAppExitDisconnect(updateRuntimeState = true)
             }
+
+            is ForegroundAction.PauseAutomation -> {
+                runtimeStatusRepository.updateSnapshot { snapshot ->
+                    snapshot.copy(
+                        lastAction = ExecutionAction.PauseAutomation,
+                        lastTriggerSource = TriggerSource.AppForegroundChanged,
+                        lastActionResult = ExecutionResult.Failed,
+                        lastActionReason = action.reason,
+                        updatedAtMillis = System.currentTimeMillis(),
+                    )
+                }
+            }
         }
     }
 
     private suspend fun scheduleScreenOffDisconnectIfNeeded() {
         val settings = settingsRepository.settings.first()
-        if (!automationRuleEngine.shouldScheduleScreenOffDisconnect(settings)) {
+        val runtimeSnapshot = runtimeStatusRepository.snapshot.first()
+        val executorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
+        if (!automationRuleEngine.shouldScheduleScreenOffDisconnect(
+                settings = settings,
+                isWifiConnected = runtimeSnapshot.isWifiConnected,
+                executorAvailable = executorAvailable,
+            )
+        ) {
             cancelScreenOffDisconnect()
             return
         }
@@ -298,9 +337,13 @@ class AutomationForegroundService : Service() {
                 delay(delayMillis)
             }
             val latestSettings = settingsRepository.settings.first()
+            val latestRuntimeSnapshot = runtimeStatusRepository.snapshot.first()
+            val latestExecutorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
             val shouldDisconnect = automationRuleEngine.shouldExecuteScreenOffDisconnect(
                 settings = latestSettings,
                 screenState = currentScreenState,
+                isWifiConnected = latestRuntimeSnapshot.isWifiConnected,
+                executorAvailable = latestExecutorAvailable,
             )
             runtimeStatusRepository.updateSnapshot { snapshot ->
                 snapshot.copy(
@@ -318,6 +361,7 @@ class AutomationForegroundService : Service() {
                 triggerSource = TriggerSource.ScreenOff,
                 reason = "息屏延迟 ${latestSettings.screenOffDelaySeconds} 秒后执行断网",
             )
+            showDisconnectPrompt(latestSettings)
         }
     }
 
@@ -342,9 +386,13 @@ class AutomationForegroundService : Service() {
                 delay(delayMillis)
             }
             val latestSettings = settingsRepository.settings.first()
+            val latestRuntimeSnapshot = runtimeStatusRepository.snapshot.first()
+            val latestExecutorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
             val shouldDisconnect = latestSettings.automationEnabled &&
                 latestSettings.appExitDisconnectEnabled &&
-                lastTargetAppActive == false
+                lastTargetAppActive == false &&
+                latestExecutorAvailable &&
+                !(latestRuntimeSnapshot.isWifiConnected && latestSettings.skipDisconnectOnWifi)
             runtimeStatusRepository.updateSnapshot { snapshot ->
                 snapshot.copy(
                     isAppExitDisconnectScheduled = false,
@@ -360,6 +408,39 @@ class AutomationForegroundService : Service() {
                 enabled = true,
                 triggerSource = TriggerSource.AppForegroundChanged,
                 reason = reason,
+            )
+            showDisconnectPrompt(latestSettings)
+        }
+    }
+
+    private suspend fun showReconnectPrompt(settings: com.gaozay.smartflight.settings.UserSettings) {
+        if (!settings.showReconnectPrompt) {
+            return
+        }
+        showPrompt(settings.reconnectPromptText.ifBlank { "SmartFlight 已恢复联网" })
+    }
+
+    private suspend fun showDisconnectPrompt(settings: com.gaozay.smartflight.settings.UserSettings) {
+        if (!settings.showDisconnectPrompt) {
+            return
+        }
+        showPrompt(settings.disconnectPromptText.ifBlank { "SmartFlight 已断网" })
+    }
+
+    private suspend fun showPrompt(message: String) {
+        withContext(Dispatchers.Main.immediate) {
+            Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private suspend fun updateSkippedForegroundDecision(decision: ForegroundRuleDecision) {
+        runtimeStatusRepository.updateSnapshot { snapshot ->
+            snapshot.copy(
+                lastAction = ExecutionAction.DoNothing,
+                lastTriggerSource = TriggerSource.AppForegroundChanged,
+                lastActionResult = ExecutionResult.Skipped,
+                lastActionReason = decision.reason,
+                updatedAtMillis = System.currentTimeMillis(),
             )
         }
     }
@@ -461,3 +542,8 @@ class AutomationForegroundService : Service() {
         const val ACTION_DEBUG_SCREEN_ON = "com.gaozay.smartflight.runtime.action.DEBUG_SCREEN_ON"
     }
 }
+
+private data class AppRuntimeRuleInfo(
+    val status: AppListStatus,
+    val isCandidate: Boolean,
+)

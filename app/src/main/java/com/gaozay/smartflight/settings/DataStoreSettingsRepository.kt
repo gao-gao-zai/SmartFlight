@@ -53,6 +53,10 @@ class DataStoreSettingsRepository @Inject constructor(
             preserveBluetoothState = preferences[Keys.PreserveBluetoothState] ?: true,
             disableScreenOnReconnect = preferences[Keys.DisableScreenOnReconnect] ?: true,
             disableUnlockReconnect = preferences[Keys.DisableUnlockReconnect] ?: true,
+            showReconnectPrompt = preferences[Keys.ShowReconnectPrompt] ?: true,
+            reconnectPromptText = preferences[Keys.ReconnectPromptText] ?: "SmartFlight 已恢复联网",
+            showDisconnectPrompt = preferences[Keys.ShowDisconnectPrompt] ?: true,
+            disconnectPromptText = preferences[Keys.DisconnectPromptText] ?: "SmartFlight 已断网",
             themeMode = enumValueOrDefault(
                 value = preferences[Keys.ThemeMode],
                 default = ThemeMode.System,
@@ -98,6 +102,10 @@ class DataStoreSettingsRepository @Inject constructor(
             preferences[Keys.PreserveBluetoothState] = updated.preserveBluetoothState
             preferences[Keys.DisableScreenOnReconnect] = updated.disableScreenOnReconnect
             preferences[Keys.DisableUnlockReconnect] = updated.disableUnlockReconnect
+            preferences[Keys.ShowReconnectPrompt] = updated.showReconnectPrompt
+            preferences[Keys.ReconnectPromptText] = updated.reconnectPromptText
+            preferences[Keys.ShowDisconnectPrompt] = updated.showDisconnectPrompt
+            preferences[Keys.DisconnectPromptText] = updated.disconnectPromptText
             preferences[Keys.ThemeMode] = updated.themeMode.name
             preferences[Keys.ThemePalette] = updated.themePalette.name
             preferences[Keys.CustomSeedColorArgb] = updated.customSeedColorArgb
@@ -126,6 +134,10 @@ class DataStoreSettingsRepository @Inject constructor(
         val PreserveBluetoothState = booleanPreferencesKey("preserve_bluetooth_state")
         val DisableScreenOnReconnect = booleanPreferencesKey("disable_screen_on_reconnect")
         val DisableUnlockReconnect = booleanPreferencesKey("disable_unlock_reconnect")
+        val ShowReconnectPrompt = booleanPreferencesKey("show_reconnect_prompt")
+        val ReconnectPromptText = stringPreferencesKey("reconnect_prompt_text")
+        val ShowDisconnectPrompt = booleanPreferencesKey("show_disconnect_prompt")
+        val DisconnectPromptText = stringPreferencesKey("disconnect_prompt_text")
         val ThemeMode = stringPreferencesKey("theme_mode")
         val ThemePalette = stringPreferencesKey("theme_palette")
         val CustomSeedColorArgb = intPreferencesKey("custom_seed_color_argb")

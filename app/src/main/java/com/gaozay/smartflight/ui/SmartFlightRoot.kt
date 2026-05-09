@@ -45,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -352,6 +353,12 @@ private fun RulesScreen(
             SwitchRow("切换时保留 Wi‑Fi 状态", "不同系统上可能失败", settings.preserveWifiState) { onUpdateSettings { s -> s.copy(preserveWifiState = it) } }
             SwitchRow("切换时保留蓝牙状态", "不同系统上可能失败", settings.preserveBluetoothState) { onUpdateSettings { s -> s.copy(preserveBluetoothState = it) } }
         } }
+        item { SettingsSection("动作提示") {
+            SwitchRow("恢复联网时提示", "自动恢复联网后显示一条短提示", settings.showReconnectPrompt) { onUpdateSettings { s -> s.copy(showReconnectPrompt = it) } }
+            TextInputRow("恢复联网提示内容", settings.reconnectPromptText) { value -> onUpdateSettings { s -> s.copy(reconnectPromptText = value) } }
+            SwitchRow("断网时提示", "自动断网后显示一条短提示", settings.showDisconnectPrompt) { onUpdateSettings { s -> s.copy(showDisconnectPrompt = it) } }
+            TextInputRow("断网提示内容", settings.disconnectPromptText) { value -> onUpdateSettings { s -> s.copy(disconnectPromptText = value) } }
+        } }
     }
 }
 
@@ -527,6 +534,17 @@ private fun NumberRow(title: String, value: Int, onValueChange: (Int) -> Unit) {
         Text("$value 秒", modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
         OutlinedButton(onClick = { onValueChange(value + 5) }) { Text("+") }
     }
+}
+
+@Composable
+private fun TextInputRow(title: String, value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(title) },
+        singleLine = true,
+    )
 }
 
 @Composable

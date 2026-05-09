@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.domain.model.AppListStatus
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.settings.UserSettings
 import javax.inject.Inject
@@ -26,42 +27,107 @@ class AutomationRuleEngine @Inject constructor() {
     }
 
     fun evaluateForegroundChange(context: ForegroundRuleContext): ForegroundRuleDecision {
-        val targetAppActive = context.packageName != null && context.packageName in context.whitelistPackages
+        val targetAppActive = context.isTargetAppActive()
+        if (!context.settings.automationEnabled) {
+            return ForegroundRuleDecision(
+                targetAppActive = targetAppActive,
+                action = ForegroundAction.None("自动化已关闭，跳过前台应用规则"),
+                reason = "自动化已关闭",
+                matchedRules = listOf("AutomationDisabled"),
+                shouldLog = false,
+            )
+        }
+        if (!context.executorAvailable) {
+            return ForegroundRuleDecision(
+                targetAppActive = targetAppActive,
+                action = ForegroundAction.PauseAutomation("执行器不可用，自动化已暂停"),
+                reason = "执行器不可用，自动化已暂停",
+                matchedRules = listOf("ExecutorUnavailable"),
+                shouldLog = true,
+            )
+        }
+        if (context.appStatus == AppListStatus.Blacklist) {
+            if (context.isWifiConnected && context.settings.skipDisconnectOnWifi) {
+                return ForegroundRuleDecision(
+                    targetAppActive = false,
+                    action = ForegroundAction.None("当前连接 Wi‑Fi，已跳过黑名单应用断网"),
+                    reason = "当前连接 Wi‑Fi，已跳过黑名单应用断网",
+                    matchedRules = listOf("Blacklist", "SkipDisconnectOnWifi"),
+                    shouldLog = true,
+                )
+            }
+            return ForegroundRuleDecision(
+                targetAppActive = false,
+                action = ForegroundAction.Disconnect(
+                    reason = "黑名单应用正在前台：${context.displayName()}",
+                ),
+                reason = "黑名单应用正在前台：${context.displayName()}",
+                matchedRules = listOf("Blacklist"),
+                shouldLog = true,
+            )
+        }
         if (context.previousTargetAppActive == targetAppActive) {
             return ForegroundRuleDecision(
                 targetAppActive = targetAppActive,
-                action = ForegroundAction.None,
+                action = ForegroundAction.None("前台应用目标状态未变化"),
+                reason = "前台应用目标状态未变化",
+                matchedRules = emptyList(),
+                shouldLog = false,
             )
         }
         if (targetAppActive && context.settings.reconnectOnTargetAppLaunch) {
+            val targetRule = if (context.appStatus == AppListStatus.Whitelist) "Whitelist" else "Candidate"
+            if (context.isWifiConnected && context.settings.skipReconnectOnWifi) {
+                return ForegroundRuleDecision(
+                    targetAppActive = true,
+                    action = ForegroundAction.CancelScheduledDisconnect(
+                        reason = "当前连接 Wi‑Fi，已跳过目标应用恢复联网",
+                    ),
+                    reason = "当前连接 Wi‑Fi，已跳过目标应用恢复联网",
+                    matchedRules = listOf(targetRule, "SkipReconnectOnWifi"),
+                    shouldLog = true,
+                )
+            }
             return ForegroundRuleDecision(
                 targetAppActive = true,
                 action = ForegroundAction.Reconnect(
-                    reason = "检测到白名单应用进入前台：${context.appLabel ?: context.packageName}",
+                    reason = "检测到目标应用进入前台：${context.displayName()}",
                 ),
+                reason = "检测到目标应用进入前台：${context.displayName()}",
+                matchedRules = listOf(targetRule),
+                shouldLog = true,
             )
         }
         if (!targetAppActive && context.settings.appExitDisconnectEnabled) {
+            if (context.isWifiConnected && context.settings.skipDisconnectOnWifi) {
+                return ForegroundRuleDecision(
+                    targetAppActive = false,
+                    action = ForegroundAction.None("当前连接 Wi‑Fi，已跳过离开目标应用断网"),
+                    reason = "当前连接 Wi‑Fi，已跳过离开目标应用断网",
+                    matchedRules = listOf("AppExitDisconnect", "SkipDisconnectOnWifi"),
+                    shouldLog = true,
+                )
+            }
+            val reason = if (context.previousTargetAppActive == true) {
+                "目标应用已离开前台"
+            } else {
+                "当前前台应用不是目标应用"
+            }
             return ForegroundRuleDecision(
                 targetAppActive = false,
                 action = if (context.settings.appExitDelaySeconds > 0) {
                     ForegroundAction.ScheduleDisconnect(
-                        reason = if (context.previousTargetAppActive == true) {
-                            "白名单应用已离开前台，将在 ${context.settings.appExitDelaySeconds} 秒后断网"
-                        } else {
-                            "当前前台应用不在白名单内，将在 ${context.settings.appExitDelaySeconds} 秒后断网"
-                        },
+                        reason = "$reason，将在 ${context.settings.appExitDelaySeconds} 秒后断网",
                         delaySeconds = context.settings.appExitDelaySeconds,
                     )
                 } else {
                     ForegroundAction.Disconnect(
-                        reason = if (context.previousTargetAppActive == true) {
-                            "白名单应用已离开前台"
-                        } else {
-                            "当前前台应用不在白名单内"
-                        },
+                        reason = reason,
                     )
                 },
+                reason = reason,
+                matchedRules = listOf("AppExitDisconnect"),
+                shouldLog = true,
             )
         }
         return ForegroundRuleDecision(
@@ -71,20 +137,38 @@ class AutomationRuleEngine @Inject constructor() {
                     reason = "白名单应用重新进入前台，已取消待执行的离开应用断网",
                 )
             } else {
-                ForegroundAction.None
+                ForegroundAction.None("没有命中需要执行的前台应用规则")
             },
+            reason = if (targetAppActive) {
+                "目标应用重新进入前台，已取消待执行的离开应用断网"
+            } else {
+                "没有命中需要执行的前台应用规则"
+            },
+            matchedRules = if (targetAppActive) listOf("CancelAppExitDisconnect") else emptyList(),
+            shouldLog = targetAppActive,
         )
     }
 
-    fun shouldScheduleScreenOffDisconnect(settings: UserSettings): Boolean =
-        settings.automationEnabled && settings.screenOffDisconnectEnabled
+    fun shouldScheduleScreenOffDisconnect(
+        settings: UserSettings,
+        isWifiConnected: Boolean = false,
+        executorAvailable: Boolean = true,
+    ): Boolean =
+        settings.automationEnabled &&
+            executorAvailable &&
+            settings.screenOffDisconnectEnabled &&
+            !(isWifiConnected && settings.skipDisconnectOnWifi)
 
     fun shouldExecuteScreenOffDisconnect(
         settings: UserSettings,
         screenState: ScreenState,
+        isWifiConnected: Boolean = false,
+        executorAvailable: Boolean = true,
     ): Boolean = settings.automationEnabled &&
+        executorAvailable &&
         settings.screenOffDisconnectEnabled &&
-        screenState == ScreenState.ScreenOff
+        screenState == ScreenState.ScreenOff &&
+        !(isWifiConnected && settings.skipDisconnectOnWifi)
 
     companion object {
         const val SCREEN_ON_POLL_INTERVAL_MILLIS = 1_500L
@@ -97,17 +181,38 @@ data class ForegroundRuleContext(
     val settings: UserSettings,
     val packageName: String?,
     val appLabel: String?,
-    val whitelistPackages: Set<String>,
+    val appStatus: AppListStatus?,
+    val isCandidate: Boolean,
+    val isWifiConnected: Boolean,
+    val executorAvailable: Boolean,
     val previousTargetAppActive: Boolean?,
-)
+) {
+    fun displayName(): String = appLabel ?: packageName ?: "未知应用"
+
+    private fun candidateCanTrigger(): Boolean =
+        !settings.whitelistOnly && appStatus == AppListStatus.Candidate && isCandidate
+
+    fun isTargetAppActive(): Boolean =
+        packageName != null &&
+            when (appStatus) {
+                AppListStatus.Whitelist -> true
+                AppListStatus.Candidate -> candidateCanTrigger()
+                AppListStatus.Blacklist, AppListStatus.Ignored, null -> false
+            }
+}
 
 data class ForegroundRuleDecision(
     val targetAppActive: Boolean,
     val action: ForegroundAction,
+    val reason: String,
+    val matchedRules: List<String>,
+    val shouldLog: Boolean,
 )
 
 sealed interface ForegroundAction {
-    data object None : ForegroundAction
+    data class None(
+        val reason: String = "",
+    ) : ForegroundAction
 
     data class Reconnect(
         val reason: String,
@@ -123,6 +228,10 @@ sealed interface ForegroundAction {
     ) : ForegroundAction
 
     data class CancelScheduledDisconnect(
+        val reason: String,
+    ) : ForegroundAction
+
+    data class PauseAutomation(
         val reason: String,
     ) : ForegroundAction
 }
