@@ -1,5 +1,7 @@
 # SmartFlight 产品设计文档
 
+> 界面设计部分已弃用：本文档中的产品定位、能力边界和规则方向仍可作为参考；涉及 UI、布局、配色和用户操作逻辑的内容以 `docs/smartflight-ui-redesign-no-tabs.md` 为准。
+
 ## 1. 项目定位
 
 - 中文名：自动飞行
