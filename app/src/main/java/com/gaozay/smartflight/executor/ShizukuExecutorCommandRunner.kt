@@ -40,7 +40,7 @@ class ShizukuExecutorCommandRunner @Inject constructor(
             )
 
         val rawResult = runCatching {
-            service.runReadonlyCommand(command.rawCommand)
+            service.runCommand(command.rawCommand)
         }.getOrElse { throwable ->
             return ExecutorCommandResult(
                 executorType = ExecutorType.Shizuku,

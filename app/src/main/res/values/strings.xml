@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">自动飞行</string>
+    <string name="automation_notification_title">自动飞行正在运行</string>
+    <string name="automation_notification_text">正在监控白名单应用前台状态</string>
+    <string name="automation_notification_channel_name">自动化运行</string>
+    <string name="automation_notification_channel_description">用于保持自动联网控制前台服务运行</string>
 </resources>
-

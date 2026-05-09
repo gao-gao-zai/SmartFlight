@@ -14,6 +14,13 @@ object ExecutorReadonlyCommands {
     )
 }
 
+object ExecutorWriteCommands {
+    fun setAirplaneModeState(enabled: Boolean): ExecutorCommand = ExecutorCommand(
+        rawCommand = "settings put global airplane_mode_on ${if (enabled) "1" else "0"}",
+        purpose = if (enabled) "开启飞行模式" else "关闭飞行模式",
+    )
+}
+
 data class ExecutorCommandResult(
     val executorType: ExecutorType,
     val executed: Boolean,

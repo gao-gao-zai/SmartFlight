@@ -51,6 +51,7 @@ import com.gaozay.smartflight.SmartFlightUiState
 import com.gaozay.smartflight.apps.AppFilter
 import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.domain.model.AppListStatus
+import com.gaozay.smartflight.ExecutionLogItem
 import com.gaozay.smartflight.ExecutorDiagnosticItem
 import java.text.DateFormat
 import java.util.Date
@@ -73,12 +74,16 @@ fun SmartFlightRoot(
     appsState: AppsUiState,
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit,
+    onSetAutomationEnabled: (Boolean) -> Unit,
+    onSetMonitorForegroundWhenScreenOff: (Boolean) -> Unit,
     onAppQueryChange: (String) -> Unit,
     onAppFilterChange: (AppFilter) -> Unit,
     onRefreshApps: () -> Unit,
     onSetAppListStatus: (String, AppListStatus) -> Unit,
     onRefreshAccessChecks: () -> Unit,
     onProbeAirplaneModeState: () -> Unit,
+    onToggleAirplaneModeState: () -> Unit,
+    onClearExecutionLogs: () -> Unit,
     onRequestShizukuPermission: () -> Unit,
     onProbeRootAccess: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
@@ -159,6 +164,8 @@ fun SmartFlightRoot(
                     state = state,
                     darkMode = darkMode,
                     onToggleDarkMode = onToggleDarkMode,
+                    onSetAutomationEnabled = onSetAutomationEnabled,
+                    onSetMonitorForegroundWhenScreenOff = onSetMonitorForegroundWhenScreenOff,
                     innerPadding = innerPadding,
                 )
 
@@ -195,6 +202,8 @@ fun SmartFlightRoot(
                     state = state,
                     onRefreshAccessChecks = onRefreshAccessChecks,
                     onProbeAirplaneModeState = onProbeAirplaneModeState,
+                    onToggleAirplaneModeState = onToggleAirplaneModeState,
+                    onClearExecutionLogs = onClearExecutionLogs,
                     innerPadding = innerPadding,
                 )
             }
@@ -207,6 +216,8 @@ private fun HomeScreen(
     state: SmartFlightUiState,
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit,
+    onSetAutomationEnabled: (Boolean) -> Unit,
+    onSetMonitorForegroundWhenScreenOff: (Boolean) -> Unit,
     innerPadding: PaddingValues,
 ) {
     LazyColumn(
@@ -290,6 +301,78 @@ private fun HomeScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
+                            text = "应用内自动化",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (state.automationEnabled) {
+                                "已启用。进入白名单应用时恢复联网，离开时断网。"
+                            } else {
+                                "仅在 App 打开期间生效，用于先验证最小自动化闭环。"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = state.automationEnabled,
+                        onCheckedChange = onSetAutomationEnabled,
+                    )
+                }
+            }
+        }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "息屏时继续监听前台应用",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (state.monitorForegroundWhenScreenOff) {
+                                "已开启。息屏后仍会继续做前台应用检测，响应更及时但更耗电。"
+                            } else {
+                                "默认关闭。息屏后暂停前台应用检测，更省电。"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = state.monitorForegroundWhenScreenOff,
+                        onCheckedChange = onSetMonitorForegroundWhenScreenOff,
+                    )
+                }
+            }
+        }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
                             text = "深色主题",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
@@ -356,6 +439,8 @@ private fun DiagnosticsScreen(
     state: SmartFlightUiState,
     onRefreshAccessChecks: () -> Unit,
     onProbeAirplaneModeState: () -> Unit,
+    onToggleAirplaneModeState: () -> Unit,
+    onClearExecutionLogs: () -> Unit,
     innerPadding: PaddingValues,
 ) {
     LazyColumn(
@@ -394,6 +479,14 @@ private fun DiagnosticsScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("探测飞行模式状态")
+            }
+        }
+        item {
+            OutlinedButton(
+                onClick = onToggleAirplaneModeState,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("手动切换飞行模式")
             }
         }
         item {
@@ -459,6 +552,46 @@ private fun DiagnosticsScreen(
         items(state.executorDiagnostics.size) { index ->
             ExecutorDiagnosticCard(item = state.executorDiagnostics[index])
         }
+        item {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "最近动作历史",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (state.recentExecutionLogs.isNotEmpty()) {
+                            OutlinedButton(onClick = onClearExecutionLogs) {
+                                Text("清空日志")
+                            }
+                        }
+                    }
+                    if (state.recentExecutionLogs.isEmpty()) {
+                        Text(
+                            text = "尚未记录任何手动探测或切换动作。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        state.recentExecutionLogs.forEach { log ->
+                            ExecutionLogCard(item = log)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -514,6 +647,41 @@ private fun ExecutorDiagnosticCard(item: ExecutorDiagnosticItem) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ExecutionLogCard(item: ExecutionLogItem) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "${item.action} · ${item.result}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = "执行器：${item.executor}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = item.detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = DateFormat.getDateTimeInstance().format(Date(item.timestampMillis)),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

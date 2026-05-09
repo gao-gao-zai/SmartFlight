@@ -8,7 +8,7 @@ class ShizukuCommandService() : IShizukuCommandService.Stub() {
     @Suppress("UNUSED_PARAMETER")
     constructor(context: Context) : this()
 
-    override fun runReadonlyCommand(command: String): String {
+    override fun runCommand(command: String): String {
         val shell = findShellPath()
         val process = ProcessBuilder(shell, "-c", command)
             .redirectErrorStream(true)

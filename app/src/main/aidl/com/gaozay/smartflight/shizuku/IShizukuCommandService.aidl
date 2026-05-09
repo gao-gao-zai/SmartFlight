@@ -1,6 +1,6 @@
 package com.gaozay.smartflight.shizuku;
 
 interface IShizukuCommandService {
-    String runReadonlyCommand(String command);
+    String runCommand(String command);
     void destroy();
 }

@@ -43,12 +43,16 @@ class MainActivity : ComponentActivity() {
                     appsState = appsUiState.value,
                     darkMode = darkMode,
                     onToggleDarkMode = { setDarkMode(!darkMode) },
+                    onSetAutomationEnabled = viewModel::setAutomationEnabled,
+                    onSetMonitorForegroundWhenScreenOff = viewModel::setMonitorForegroundWhenScreenOff,
                     onAppQueryChange = viewModel::updateAppQuery,
                     onAppFilterChange = viewModel::updateAppFilter,
                     onRefreshApps = viewModel::refreshInstalledApps,
                     onSetAppListStatus = viewModel::setAppListStatus,
                     onRefreshAccessChecks = viewModel::refreshAccessChecks,
                     onProbeAirplaneModeState = viewModel::probeAirplaneModeState,
+                    onToggleAirplaneModeState = viewModel::toggleAirplaneModeState,
+                    onClearExecutionLogs = viewModel::clearExecutionLogs,
                     onRequestShizukuPermission = {
                         runCatching {
                             Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
