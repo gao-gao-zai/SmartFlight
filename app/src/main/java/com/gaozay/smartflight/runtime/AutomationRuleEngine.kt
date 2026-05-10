@@ -1,6 +1,6 @@
 package com.gaozay.smartflight.runtime
 
-import com.gaozay.smartflight.domain.model.AppListStatus
+import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.settings.UserSettings
 import javax.inject.Inject
@@ -55,7 +55,7 @@ class AutomationRuleEngine @Inject constructor() {
                 shouldLog = true,
             )
         }
-        if (context.appStatus == AppListStatus.Blacklist) {
+        if (context.isInBlacklist) {
             if (context.isWifiConnected && context.settings.skipDisconnectOnWifi) {
                 return ForegroundRuleDecision(
                     targetAppActive = false,
@@ -85,7 +85,11 @@ class AutomationRuleEngine @Inject constructor() {
             )
         }
         if (targetAppActive && context.settings.reconnectOnTargetAppLaunch) {
-            val targetRule = if (context.appStatus == AppListStatus.Whitelist) "Whitelist" else "Candidate"
+            val targetRule = when (context.onlineSource) {
+                AppOnlineSourceTag.Manual -> "ManualOnline"
+                AppOnlineSourceTag.Auto -> "AutoOnline"
+                null -> "OnlineList"
+            }
             if (context.isWifiConnected && context.settings.skipReconnectOnWifi) {
                 return ForegroundRuleDecision(
                     targetAppActive = true,
@@ -100,9 +104,9 @@ class AutomationRuleEngine @Inject constructor() {
             return ForegroundRuleDecision(
                 targetAppActive = true,
                 action = ForegroundAction.Reconnect(
-                    reason = "检测到目标应用进入前台：${context.displayName()}",
+                    reason = "检测到联网应用进入前台：${context.displayName()}",
                 ),
-                reason = "检测到目标应用进入前台：${context.displayName()}",
+                reason = "检测到联网应用进入前台：${context.displayName()}",
                 matchedRules = listOf(targetRule),
                 shouldLog = true,
             )
@@ -118,9 +122,9 @@ class AutomationRuleEngine @Inject constructor() {
                 )
             }
             val reason = if (context.previousTargetAppActive == true) {
-                "目标应用已离开前台"
+                "联网应用已离开前台"
             } else {
-                "当前前台应用不是目标应用"
+                "当前前台应用不是联网应用"
             }
             return ForegroundRuleDecision(
                 targetAppActive = false,
@@ -143,13 +147,13 @@ class AutomationRuleEngine @Inject constructor() {
             targetAppActive = targetAppActive,
             action = if (targetAppActive) {
                 ForegroundAction.CancelScheduledDisconnect(
-                    reason = "白名单应用重新进入前台，已取消待执行的离开应用断网",
+                    reason = "联网应用重新进入前台，已取消待执行的离开应用断网",
                 )
             } else {
                 ForegroundAction.None("没有命中需要执行的前台应用规则")
             },
             reason = if (targetAppActive) {
-                "目标应用重新进入前台，已取消待执行的离开应用断网"
+                "联网应用重新进入前台，已取消待执行的离开应用断网"
             } else {
                 "没有命中需要执行的前台应用规则"
             },
@@ -190,24 +194,17 @@ data class ForegroundRuleContext(
     val settings: UserSettings,
     val packageName: String?,
     val appLabel: String?,
-    val appStatus: AppListStatus?,
-    val isCandidate: Boolean,
+    val isInOnlineList: Boolean,
+    val isInBlacklist: Boolean,
+    val onlineSource: AppOnlineSourceTag?,
     val isWifiConnected: Boolean,
     val executorAvailable: Boolean,
     val previousTargetAppActive: Boolean?,
 ) {
     fun displayName(): String = appLabel ?: packageName ?: "未知应用"
 
-    private fun candidateCanTrigger(): Boolean =
-        !settings.whitelistOnly && appStatus == AppListStatus.Candidate && isCandidate
-
     fun isTargetAppActive(): Boolean =
-        packageName != null &&
-            when (appStatus) {
-                AppListStatus.Whitelist -> true
-                AppListStatus.Candidate -> candidateCanTrigger()
-                AppListStatus.Blacklist, AppListStatus.Ignored, null -> false
-            }
+        packageName != null && !isInBlacklist && isInOnlineList
 }
 
 data class ForegroundRuleDecision(

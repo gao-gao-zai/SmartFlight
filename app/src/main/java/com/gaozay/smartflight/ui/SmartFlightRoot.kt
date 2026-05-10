@@ -74,7 +74,6 @@ import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.apps.InternetPermissionFilter
 import com.gaozay.smartflight.apps.LauncherFilter
-import com.gaozay.smartflight.domain.model.AppListStatus
 import com.gaozay.smartflight.domain.model.CornerStyle
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
@@ -113,7 +112,9 @@ fun SmartFlightRoot(
     onAppLauncherFilterChange: (LauncherFilter) -> Unit,
     onClearAppAdvancedFilters: () -> Unit,
     onRefreshApps: () -> Unit,
-    onSetAppListStatus: (String, AppListStatus) -> Unit,
+    onSetAppManualOnline: (String) -> Unit,
+    onSetAppManualOffline: (String) -> Unit,
+    onResetAppToDefault: (String) -> Unit,
     onRefreshAccessChecks: () -> Unit,
     onProbeAirplaneModeState: () -> Unit,
     onToggleAirplaneModeState: () -> Unit,
@@ -164,7 +165,9 @@ fun SmartFlightRoot(
                     onLauncherFilterChange = onAppLauncherFilterChange,
                     onClearAdvancedFilters = onClearAppAdvancedFilters,
                     onRefreshApps = onRefreshApps,
-                    onSetListStatus = onSetAppListStatus,
+                    onSetManualOnline = onSetAppManualOnline,
+                    onSetManualOffline = onSetAppManualOffline,
+                    onResetToDefault = onResetAppToDefault,
                 )
                 SmartFlightScreen.Rules -> RulesScreen(state.settings, innerPadding, onUpdateSettings, onSetNetworkControlMode, onSetPreferredExecutorType, onSetMonitorForegroundWhenScreenOff)
                 SmartFlightScreen.Diagnostics -> DiagnosticsScreen(
@@ -244,7 +247,7 @@ private fun DashboardScreen(
         item { ExplanationCard(state.triggerSummary) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                EntryCard(Icons.Rounded.Apps, "应用范围", "设置哪些应用会触发恢复联网", onOpenApps)
+                EntryCard(Icons.Rounded.Apps, "应用范围", "设置哪些应用会被视为联网", onOpenApps)
                 EntryCard(Icons.AutoMirrored.Rounded.Rule, "自动化规则", "配置息屏、离开应用和 Wi‑Fi 例外", onOpenRules)
                 EntryCard(Icons.Rounded.BugReport, "诊断与日志", "查看权限、执行器和最近动作", onOpenDiagnostics)
             }
@@ -355,10 +358,9 @@ private fun RulesScreen(
             ChoiceRow("执行器偏好", ExecutorType.entries.filterNot { it == ExecutorType.Unavailable }, settings.preferredExecutorType, onSetPreferredExecutorType)
         } }
         item { SettingsSection("应用触发") {
-            SwitchRow("启动目标应用时恢复联网", "白名单应用进入前台时关闭飞行模式", settings.reconnectOnTargetAppLaunch) { onUpdateSettings { s -> s.copy(reconnectOnTargetAppLaunch = it) } }
-            SwitchRow("离开目标应用后断网", "离开白名单应用后等待一段时间再断网", settings.appExitDisconnectEnabled) { onUpdateSettings { s -> s.copy(appExitDisconnectEnabled = it) } }
+            SwitchRow("启动目标应用时恢复联网", "联网应用进入前台时关闭飞行模式", settings.reconnectOnTargetAppLaunch) { onUpdateSettings { s -> s.copy(reconnectOnTargetAppLaunch = it) } }
+            SwitchRow("离开目标应用后断网", "离开联网应用后等待一段时间再断网", settings.appExitDisconnectEnabled) { onUpdateSettings { s -> s.copy(appExitDisconnectEnabled = it) } }
             NumberRow("离开后延迟秒数", settings.appExitDelaySeconds) { onUpdateSettings { s -> s.copy(appExitDelaySeconds = it.coerceIn(0, 600)) } }
-            SwitchRow("仅响应白名单应用", "候选应用只用于展示，不触发恢复联网", settings.whitelistOnly) { onUpdateSettings { s -> s.copy(whitelistOnly = it) } }
         } }
         item { SettingsSection("息屏触发") {
             SwitchRow("息屏后自动断网", "屏幕关闭后按延迟执行断网", settings.screenOffDisconnectEnabled) { onUpdateSettings { s -> s.copy(screenOffDisconnectEnabled = it) } }

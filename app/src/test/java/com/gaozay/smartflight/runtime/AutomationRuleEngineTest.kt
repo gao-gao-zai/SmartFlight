@@ -1,6 +1,6 @@
 package com.gaozay.smartflight.runtime
 
-import com.gaozay.smartflight.domain.model.AppListStatus
+import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.settings.UserSettings
 import org.junit.Assert.assertEquals
@@ -16,7 +16,7 @@ class AutomationRuleEngineTest {
         val decision = engine.evaluateForegroundChange(
             context(
                 settings = UserSettings(automationEnabled = false),
-                appStatus = AppListStatus.Whitelist,
+                isInOnlineList = true,
                 previousTargetAppActive = false,
             ),
         )
@@ -30,7 +30,7 @@ class AutomationRuleEngineTest {
     fun executorUnavailablePausesAutomation() {
         val decision = engine.evaluateForegroundChange(
             context(
-                appStatus = AppListStatus.Whitelist,
+                isInOnlineList = true,
                 executorAvailable = false,
                 previousTargetAppActive = false,
             ),
@@ -42,58 +42,41 @@ class AutomationRuleEngineTest {
     }
 
     @Test
-    fun whitelistAppReconnectsWhenEnteringForeground() {
+    fun manualOnlineAppReconnectsWhenEnteringForeground() {
         val decision = engine.evaluateForegroundChange(
             context(
-                appStatus = AppListStatus.Whitelist,
+                isInOnlineList = true,
+                onlineSource = AppOnlineSourceTag.Manual,
                 previousTargetAppActive = false,
             ),
         )
 
         assertTrue(decision.action is ForegroundAction.Reconnect)
-        assertEquals(listOf("Whitelist"), decision.matchedRules)
+        assertEquals(listOf("ManualOnline"), decision.matchedRules)
         assertTrue(decision.targetAppActive)
     }
 
     @Test
-    fun candidateAppReconnectsWhenWhitelistOnlyIsDisabled() {
+    fun autoOnlineAppReconnectsWhenEnteringForeground() {
         val decision = engine.evaluateForegroundChange(
             context(
-                settings = UserSettings(automationEnabled = true, whitelistOnly = false),
-                appStatus = AppListStatus.Candidate,
-                isCandidate = true,
+                isInOnlineList = true,
+                onlineSource = AppOnlineSourceTag.Auto,
                 previousTargetAppActive = false,
             ),
         )
 
         assertTrue(decision.action is ForegroundAction.Reconnect)
-        assertEquals(listOf("Candidate"), decision.matchedRules)
+        assertEquals(listOf("AutoOnline"), decision.matchedRules)
         assertTrue(decision.targetAppActive)
     }
 
     @Test
-    fun candidateAppDoesNotTriggerWhenWhitelistOnlyIsEnabled() {
-        val decision = engine.evaluateForegroundChange(
-            context(
-                settings = UserSettings(automationEnabled = true, whitelistOnly = true, appExitDisconnectEnabled = false),
-                appStatus = AppListStatus.Candidate,
-                isCandidate = true,
-                previousTargetAppActive = false,
-            ),
-        )
-
-        assertTrue(decision.action is ForegroundAction.None)
-        assertFalse(decision.targetAppActive)
-        assertFalse(decision.shouldLog)
-    }
-
-    @Test
-    fun ignoredAppDoesNotTriggerReconnect() {
+    fun offlineAppDoesNotTriggerReconnect() {
         val decision = engine.evaluateForegroundChange(
             context(
                 settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = false),
-                appStatus = AppListStatus.Ignored,
-                isCandidate = true,
+                isInOnlineList = false,
                 previousTargetAppActive = false,
             ),
         )
@@ -106,7 +89,9 @@ class AutomationRuleEngineTest {
     fun blacklistAppDisconnects() {
         val decision = engine.evaluateForegroundChange(
             context(
-                appStatus = AppListStatus.Blacklist,
+                isInOnlineList = false,
+                isInBlacklist = true,
+                onlineSource = AppOnlineSourceTag.Manual,
                 previousTargetAppActive = false,
             ),
         )
@@ -121,14 +106,15 @@ class AutomationRuleEngineTest {
         val decision = engine.evaluateForegroundChange(
             context(
                 settings = UserSettings(automationEnabled = true, skipReconnectOnWifi = true),
-                appStatus = AppListStatus.Whitelist,
+                isInOnlineList = true,
+                onlineSource = AppOnlineSourceTag.Manual,
                 isWifiConnected = true,
                 previousTargetAppActive = false,
             ),
         )
 
         assertTrue(decision.action is ForegroundAction.CancelScheduledDisconnect)
-        assertEquals(listOf("Whitelist", "SkipReconnectOnWifi"), decision.matchedRules)
+        assertEquals(listOf("ManualOnline", "SkipReconnectOnWifi"), decision.matchedRules)
         assertTrue(decision.shouldLog)
     }
 
@@ -137,7 +123,8 @@ class AutomationRuleEngineTest {
         val decision = engine.evaluateForegroundChange(
             context(
                 settings = UserSettings(automationEnabled = true, skipDisconnectOnWifi = true),
-                appStatus = null,
+                packageName = "com.example.other",
+                isInOnlineList = false,
                 isWifiConnected = true,
                 previousTargetAppActive = true,
             ),
@@ -149,11 +136,12 @@ class AutomationRuleEngineTest {
     }
 
     @Test
-    fun leavingTargetAppSchedulesDisconnect() {
+    fun leavingOnlineAppSchedulesDisconnect() {
         val decision = engine.evaluateForegroundChange(
             context(
                 settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = true, appExitDelaySeconds = 45),
-                appStatus = null,
+                packageName = "com.example.other",
+                isInOnlineList = false,
                 previousTargetAppActive = true,
             ),
         )
@@ -196,8 +184,9 @@ class AutomationRuleEngineTest {
         settings: UserSettings = UserSettings(automationEnabled = true),
         packageName: String? = "com.example.app",
         appLabel: String? = "Example",
-        appStatus: AppListStatus? = AppListStatus.Whitelist,
-        isCandidate: Boolean = appStatus == AppListStatus.Candidate,
+        isInOnlineList: Boolean = true,
+        isInBlacklist: Boolean = false,
+        onlineSource: AppOnlineSourceTag? = AppOnlineSourceTag.Manual,
         isWifiConnected: Boolean = false,
         executorAvailable: Boolean = true,
         previousTargetAppActive: Boolean? = false,
@@ -205,8 +194,9 @@ class AutomationRuleEngineTest {
         settings = settings,
         packageName = packageName,
         appLabel = appLabel,
-        appStatus = appStatus,
-        isCandidate = isCandidate,
+        isInOnlineList = isInOnlineList,
+        isInBlacklist = isInBlacklist,
+        onlineSource = onlineSource,
         isWifiConnected = isWifiConnected,
         executorAvailable = executorAvailable,
         previousTargetAppActive = previousTargetAppActive,

@@ -8,7 +8,6 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
-import com.gaozay.smartflight.domain.model.AppListStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,7 +29,7 @@ class InstalledAppScanner @Inject constructor(
                     ?.contains(Manifest.permission.INTERNET) == true
                 val isSystemApp = applicationInfo.isSystemApp()
                 if (isSystemApp) return@mapNotNull null
-                val isCandidate = declaresInternetPermission && hasLauncherEntry
+                val isAutoDetectedOnline = declaresInternetPermission && hasLauncherEntry
                 InstalledAppEntity(
                     packageName = packageName,
                     label = applicationInfo.loadLabel(packageManager).toString(),
@@ -38,8 +37,10 @@ class InstalledAppScanner @Inject constructor(
                     isSystemApp = isSystemApp,
                     hasLauncherEntry = hasLauncherEntry,
                     declaresInternetPermission = declaresInternetPermission,
-                    isCandidate = isCandidate,
-                    listStatus = if (isCandidate) AppListStatus.Candidate.name else AppListStatus.Ignored.name,
+                    isAutoDetectedOnline = isAutoDetectedOnline,
+                    isInOnlineList = isAutoDetectedOnline,
+                    isInWhitelist = false,
+                    isInBlacklist = false,
                     lastScannedAtMillis = now,
                 )
             }

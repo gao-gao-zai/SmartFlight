@@ -46,7 +46,6 @@ class DataStoreSettingsRepository @Inject constructor(
             appExitDelaySeconds = preferences[Keys.AppExitDelaySeconds] ?: 30,
             reconnectOnTargetAppLaunch = preferences[Keys.ReconnectOnTargetAppLaunch] ?: true,
             monitorForegroundWhenScreenOff = preferences[Keys.MonitorForegroundWhenScreenOff] ?: false,
-            whitelistOnly = preferences[Keys.WhitelistOnly] ?: false,
             skipReconnectOnWifi = preferences[Keys.SkipReconnectOnWifi] ?: true,
             skipDisconnectOnWifi = preferences[Keys.SkipDisconnectOnWifi] ?: true,
             preserveWifiState = preferences[Keys.PreserveWifiState] ?: true,
@@ -95,7 +94,6 @@ class DataStoreSettingsRepository @Inject constructor(
             preferences[Keys.AppExitDelaySeconds] = updated.appExitDelaySeconds
             preferences[Keys.ReconnectOnTargetAppLaunch] = updated.reconnectOnTargetAppLaunch
             preferences[Keys.MonitorForegroundWhenScreenOff] = updated.monitorForegroundWhenScreenOff
-            preferences[Keys.WhitelistOnly] = updated.whitelistOnly
             preferences[Keys.SkipReconnectOnWifi] = updated.skipReconnectOnWifi
             preferences[Keys.SkipDisconnectOnWifi] = updated.skipDisconnectOnWifi
             preferences[Keys.PreserveWifiState] = updated.preserveWifiState
@@ -127,7 +125,6 @@ class DataStoreSettingsRepository @Inject constructor(
         val AppExitDelaySeconds = intPreferencesKey("app_exit_delay_seconds")
         val ReconnectOnTargetAppLaunch = booleanPreferencesKey("reconnect_on_target_app_launch")
         val MonitorForegroundWhenScreenOff = booleanPreferencesKey("monitor_foreground_when_screen_off")
-        val WhitelistOnly = booleanPreferencesKey("whitelist_only")
         val SkipReconnectOnWifi = booleanPreferencesKey("skip_reconnect_on_wifi")
         val SkipDisconnectOnWifi = booleanPreferencesKey("skip_disconnect_on_wifi")
         val PreserveWifiState = booleanPreferencesKey("preserve_wifi_state")

@@ -9,11 +9,10 @@ import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.apps.InternetPermissionFilter
 import com.gaozay.smartflight.apps.LauncherFilter
 import com.gaozay.smartflight.apps.InstalledAppRepository
-import com.gaozay.smartflight.apps.status
+import com.gaozay.smartflight.apps.isOnline
 import com.gaozay.smartflight.data.local.entity.ExecutionLogEntity
 import com.gaozay.smartflight.domain.model.CornerStyle
 import com.gaozay.smartflight.domain.model.ExecutionAction
-import com.gaozay.smartflight.domain.model.AppListStatus
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
@@ -134,10 +133,10 @@ class MainViewModel @Inject constructor(
                 app.packageName.contains(query, ignoreCase = true)
             val matchesStatusFilter = when (filter) {
                 AppFilter.All -> true
-                AppFilter.Candidate -> app.status() == AppListStatus.Candidate
-                AppFilter.Whitelist -> app.status() == AppListStatus.Whitelist
-                AppFilter.Blacklist -> app.status() == AppListStatus.Blacklist
-                AppFilter.Ignored -> app.status() == AppListStatus.Ignored
+                AppFilter.Online -> app.isOnline()
+                AppFilter.Offline -> !app.isOnline()
+                AppFilter.Whitelist -> app.isInWhitelist
+                AppFilter.Blacklist -> app.isInBlacklist
             }
             val matchesInternetPermissionFilter = when (internetPermissionFilter) {
                 InternetPermissionFilter.All -> true
@@ -168,10 +167,10 @@ class MainViewModel @Inject constructor(
             appTypeFilter = typeFilter,
             launcherFilter = launcherFilter,
             totalCount = apps.size,
-            candidateCount = apps.count { it.status() == AppListStatus.Candidate },
-            whitelistCount = apps.count { it.status() == AppListStatus.Whitelist },
-            blacklistCount = apps.count { it.status() == AppListStatus.Blacklist },
-            ignoredCount = apps.count { it.status() == AppListStatus.Ignored },
+            onlineCount = apps.count { it.isOnline() },
+            offlineCount = apps.count { !it.isOnline() },
+            whitelistCount = apps.count { it.isInWhitelist },
+            blacklistCount = apps.count { it.isInBlacklist },
             filteredCount = filteredApps.size,
             isScanning = isScanning,
             lastScanSummary = lastScanSummary,
@@ -318,9 +317,21 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun setAppListStatus(packageName: String, status: AppListStatus) {
+    fun setAppManualOnline(packageName: String) {
         viewModelScope.launch {
-            installedAppRepository.setListStatus(packageName, status)
+            installedAppRepository.setManualOnline(packageName)
+        }
+    }
+
+    fun setAppManualOffline(packageName: String) {
+        viewModelScope.launch {
+            installedAppRepository.setManualOffline(packageName)
+        }
+    }
+
+    fun resetAppToDefault(packageName: String) {
+        viewModelScope.launch {
+            installedAppRepository.resetToDefault(packageName)
         }
     }
 
@@ -424,7 +435,7 @@ private fun buildRuntimeSummary(
         val remainingSeconds = pendingAt?.let {
             ((it - System.currentTimeMillis()).coerceAtLeast(0L) + 999L) / 1000L
         } ?: settings.appExitDelaySeconds.toLong()
-        return "白名单应用已离开前台，将在 ${remainingSeconds} 秒后断网"
+        return "联网应用已离开前台，将在 ${remainingSeconds} 秒后断网"
     }
     if (snapshot.isScreenOffDisconnectScheduled) {
         val pendingAt = snapshot.pendingScreenOffDisconnectAtMillis
@@ -448,7 +459,7 @@ private fun buildRuntimeSummary(
                     "屏幕已点亮，已取消待执行的息屏延迟断网"
 
                 com.gaozay.smartflight.domain.model.TriggerSource.AppForegroundChanged ->
-                    "白名单应用已重新进入前台，已取消待执行的离开应用延迟断网"
+                    "联网应用已重新进入前台，已取消待执行的离开应用延迟断网"
 
                 else -> "已取消待执行的息屏延迟断网"
             }
@@ -473,7 +484,7 @@ private fun buildRuntimeSummary(
         val remainingSeconds = snapshot.pendingAppExitDisconnectAtMillis?.let {
             ((it - System.currentTimeMillis()).coerceAtLeast(0L) + 999L) / 1000L
         } ?: settings.appExitDelaySeconds.toLong()
-        return "白名单应用已离开前台，将在 ${remainingSeconds} 秒后断网"
+        return "联网应用已离开前台，将在 ${remainingSeconds} 秒后断网"
     }
     if (snapshot.lastAction == ExecutionAction.DoNothing &&
         snapshot.lastTriggerSource == com.gaozay.smartflight.domain.model.TriggerSource.Manual

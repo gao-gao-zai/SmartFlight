@@ -17,7 +17,6 @@ data class UserSettings(
     val appExitDelaySeconds: Int = 30,
     val reconnectOnTargetAppLaunch: Boolean = true,
     val monitorForegroundWhenScreenOff: Boolean = false,
-    val whitelistOnly: Boolean = false,
     val skipReconnectOnWifi: Boolean = true,
     val skipDisconnectOnWifi: Boolean = true,
     val preserveWifiState: Boolean = true,

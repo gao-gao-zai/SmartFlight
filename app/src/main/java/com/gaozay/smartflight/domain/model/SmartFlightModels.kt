@@ -1,10 +1,8 @@
 package com.gaozay.smartflight.domain.model
 
-enum class AppListStatus(val label: String) {
-    Candidate("候选"),
-    Whitelist("白名单"),
-    Blacklist("黑名单"),
-    Ignored("忽略"),
+enum class AppOnlineSourceTag(val label: String) {
+    Auto("自动"),
+    Manual("手动"),
 }
 
 enum class NetworkControlMode(val label: String) {

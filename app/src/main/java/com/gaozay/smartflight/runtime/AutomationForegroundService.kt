@@ -17,10 +17,10 @@ import androidx.core.app.NotificationCompat
 import com.gaozay.smartflight.MainActivity
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.InstalledAppRepository
-import com.gaozay.smartflight.apps.status
-import com.gaozay.smartflight.domain.model.AppListStatus
+import com.gaozay.smartflight.apps.sourceTag
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
+import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.permission.AccessRepository
@@ -172,9 +172,10 @@ class AutomationForegroundService : Service() {
             launch {
                 installedAppRepository.observeApps().collect { apps ->
                     appRulesByPackageName = apps.associate { app ->
-                        app.packageName to AppRuntimeRuleInfo(
-                            status = app.status(),
-                            isCandidate = app.isCandidate,
+                    app.packageName to AppRuntimeRuleInfo(
+                            isInOnlineList = app.isInOnlineList,
+                            isInBlacklist = app.isInBlacklist,
+                            sourceTag = app.sourceTag(),
                         )
                     }
                 }
@@ -247,8 +248,9 @@ class AutomationForegroundService : Service() {
                 settings = settings,
                 packageName = packageName,
                 appLabel = foregroundApp?.appLabel,
-                appStatus = appRuleInfo?.status,
-                isCandidate = appRuleInfo?.isCandidate == true,
+                isInOnlineList = appRuleInfo?.isInOnlineList == true,
+                isInBlacklist = appRuleInfo?.isInBlacklist == true,
+                onlineSource = appRuleInfo?.sourceTag,
                 isWifiConnected = runtimeSnapshot.isWifiConnected,
                 executorAvailable = executorAvailable,
                 previousTargetAppActive = lastTargetAppActive,
@@ -579,6 +581,7 @@ class AutomationForegroundService : Service() {
 }
 
 private data class AppRuntimeRuleInfo(
-    val status: AppListStatus,
-    val isCandidate: Boolean,
+    val isInOnlineList: Boolean,
+    val isInBlacklist: Boolean,
+    val sourceTag: AppOnlineSourceTag?,
 )

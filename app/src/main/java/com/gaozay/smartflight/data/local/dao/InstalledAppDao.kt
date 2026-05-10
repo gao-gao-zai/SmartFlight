@@ -15,9 +15,6 @@ interface InstalledAppDao {
     @Query("SELECT * FROM installed_apps")
     suspend fun getAll(): List<InstalledAppEntity>
 
-    @Query("SELECT * FROM installed_apps WHERE listStatus = :listStatus ORDER BY label COLLATE NOCASE ASC")
-    fun observeByListStatus(listStatus: String): Flow<List<InstalledAppEntity>>
-
     @Query("SELECT * FROM installed_apps WHERE packageName = :packageName LIMIT 1")
     suspend fun getByPackageName(packageName: String): InstalledAppEntity?
 
@@ -34,9 +31,6 @@ interface InstalledAppDao {
             deleteMissing(apps.map { it.packageName })
         }
     }
-
-    @Query("UPDATE installed_apps SET listStatus = :listStatus WHERE packageName = :packageName")
-    suspend fun updateListStatus(packageName: String, listStatus: String)
 
     @Query("DELETE FROM installed_apps WHERE packageName NOT IN (:packageNames)")
     suspend fun deleteMissing(packageNames: List<String>)

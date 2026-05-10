@@ -38,7 +38,7 @@ object DatabaseModule {
         context,
         SmartFlightDatabase::class.java,
         "smartflight.db",
-    ).build()
+    ).addMigrations(SmartFlightDatabase.MIGRATION_1_2).build()
 
     @Provides
     fun provideInstalledAppDao(database: SmartFlightDatabase): InstalledAppDao =

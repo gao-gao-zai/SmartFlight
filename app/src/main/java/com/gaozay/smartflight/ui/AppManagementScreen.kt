@@ -54,9 +54,11 @@ import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.apps.InternetPermissionFilter
 import com.gaozay.smartflight.apps.LauncherFilter
-import com.gaozay.smartflight.apps.status
+import com.gaozay.smartflight.apps.isOnline
+import com.gaozay.smartflight.apps.sourceTag
+import com.gaozay.smartflight.apps.statusLabel
 import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
-import com.gaozay.smartflight.domain.model.AppListStatus
+import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
 
 @Composable
 fun AppManagementScreen(
@@ -69,7 +71,9 @@ fun AppManagementScreen(
     onLauncherFilterChange: (LauncherFilter) -> Unit,
     onClearAdvancedFilters: () -> Unit,
     onRefreshApps: () -> Unit,
-    onSetListStatus: (String, AppListStatus) -> Unit,
+    onSetManualOnline: (String) -> Unit,
+    onSetManualOffline: (String) -> Unit,
+    onResetToDefault: (String) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -111,10 +115,15 @@ fun AppManagementScreen(
             item { EmptyAppsCard(onRefreshApps = onRefreshApps) }
         } else {
             items(
-                items = state.apps,
-                key = { it.packageName },
-            ) { app ->
-                AppRow(app = app, onSetListStatus = onSetListStatus)
+            items = state.apps,
+            key = { it.packageName },
+        ) { app ->
+                AppRow(
+                    app = app,
+                    onSetManualOnline = onSetManualOnline,
+                    onSetManualOffline = onSetManualOffline,
+                    onResetToDefault = onResetToDefault,
+                )
             }
         }
     }
@@ -146,7 +155,7 @@ private fun AppScopeSummary(
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "白名单会恢复联网，黑名单和忽略不会触发规则",
+                        text = "联网列表决定应用是否会触发恢复联网，手动标记优先于自动识别",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -167,13 +176,13 @@ private fun AppScopeSummary(
                     modifier = Modifier.weight(1f),
                 )
                 CountPill(
-                    label = "白名单",
-                    count = state.whitelistCount,
+                    label = "联网",
+                    count = state.onlineCount,
                     modifier = Modifier.weight(1f),
                 )
                 CountPill(
-                    label = "黑名单",
-                    count = state.blacklistCount,
+                    label = "非联网",
+                    count = state.offlineCount,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -396,7 +405,7 @@ private fun EmptyAppsCard(onRefreshApps: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "点击扫描读取已安装应用，并自动识别可能需要联网控制的候选应用。",
+                text = "点击扫描读取已安装应用，并自动识别需要联网的应用。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -410,9 +419,11 @@ private fun EmptyAppsCard(onRefreshApps: () -> Unit) {
 @Composable
 private fun AppRow(
     app: InstalledAppEntity,
-    onSetListStatus: (String, AppListStatus) -> Unit,
+    onSetManualOnline: (String) -> Unit,
+    onSetManualOffline: (String) -> Unit,
+    onResetToDefault: (String) -> Unit,
 ) {
-    val status = app.status()
+    val sourceTag = app.sourceTag()
     var expanded by rememberSaveable(app.packageName) { mutableStateOf(false) }
     Card(
         colors = CardDefaults.cardColors(
@@ -426,7 +437,7 @@ private fun AppRow(
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppIcon(packageName = app.packageName, label = app.label, status = status)
+            AppIcon(packageName = app.packageName, label = app.label, app = app)
             Spacer(modifier = Modifier.size(12.dp))
             Column(
                 modifier = Modifier.weight(1f),
@@ -448,10 +459,17 @@ private fun AppRow(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     InfoTag(
-                        text = status.userLabel(),
-                        containerColor = status.tagContainerColor(),
-                        contentColor = status.tagContentColor(),
+                        text = app.statusLabel(),
+                        containerColor = app.statusTagContainerColor(),
+                        contentColor = app.statusTagContentColor(),
                     )
+                    sourceTag?.let {
+                        InfoTag(
+                            text = it.label,
+                            containerColor = it.tagContainerColor(),
+                            contentColor = it.tagContentColor(),
+                        )
+                    }
                     InfoTag(text = if (app.declaresInternetPermission) "声明联网" else "未声明联网")
                     InfoTag(text = if (app.isSystemApp) "系统应用" else "用户应用")
                 }
@@ -465,19 +483,31 @@ private fun AppRow(
                     onDismissRequest = { expanded = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("当前：${status.userLabel()}") },
+                        text = { Text("当前：${app.statusLabel()}${sourceTag?.let { " · ${it.label}" } ?: ""}") },
                         enabled = false,
                         onClick = {},
                     )
-                    AppListStatus.entries.forEach { targetStatus ->
-                        DropdownMenuItem(
-                            text = { Text(targetStatus.actionLabel()) },
-                            onClick = {
-                                expanded = false
-                                onSetListStatus(app.packageName, targetStatus)
-                            },
-                        )
-                    }
+                    DropdownMenuItem(
+                        text = { Text("设为联网") },
+                        onClick = {
+                            expanded = false
+                            onSetManualOnline(app.packageName)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("设为非联网") },
+                        onClick = {
+                            expanded = false
+                            onSetManualOffline(app.packageName)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("恢复默认") },
+                        onClick = {
+                            expanded = false
+                            onResetToDefault(app.packageName)
+                        },
+                    )
                 }
             }
         }
@@ -488,7 +518,7 @@ private fun AppRow(
 private fun AppIcon(
     packageName: String,
     label: String,
-    status: AppListStatus,
+    app: InstalledAppEntity,
 ) {
     val packageManager = LocalContext.current.packageManager
     val bitmap = remember(packageName) {
@@ -500,14 +530,14 @@ private fun AppIcon(
         modifier = Modifier
             .size(42.dp)
             .clip(CircleShape)
-            .background(status.iconFallbackContainerColor()),
+            .background(app.iconFallbackContainerColor()),
         contentAlignment = Alignment.Center,
     ) {
         if (bitmap == null) {
             Text(
                 text = label.take(1).ifBlank { "?" },
                 fontWeight = FontWeight.Bold,
-                color = status.iconFallbackContentColor(),
+                color = app.iconFallbackContentColor(),
             )
         } else {
             Image(
@@ -532,19 +562,17 @@ private fun Drawable.toBitmap(): Bitmap {
 }
 
 @Composable
-private fun AppListStatus.iconFallbackContainerColor(): Color = when (this) {
-    AppListStatus.Whitelist -> MaterialTheme.colorScheme.primaryContainer
-    AppListStatus.Blacklist -> MaterialTheme.colorScheme.errorContainer
-    AppListStatus.Ignored -> MaterialTheme.colorScheme.surfaceVariant
-    AppListStatus.Candidate -> MaterialTheme.colorScheme.secondaryContainer
+private fun InstalledAppEntity.iconFallbackContainerColor(): Color = when {
+    isInBlacklist -> MaterialTheme.colorScheme.errorContainer
+    isOnline() -> MaterialTheme.colorScheme.primaryContainer
+    else -> MaterialTheme.colorScheme.surfaceVariant
 }
 
 @Composable
-private fun AppListStatus.iconFallbackContentColor(): Color = when (this) {
-    AppListStatus.Whitelist -> MaterialTheme.colorScheme.onPrimaryContainer
-    AppListStatus.Blacklist -> MaterialTheme.colorScheme.onErrorContainer
-    AppListStatus.Ignored -> MaterialTheme.colorScheme.onSurfaceVariant
-    AppListStatus.Candidate -> MaterialTheme.colorScheme.onSecondaryContainer
+private fun InstalledAppEntity.iconFallbackContentColor(): Color = when {
+    isInBlacklist -> MaterialTheme.colorScheme.onErrorContainer
+    isOnline() -> MaterialTheme.colorScheme.onPrimaryContainer
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 @Composable
@@ -571,27 +599,37 @@ private fun InfoTag(
 }
 
 @Composable
-private fun AppListStatus.tagContainerColor(): Color = when (this) {
-    AppListStatus.Candidate -> MaterialTheme.colorScheme.secondaryContainer
-    AppListStatus.Whitelist -> MaterialTheme.colorScheme.primaryContainer
-    AppListStatus.Blacklist -> MaterialTheme.colorScheme.errorContainer
-    AppListStatus.Ignored -> MaterialTheme.colorScheme.surfaceVariant
+private fun InstalledAppEntity.statusTagContainerColor(): Color = when {
+    isInBlacklist -> MaterialTheme.colorScheme.errorContainer
+    isOnline() -> MaterialTheme.colorScheme.primaryContainer
+    else -> MaterialTheme.colorScheme.surfaceVariant
 }
 
 @Composable
-private fun AppListStatus.tagContentColor(): Color = when (this) {
-    AppListStatus.Candidate -> MaterialTheme.colorScheme.onSecondaryContainer
-    AppListStatus.Whitelist -> MaterialTheme.colorScheme.onPrimaryContainer
-    AppListStatus.Blacklist -> MaterialTheme.colorScheme.onErrorContainer
-    AppListStatus.Ignored -> MaterialTheme.colorScheme.onSurfaceVariant
+private fun InstalledAppEntity.statusTagContentColor(): Color = when {
+    isInBlacklist -> MaterialTheme.colorScheme.onErrorContainer
+    isOnline() -> MaterialTheme.colorScheme.onPrimaryContainer
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+@Composable
+private fun AppOnlineSourceTag.tagContainerColor(): Color = when (this) {
+    AppOnlineSourceTag.Auto -> MaterialTheme.colorScheme.secondaryContainer
+    AppOnlineSourceTag.Manual -> MaterialTheme.colorScheme.tertiaryContainer
+}
+
+@Composable
+private fun AppOnlineSourceTag.tagContentColor(): Color = when (this) {
+    AppOnlineSourceTag.Auto -> MaterialTheme.colorScheme.onSecondaryContainer
+    AppOnlineSourceTag.Manual -> MaterialTheme.colorScheme.onTertiaryContainer
 }
 
 private fun AppFilter.zhLabel(): String = when (this) {
     AppFilter.All -> "全部应用"
-    AppFilter.Candidate -> "普通候选"
+    AppFilter.Online -> "联网"
+    AppFilter.Offline -> "非联网"
     AppFilter.Whitelist -> "白名单"
     AppFilter.Blacklist -> "黑名单"
-    AppFilter.Ignored -> "已忽略"
 }
 
 private fun InternetPermissionFilter.zhLabel(): String = when (this) {
@@ -612,16 +650,3 @@ private fun LauncherFilter.zhLabel(): String = when (this) {
     LauncherFilter.NoLauncher -> "无启动入口"
 }
 
-private fun AppListStatus.userLabel(): String = when (this) {
-    AppListStatus.Candidate -> "普通候选"
-    AppListStatus.Whitelist -> "白名单"
-    AppListStatus.Blacklist -> "黑名单"
-    AppListStatus.Ignored -> "已忽略"
-}
-
-private fun AppListStatus.actionLabel(): String = when (this) {
-    AppListStatus.Candidate -> "作为普通候选"
-    AppListStatus.Whitelist -> "加入白名单：打开时恢复联网"
-    AppListStatus.Blacklist -> "加入黑名单：不因它联网"
-    AppListStatus.Ignored -> "忽略此应用：不参与规则"
-}

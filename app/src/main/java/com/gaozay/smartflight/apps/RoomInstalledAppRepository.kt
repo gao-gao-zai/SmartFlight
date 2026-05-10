@@ -2,7 +2,6 @@ package com.gaozay.smartflight.apps
 
 import com.gaozay.smartflight.data.local.dao.InstalledAppDao
 import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
-import com.gaozay.smartflight.domain.model.AppListStatus
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -13,9 +12,6 @@ class RoomInstalledAppRepository @Inject constructor(
     private val installedAppScanner: InstalledAppScanner,
 ) : InstalledAppRepository {
     override fun observeApps(): Flow<List<InstalledAppEntity>> = installedAppDao.observeAll()
-
-    override fun observeAppsByStatus(status: AppListStatus): Flow<List<InstalledAppEntity>> =
-        installedAppDao.observeByListStatus(status.name)
 
     override fun observeAppCount(): Flow<Int> = installedAppDao.observeCount()
 
@@ -29,7 +25,7 @@ class RoomInstalledAppRepository @Inject constructor(
             if (existing == null) {
                 scanned
             } else {
-                scanned.copy(listStatus = existing.listStatus)
+                mergeScannedState(scanned = scanned, existing = existing)
             }
         }
         installedAppDao.replaceScannedApps(scannedApps)
@@ -40,10 +36,70 @@ class RoomInstalledAppRepository @Inject constructor(
         installedAppDao.upsertAll(apps)
     }
 
-    override suspend fun setListStatus(packageName: String, status: AppListStatus) {
-        installedAppDao.updateListStatus(
-            packageName = packageName,
-            listStatus = status.name,
+    override suspend fun setManualOnline(packageName: String) {
+        val app = installedAppDao.getByPackageName(packageName) ?: return
+        installedAppDao.upsert(
+            app.copy(
+                isInOnlineList = true,
+                isInWhitelist = true,
+                isInBlacklist = false,
+            ),
         )
+    }
+
+    override suspend fun setManualOffline(packageName: String) {
+        val app = installedAppDao.getByPackageName(packageName) ?: return
+        installedAppDao.upsert(
+            app.copy(
+                isInOnlineList = false,
+                isInWhitelist = false,
+                isInBlacklist = true,
+            ),
+        )
+    }
+
+    override suspend fun resetToDefault(packageName: String) {
+        val app = installedAppDao.getByPackageName(packageName) ?: return
+        val shouldBeOnline = app.isAutoDetectedOnline
+        installedAppDao.upsert(
+            app.copy(
+                isInOnlineList = shouldBeOnline,
+                isInWhitelist = false,
+                isInBlacklist = false,
+            ),
+        )
+    }
+
+    private fun mergeScannedState(
+        scanned: InstalledAppEntity,
+        existing: InstalledAppEntity,
+    ): InstalledAppEntity {
+        val isManualOnline = existing.isInWhitelist
+        val isManualOffline = existing.isInBlacklist
+        return when {
+            isManualOnline -> scanned.copy(
+                isInOnlineList = true,
+                isInWhitelist = true,
+                isInBlacklist = false,
+            )
+
+            isManualOffline -> scanned.copy(
+                isInOnlineList = false,
+                isInWhitelist = false,
+                isInBlacklist = true,
+            )
+
+            scanned.isAutoDetectedOnline -> scanned.copy(
+                isInOnlineList = true,
+                isInWhitelist = false,
+                isInBlacklist = false,
+            )
+
+            else -> scanned.copy(
+                isInOnlineList = false,
+                isInWhitelist = false,
+                isInBlacklist = false,
+            )
+        }
     }
 }
