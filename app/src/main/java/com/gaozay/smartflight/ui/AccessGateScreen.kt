@@ -46,6 +46,7 @@ import com.gaozay.smartflight.permission.AccessGateState
 fun AccessGateScreen(
     state: AccessGateState,
     onRefresh: () -> Unit,
+    onContinueToApp: () -> Unit,
     onRequestShizukuPermission: () -> Unit,
     onProbeRootAccess: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
@@ -102,6 +103,14 @@ fun AccessGateScreen(
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (state.canEnterApp) {
+                    Button(
+                        onClick = onContinueToApp,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("进入主页面")
+                    }
+                }
                 Button(
                     onClick = onRefresh,
                     modifier = Modifier.fillMaxWidth(),
@@ -251,6 +260,13 @@ private fun SystemAccessCard(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
+            OutlinedButton(
+                onClick = onAutoGrantCompanionPermissions,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = canAutoGrant,
+            ) {
+                Text("尝试自动授权")
+            }
             AccessResultRow(result = usageStatsAccess)
             OutlinedButton(onClick = onOpenUsageAccessSettings) {
                 Icon(Icons.Rounded.Settings, contentDescription = "打开使用情况访问设置")
@@ -268,13 +284,6 @@ private fun SystemAccessCard(
                 Icon(Icons.Rounded.BatterySaver, contentDescription = "打开电池优化设置")
                 Spacer(modifier = Modifier.size(8.dp))
                 Text("打开电池优化设置")
-            }
-            OutlinedButton(
-                onClick = onAutoGrantCompanionPermissions,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = canAutoGrant,
-            ) {
-                Text("尝试自动授权")
             }
         }
     }

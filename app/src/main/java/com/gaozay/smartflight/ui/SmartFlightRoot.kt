@@ -130,16 +130,22 @@ fun SmartFlightRoot(
     onOpenBatteryOptimizationSettings: () -> Unit,
 ) {
     var screen by rememberSaveable { mutableStateOf(SmartFlightScreen.Dashboard) }
-    if (!state.accessGateState.canEnterApp) {
+    var forceShowAccessGate by rememberSaveable { mutableStateOf(false) }
+    val showAccessGate = forceShowAccessGate || !state.accessGateState.canEnterApp
+    if (showAccessGate) {
         Scaffold(topBar = { SmartFlightTopBar("SmartFlight 接入检查") }) { innerPadding ->
             Surface(Modifier.fillMaxSize().padding(innerPadding)) {
                 AccessGateScreen(
                     state = state.accessGateState,
                     onRefresh = onRefreshAccessChecks,
+                    onContinueToApp = { forceShowAccessGate = false },
                     onRequestShizukuPermission = onRequestShizukuPermission,
                     onProbeRootAccess = onProbeRootAccess,
                     onSetAdbBootstrapped = onSetAdbBootstrapped,
-                    onAutoGrantCompanionPermissions = onAutoGrantCompanionPermissions,
+                    onAutoGrantCompanionPermissions = {
+                        forceShowAccessGate = true
+                        onAutoGrantCompanionPermissions()
+                    },
                     onOpenUsageAccessSettings = onOpenUsageAccessSettings,
                     onOpenNotificationSettings = onOpenNotificationSettings,
                     onOpenBatteryOptimizationSettings = onOpenBatteryOptimizationSettings,
