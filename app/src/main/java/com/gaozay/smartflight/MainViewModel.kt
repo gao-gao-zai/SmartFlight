@@ -204,6 +204,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun autoGrantCompanionPermissions() {
+        viewModelScope.launch {
+            accessRepository.autoGrantCompanionPermissions()
+        }
+    }
+
     fun probeAirplaneModeState() {
         viewModelScope.launch {
             accessRepository.probeAirplaneModeState()

@@ -1,10 +1,12 @@
 package com.gaozay.smartflight.permission
 
+import android.os.Build
 import com.gaozay.smartflight.data.local.entity.ExecutionLogEntity
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
+import com.gaozay.smartflight.executor.ExecutorWriteCommands
 import com.gaozay.smartflight.executor.ExecutorProbeService
 import com.gaozay.smartflight.executor.ExecutorCommandResult
 import com.gaozay.smartflight.logs.ExecutionLogRepository
@@ -13,11 +15,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import dagger.hilt.android.qualifiers.ApplicationContext
+import android.content.Context
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class DefaultAccessRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val advancedAccessChecker: AdvancedAccessChecker,
     private val systemPermissionChecker: SystemPermissionChecker,
     private val adbBootstrapRepository: AdbBootstrapRepository,
@@ -72,6 +77,33 @@ class DefaultAccessRepository @Inject constructor(
 
     override suspend fun probeRootAccess() {
         rootAccessChecker.probeAuthorization()
+        refresh()
+    }
+
+    override suspend fun autoGrantCompanionPermissions() {
+        val currentState = accessGateState.value
+        if (!currentState.advancedAccess.isAvailable) {
+            return
+        }
+
+        val packageName = context.packageName
+        if (!currentState.usageStatsAccess.satisfiesRequirement) {
+            executorProbeService.runCommand(
+                ExecutorWriteCommands.grantUsageStatsAccess(packageName),
+            )
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !currentState.notificationAccess.satisfiesRequirement
+        ) {
+            executorProbeService.runCommand(
+                ExecutorWriteCommands.grantNotificationPermission(packageName),
+            )
+        }
+        if (!currentState.batteryOptimization.satisfiesRequirement) {
+            executorProbeService.runCommand(
+                ExecutorWriteCommands.whitelistBatteryOptimization(packageName),
+            )
+        }
         refresh()
     }
 

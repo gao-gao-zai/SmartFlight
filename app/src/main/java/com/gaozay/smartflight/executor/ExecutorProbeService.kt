@@ -35,14 +35,23 @@ class ExecutorProbeService @Inject constructor(
         return selected.executorType to runner
     }
 
+    suspend fun runCommand(command: ExecutorCommand): ExecutorCommandResult {
+        val (executorType, runner) = currentRunner()
+        return runner?.run(command) ?: ExecutorCommandResult(
+            executorType = executorType,
+            executed = false,
+            summary = "没有可用于${command.purpose}的执行器",
+        )
+    }
+
     suspend fun probeAirplaneModeState(): ExecutorCommandResult {
-        val (_, runner) = currentRunner()
-        return runner?.run(ExecutorReadonlyCommands.ReadAirplaneModeState)
-            ?: ExecutorCommandResult(
-                executorType = ExecutorType.Unavailable,
-                executed = false,
-                summary = "没有可用于读取飞行模式状态的执行器",
-            )
+        return runCommand(ExecutorReadonlyCommands.ReadAirplaneModeState).let { result ->
+            if (!result.executed && result.summary.startsWith("没有可用于")) {
+                result.copy(summary = "没有可用于读取飞行模式状态的执行器")
+            } else {
+                result
+            }
+        }
     }
 
     suspend fun toggleAirplaneModeState(): ExecutorCommandResult {

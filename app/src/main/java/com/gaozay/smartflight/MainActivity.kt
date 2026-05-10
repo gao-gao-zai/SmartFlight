@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onProbeRootAccess = viewModel::probeRootAccess,
                     onSetAdbBootstrapped = viewModel::setAdbBootstrapped,
+                    onAutoGrantCompanionPermissions = viewModel::autoGrantCompanionPermissions,
                     onOpenUsageAccessSettings = {
                         startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
                     },

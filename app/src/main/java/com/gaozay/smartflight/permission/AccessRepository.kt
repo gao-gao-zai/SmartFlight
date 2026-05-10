@@ -12,6 +12,8 @@ interface AccessRepository {
 
     suspend fun probeRootAccess()
 
+    suspend fun autoGrantCompanionPermissions()
+
     suspend fun probeAirplaneModeState()
 
     suspend fun toggleAirplaneModeState()

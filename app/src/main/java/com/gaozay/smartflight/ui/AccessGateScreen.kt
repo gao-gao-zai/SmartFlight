@@ -49,6 +49,7 @@ fun AccessGateScreen(
     onRequestShizukuPermission: () -> Unit,
     onProbeRootAccess: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
+    onAutoGrantCompanionPermissions: () -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenBatteryOptimizationSettings: () -> Unit,
@@ -68,7 +69,7 @@ fun AccessGateScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "自动化功能至少需要一种高级执行能力，并授予使用情况访问权限。通知和电池优化先作为建议项展示。",
+                    text = "自动化功能至少需要一种高级执行能力，并授予使用情况访问权限。自动授权只会在你点击按钮后尝试执行。",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -88,27 +89,15 @@ fun AccessGateScreen(
             )
         }
         item {
-            AccessCheckCard(
-                icon = Icons.Rounded.VerifiedUser,
-                result = state.usageStatsAccess,
-                actionText = "打开使用情况访问设置",
-                onAction = onOpenUsageAccessSettings,
-            )
-        }
-        item {
-            AccessCheckCard(
-                icon = Icons.Rounded.Notifications,
-                result = state.notificationAccess,
-                actionText = "打开通知设置",
-                onAction = onOpenNotificationSettings,
-            )
-        }
-        item {
-            AccessCheckCard(
-                icon = Icons.Rounded.BatterySaver,
-                result = state.batteryOptimization,
-                actionText = "打开电池优化设置",
-                onAction = onOpenBatteryOptimizationSettings,
+            SystemAccessCard(
+                usageStatsAccess = state.usageStatsAccess,
+                notificationAccess = state.notificationAccess,
+                batteryOptimization = state.batteryOptimization,
+                canAutoGrant = state.advancedAccess.isAvailable,
+                onAutoGrantCompanionPermissions = onAutoGrantCompanionPermissions,
+                onOpenUsageAccessSettings = onOpenUsageAccessSettings,
+                onOpenNotificationSettings = onOpenNotificationSettings,
+                onOpenBatteryOptimizationSettings = onOpenBatteryOptimizationSettings,
             )
         }
         item {
@@ -234,11 +223,15 @@ private fun AccessSectionCard(
 }
 
 @Composable
-private fun AccessCheckCard(
-    icon: ImageVector,
-    result: AccessCheckResult,
-    actionText: String,
-    onAction: () -> Unit,
+private fun SystemAccessCard(
+    usageStatsAccess: AccessCheckResult,
+    notificationAccess: AccessCheckResult,
+    batteryOptimization: AccessCheckResult,
+    canAutoGrant: Boolean,
+    onAutoGrantCompanionPermissions: () -> Unit,
+    onOpenUsageAccessSettings: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenBatteryOptimizationSettings: () -> Unit,
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -250,19 +243,38 @@ private fun AccessCheckCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = result.title)
+                Icon(Icons.Rounded.VerifiedUser, contentDescription = "一般权限")
                 Spacer(modifier = Modifier.size(10.dp))
                 Text(
-                    text = result.title,
+                    text = "一般权限",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-            AccessResultRow(result = result)
-            OutlinedButton(onClick = onAction) {
-                Icon(Icons.Rounded.Settings, contentDescription = actionText)
+            AccessResultRow(result = usageStatsAccess)
+            OutlinedButton(onClick = onOpenUsageAccessSettings) {
+                Icon(Icons.Rounded.Settings, contentDescription = "打开使用情况访问设置")
                 Spacer(modifier = Modifier.size(8.dp))
-                Text(actionText)
+                Text("打开使用情况访问设置")
+            }
+            AccessResultRow(result = notificationAccess)
+            OutlinedButton(onClick = onOpenNotificationSettings) {
+                Icon(Icons.Rounded.Notifications, contentDescription = "打开通知设置")
+                Spacer(modifier = Modifier.size(8.dp))
+                Text("打开通知设置")
+            }
+            AccessResultRow(result = batteryOptimization)
+            OutlinedButton(onClick = onOpenBatteryOptimizationSettings) {
+                Icon(Icons.Rounded.BatterySaver, contentDescription = "打开电池优化设置")
+                Spacer(modifier = Modifier.size(8.dp))
+                Text("打开电池优化设置")
+            }
+            OutlinedButton(
+                onClick = onAutoGrantCompanionPermissions,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = canAutoGrant,
+            ) {
+                Text("尝试自动授权")
             }
         }
     }
