@@ -46,7 +46,6 @@ import com.gaozay.smartflight.permission.AccessGateState
 fun AccessGateScreen(
     state: AccessGateState,
     onRefresh: () -> Unit,
-    onContinueToApp: () -> Unit,
     onRequestShizukuPermission: () -> Unit,
     onProbeRootAccess: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
@@ -103,19 +102,11 @@ fun AccessGateScreen(
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (state.canEnterApp) {
-                    Button(
-                        onClick = onContinueToApp,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("进入主页面")
-                    }
-                }
                 Button(
                     onClick = onRefresh,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("重新检测")
+                    Text(if (state.canEnterApp) "刷新状态" else "继续检查")
                 }
                 if (state.advisoryChecks.isNotEmpty()) {
                     Text(

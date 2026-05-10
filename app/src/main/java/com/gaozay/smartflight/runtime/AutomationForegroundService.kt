@@ -25,6 +25,8 @@ import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.settings.SettingsRepository
+import com.gaozay.smartflight.runtime.isDisconnected
+import com.gaozay.smartflight.runtime.mobileDataNoOpSuffix
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +61,9 @@ class AutomationForegroundService : Service() {
 
     @Inject
     lateinit var automationRuleEngine: AutomationRuleEngine
+
+    @Inject
+    lateinit var runtimeEnvironmentMonitor: RuntimeEnvironmentMonitor
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var automationJob: Job? = null
@@ -104,8 +109,13 @@ class AutomationForegroundService : Service() {
                 addAction(Intent.ACTION_USER_PRESENT)
             },
         )
+        runtimeEnvironmentMonitor.register(serviceScope)
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
+        serviceScope.launch {
+            runtimeEnvironmentMonitor.refreshSnapshot()
+            accessRepository.syncCurrentNetworkControlState()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -144,6 +154,7 @@ class AutomationForegroundService : Service() {
         automationJob?.cancel()
         screenOffDisconnectJob?.cancel()
         appExitDisconnectJob?.cancel()
+        runtimeEnvironmentMonitor.unregister()
         unregisterReceiver(screenStateReceiver)
         runBlocking {
             runtimeStatusRepository.updateSnapshot { snapshot ->
@@ -267,10 +278,10 @@ class AutomationForegroundService : Service() {
             is ForegroundAction.Reconnect -> {
                 cancelAppExitDisconnect(updateRuntimeState = true)
                 executeAirplaneModeChange(
-                    currentEnabled = runtimeSnapshot.isAirplaneModeEnabled,
-                    targetEnabled = false,
+                    currentDisconnected = runtimeSnapshot.isDisconnected(settings.networkControlMode),
+                    targetDisconnected = false,
                     triggerSource = TriggerSource.AppForegroundChanged,
-                    reason = action.reason,
+                    reason = action.reason + settings.mobileDataNoOpSuffix(),
                     onPrompt = { showReconnectPrompt(settings) },
                 )
             }
@@ -278,10 +289,10 @@ class AutomationForegroundService : Service() {
             is ForegroundAction.Disconnect -> {
                 cancelAppExitDisconnect(updateRuntimeState = false)
                 executeAirplaneModeChange(
-                    currentEnabled = runtimeSnapshot.isAirplaneModeEnabled,
-                    targetEnabled = true,
+                    currentDisconnected = runtimeSnapshot.isDisconnected(settings.networkControlMode),
+                    targetDisconnected = true,
                     triggerSource = TriggerSource.AppForegroundChanged,
-                    reason = action.reason,
+                    reason = action.reason + settings.mobileDataNoOpSuffix(),
                     onPrompt = { showDisconnectPrompt(settings) },
                 )
             }
@@ -321,7 +332,7 @@ class AutomationForegroundService : Service() {
             cancelScreenOffDisconnect()
             return
         }
-        if (runtimeSnapshot.isAirplaneModeEnabled == true) {
+        if (runtimeSnapshot.isDisconnected(settings.networkControlMode) == true) {
             cancelScreenOffDisconnect()
             return
         }
@@ -352,7 +363,7 @@ class AutomationForegroundService : Service() {
                 screenState = currentScreenState,
                 isWifiConnected = latestRuntimeSnapshot.isWifiConnected,
                 executorAvailable = latestExecutorAvailable,
-            ) && latestRuntimeSnapshot.isAirplaneModeEnabled != true
+            ) && latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode) != true
             runtimeStatusRepository.updateSnapshot { snapshot ->
                 snapshot.copy(
                     isScreenOffDisconnectScheduled = false,
@@ -365,10 +376,10 @@ class AutomationForegroundService : Service() {
                 return@launch
             }
             executeAirplaneModeChange(
-                currentEnabled = latestRuntimeSnapshot.isAirplaneModeEnabled,
-                targetEnabled = true,
+                currentDisconnected = latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode),
+                targetDisconnected = true,
                 triggerSource = TriggerSource.ScreenOff,
-                reason = "息屏延迟 ${latestSettings.screenOffDelaySeconds} 秒后执行断网",
+                reason = "息屏延迟 ${latestSettings.screenOffDelaySeconds} 秒后执行断网${latestSettings.mobileDataNoOpSuffix()}",
                 onPrompt = { showDisconnectPrompt(latestSettings) },
             )
         }
@@ -376,7 +387,8 @@ class AutomationForegroundService : Service() {
 
     private suspend fun scheduleAppExitDisconnect(reason: String, delaySeconds: Int) {
         val runtimeSnapshot = runtimeStatusRepository.snapshot.first()
-        if (runtimeSnapshot.isAirplaneModeEnabled == true) {
+        val currentSettings = settingsRepository.settings.first()
+        if (runtimeSnapshot.isDisconnected(currentSettings.networkControlMode) == true) {
             cancelAppExitDisconnect(updateRuntimeState = false)
             return
         }
@@ -406,7 +418,7 @@ class AutomationForegroundService : Service() {
                 latestSettings.appExitDisconnectEnabled &&
                 lastTargetAppActive == false &&
                 latestExecutorAvailable &&
-                latestRuntimeSnapshot.isAirplaneModeEnabled != true &&
+                latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode) != true &&
                 !(latestRuntimeSnapshot.isWifiConnected && latestSettings.skipDisconnectOnWifi)
             runtimeStatusRepository.updateSnapshot { snapshot ->
                 snapshot.copy(
@@ -420,27 +432,27 @@ class AutomationForegroundService : Service() {
                 return@launch
             }
             executeAirplaneModeChange(
-                currentEnabled = latestRuntimeSnapshot.isAirplaneModeEnabled,
-                targetEnabled = true,
+                currentDisconnected = latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode),
+                targetDisconnected = true,
                 triggerSource = TriggerSource.AppForegroundChanged,
-                reason = reason,
+                reason = reason + latestSettings.mobileDataNoOpSuffix(),
                 onPrompt = { showDisconnectPrompt(latestSettings) },
             )
         }
     }
 
     private suspend fun executeAirplaneModeChange(
-        currentEnabled: Boolean?,
-        targetEnabled: Boolean,
+        currentDisconnected: Boolean?,
+        targetDisconnected: Boolean,
         triggerSource: TriggerSource,
         reason: String,
         onPrompt: suspend () -> Unit,
     ) {
-        if (currentEnabled == targetEnabled) {
+        if (currentDisconnected == targetDisconnected) {
             return
         }
-        accessRepository.setAirplaneModeState(
-            enabled = targetEnabled,
+        accessRepository.setDisconnectedState(
+            disconnected = targetDisconnected,
             triggerSource = triggerSource,
             reason = reason,
         )

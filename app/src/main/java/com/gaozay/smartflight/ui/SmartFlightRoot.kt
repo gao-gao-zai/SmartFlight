@@ -116,11 +116,12 @@ fun SmartFlightRoot(
     onSetAppManualOffline: (String) -> Unit,
     onResetAppToDefault: (String) -> Unit,
     onRefreshAccessChecks: () -> Unit,
-    onProbeAirplaneModeState: () -> Unit,
-    onToggleAirplaneModeState: () -> Unit,
+    onProbeCurrentNetworkControlState: () -> Unit,
+    onToggleCurrentNetworkControlState: () -> Unit,
     onSimulateScreenOff: () -> Unit,
     onSimulateScreenOn: () -> Unit,
     onClearExecutionLogs: () -> Unit,
+    onRequestBluetoothPermission: () -> Unit,
     onRequestShizukuPermission: () -> Unit,
     onProbeRootAccess: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
@@ -130,22 +131,16 @@ fun SmartFlightRoot(
     onOpenBatteryOptimizationSettings: () -> Unit,
 ) {
     var screen by rememberSaveable { mutableStateOf(SmartFlightScreen.Dashboard) }
-    var forceShowAccessGate by rememberSaveable { mutableStateOf(false) }
-    val showAccessGate = forceShowAccessGate || !state.accessGateState.canEnterApp
-    if (showAccessGate) {
+    if (!state.accessGateState.canEnterApp) {
         Scaffold(topBar = { SmartFlightTopBar("SmartFlight 接入检查") }) { innerPadding ->
             Surface(Modifier.fillMaxSize().padding(innerPadding)) {
                 AccessGateScreen(
                     state = state.accessGateState,
                     onRefresh = onRefreshAccessChecks,
-                    onContinueToApp = { forceShowAccessGate = false },
                     onRequestShizukuPermission = onRequestShizukuPermission,
                     onProbeRootAccess = onProbeRootAccess,
                     onSetAdbBootstrapped = onSetAdbBootstrapped,
-                    onAutoGrantCompanionPermissions = {
-                        forceShowAccessGate = true
-                        onAutoGrantCompanionPermissions()
-                    },
+                    onAutoGrantCompanionPermissions = onAutoGrantCompanionPermissions,
                     onOpenUsageAccessSettings = onOpenUsageAccessSettings,
                     onOpenNotificationSettings = onOpenNotificationSettings,
                     onOpenBatteryOptimizationSettings = onOpenBatteryOptimizationSettings,
@@ -182,11 +177,12 @@ fun SmartFlightRoot(
                     state = state,
                     innerPadding = innerPadding,
                     onRefreshAccessChecks = onRefreshAccessChecks,
-                    onProbeAirplaneModeState = onProbeAirplaneModeState,
-                    onToggleAirplaneModeState = onToggleAirplaneModeState,
+                    onProbeCurrentNetworkControlState = onProbeCurrentNetworkControlState,
+                    onToggleCurrentNetworkControlState = onToggleCurrentNetworkControlState,
                     onSimulateScreenOff = onSimulateScreenOff,
                     onSimulateScreenOn = onSimulateScreenOn,
                     onClearExecutionLogs = onClearExecutionLogs,
+                    onRequestBluetoothPermission = onRequestBluetoothPermission,
                     onRequestShizukuPermission = onRequestShizukuPermission,
                     onProbeRootAccess = onProbeRootAccess,
                     onSetAdbBootstrapped = onSetAdbBootstrapped,
@@ -366,7 +362,7 @@ private fun RulesScreen(
             ChoiceRow("执行器偏好", ExecutorType.entries.filterNot { it == ExecutorType.Unavailable }, settings.preferredExecutorType, onSetPreferredExecutorType)
         } }
         item { SettingsSection("应用触发") {
-            SwitchRow("启动目标应用时恢复联网", "联网应用进入前台时关闭飞行模式", settings.reconnectOnTargetAppLaunch) { onUpdateSettings { s -> s.copy(reconnectOnTargetAppLaunch = it) } }
+            SwitchRow("启动目标应用时恢复联网", "联网应用进入前台时按当前模式恢复联网", settings.reconnectOnTargetAppLaunch) { onUpdateSettings { s -> s.copy(reconnectOnTargetAppLaunch = it) } }
             SwitchRow("离开目标应用后断网", "离开联网应用后等待一段时间再断网", settings.appExitDisconnectEnabled) { onUpdateSettings { s -> s.copy(appExitDisconnectEnabled = it) } }
             NumberRow("离开后延迟秒数", settings.appExitDelaySeconds) { onUpdateSettings { s -> s.copy(appExitDelaySeconds = it.coerceIn(0, 600)) } }
         } }
@@ -416,11 +412,12 @@ private fun DiagnosticsScreen(
     state: SmartFlightUiState,
     innerPadding: PaddingValues,
     onRefreshAccessChecks: () -> Unit,
-    onProbeAirplaneModeState: () -> Unit,
-    onToggleAirplaneModeState: () -> Unit,
+    onProbeCurrentNetworkControlState: () -> Unit,
+    onToggleCurrentNetworkControlState: () -> Unit,
     onSimulateScreenOff: () -> Unit,
     onSimulateScreenOn: () -> Unit,
     onClearExecutionLogs: () -> Unit,
+    onRequestBluetoothPermission: () -> Unit,
     onRequestShizukuPermission: () -> Unit,
     onProbeRootAccess: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
@@ -490,6 +487,15 @@ private fun DiagnosticsScreen(
             InfoRow("当前实际执行器", state.runtimeExecutor)
             InfoRow("最近结果", state.runtimeLastResult)
             InfoRow("最近摘要", state.runtimeLastCheck)
+            InfoRow("当前统一网络状态", state.unifiedNetworkState)
+            InfoRow("Wi‑Fi 状态", state.wifiStatus)
+            InfoRow("蓝牙状态", state.bluetoothStatus)
+            InfoRow("移动数据状态", state.mobileDataStatus)
+            if (!state.bluetoothReadable) {
+                OutlinedButton(onClick = onRequestBluetoothPermission, modifier = Modifier.fillMaxWidth()) {
+                    Text("请求蓝牙状态权限")
+                }
+            }
         } }
         item {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
@@ -500,8 +506,8 @@ private fun DiagnosticsScreen(
                     }
                     if (advancedExpanded) {
                         Text("这里的操作会直接改变设备联网状态，仅用于排障。", color = MaterialTheme.colorScheme.error)
-                        OutlinedButton(onClick = { pendingAction = "probe" }, modifier = Modifier.fillMaxWidth()) { Text("探测飞行模式状态") }
-                        OutlinedButton(onClick = { pendingAction = "toggle" }, modifier = Modifier.fillMaxWidth()) { Text("手动切换飞行模式") }
+                        OutlinedButton(onClick = { pendingAction = "probe" }, modifier = Modifier.fillMaxWidth()) { Text("探测当前控制状态") }
+                        OutlinedButton(onClick = { pendingAction = "toggle" }, modifier = Modifier.fillMaxWidth()) { Text("手动切换当前模式") }
                         OutlinedButton(onClick = onSimulateScreenOff, modifier = Modifier.fillMaxWidth()) { Text("模拟息屏") }
                         OutlinedButton(onClick = onSimulateScreenOn, modifier = Modifier.fillMaxWidth()) { Text("模拟亮屏 / 取消延迟断网") }
                         OutlinedButton(onClick = { pendingAction = "clear" }, modifier = Modifier.fillMaxWidth()) { Text("清空日志") }
@@ -515,10 +521,10 @@ private fun DiagnosticsScreen(
         } }
     }
     pendingAction?.let { action ->
-        ConfirmActionDialog(action = action, onDismiss = { pendingAction = null }) {
+        ConfirmActionDialog(action = action, modeLabel = state.currentMode, onDismiss = { pendingAction = null }) {
             when (action) {
-                "probe" -> onProbeAirplaneModeState()
-                "toggle" -> onToggleAirplaneModeState()
+                "probe" -> onProbeCurrentNetworkControlState()
+                "toggle" -> onToggleCurrentNetworkControlState()
                 "clear" -> onClearExecutionLogs()
             }
             pendingAction = null
@@ -826,16 +832,16 @@ private fun ExecutionLogCard(item: ExecutionLogItem) {
 }
 
 @Composable
-private fun ConfirmActionDialog(action: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun ConfirmActionDialog(action: String, modeLabel: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     val title = when (action) {
-        "probe" -> "探测飞行模式状态"
-        "toggle" -> "手动切换飞行模式"
+        "probe" -> "探测当前控制状态"
+        "toggle" -> "手动切换当前模式"
         "clear" -> "清空全部日志"
         else -> "确认操作"
     }
     val description = when (action) {
-        "probe" -> "即将读取设备飞行模式状态，并写入一条诊断日志。"
-        "toggle" -> "即将直接改变设备联网状态。该操作仅用于排障，并会写入日志。"
+        "probe" -> "即将读取设备当前的 $modeLabel 状态，并写入一条诊断日志。"
+        "toggle" -> "即将直接切换当前联网控制方式（$modeLabel）。该操作仅用于排障，并会写入日志。"
         "clear" -> "即将清空当前保存的执行日志，此操作不可从应用内恢复。"
         else -> "请确认是否继续。"
     }

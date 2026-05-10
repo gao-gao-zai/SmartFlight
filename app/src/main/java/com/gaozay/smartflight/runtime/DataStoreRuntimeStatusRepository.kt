@@ -42,9 +42,11 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
                 default = UnifiedNetworkState.Unknown,
             ),
             isAirplaneModeEnabled = preferences[Keys.IsAirplaneModeEnabled],
+            isMobileDataEnabled = preferences[Keys.IsMobileDataEnabled],
             isWifiConnected = preferences[Keys.IsWifiConnected] ?: false,
             isWifiEnabled = preferences[Keys.IsWifiEnabled] ?: false,
             isBluetoothEnabled = preferences[Keys.IsBluetoothEnabled] ?: false,
+            isBluetoothStateReadable = preferences[Keys.IsBluetoothStateReadable] ?: false,
             isForegroundServiceRunning = preferences[Keys.IsForegroundServiceRunning] ?: false,
             isScreenOffDisconnectScheduled = preferences[Keys.IsScreenOffDisconnectScheduled] ?: false,
             pendingScreenOffDisconnectAtMillis = preferences[Keys.PendingScreenOffDisconnectAtMillis],
@@ -77,7 +79,7 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
     }
 
     override suspend fun updateSnapshot(transform: (RuntimeSnapshot) -> RuntimeSnapshot) {
-        val updated = transform(snapshot.first())
+        val updated = transform(snapshot.first()).withDerivedUnifiedNetworkState()
         context.runtimeDataStore.edit { preferences ->
             updated.currentForegroundPackageName?.let {
                 preferences[Keys.CurrentForegroundPackageName] = it
@@ -90,9 +92,13 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
             updated.isAirplaneModeEnabled?.let {
                 preferences[Keys.IsAirplaneModeEnabled] = it
             } ?: preferences.remove(Keys.IsAirplaneModeEnabled)
+            updated.isMobileDataEnabled?.let {
+                preferences[Keys.IsMobileDataEnabled] = it
+            } ?: preferences.remove(Keys.IsMobileDataEnabled)
             preferences[Keys.IsWifiConnected] = updated.isWifiConnected
             preferences[Keys.IsWifiEnabled] = updated.isWifiEnabled
             preferences[Keys.IsBluetoothEnabled] = updated.isBluetoothEnabled
+            preferences[Keys.IsBluetoothStateReadable] = updated.isBluetoothStateReadable
             preferences[Keys.IsForegroundServiceRunning] = updated.isForegroundServiceRunning
             preferences[Keys.IsScreenOffDisconnectScheduled] = updated.isScreenOffDisconnectScheduled
             updated.pendingScreenOffDisconnectAtMillis?.let {
@@ -122,9 +128,11 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
         val ScreenState = stringPreferencesKey("screen_state")
         val UnifiedNetworkState = stringPreferencesKey("unified_network_state")
         val IsAirplaneModeEnabled = booleanPreferencesKey("is_airplane_mode_enabled")
+        val IsMobileDataEnabled = booleanPreferencesKey("is_mobile_data_enabled")
         val IsWifiConnected = booleanPreferencesKey("is_wifi_connected")
         val IsWifiEnabled = booleanPreferencesKey("is_wifi_enabled")
         val IsBluetoothEnabled = booleanPreferencesKey("is_bluetooth_enabled")
+        val IsBluetoothStateReadable = booleanPreferencesKey("is_bluetooth_state_readable")
         val IsForegroundServiceRunning = booleanPreferencesKey("is_foreground_service_running")
         val IsScreenOffDisconnectScheduled = booleanPreferencesKey("is_screen_off_disconnect_scheduled")
         val PendingScreenOffDisconnectAtMillis = longPreferencesKey("pending_screen_off_disconnect_at_millis")

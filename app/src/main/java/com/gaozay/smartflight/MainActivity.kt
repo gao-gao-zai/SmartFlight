@@ -1,12 +1,17 @@
 package com.gaozay.smartflight
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 import androidx.activity.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gaozay.smartflight.ui.SmartFlightRoot
@@ -25,6 +30,11 @@ class MainActivity : ComponentActivity() {
         if (requestCode == SHIZUKU_REQUEST_CODE) {
             viewModel.refreshAccessChecks()
         }
+    }
+    private val bluetoothPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {
+        viewModel.refreshAccessChecks()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,11 +69,21 @@ class MainActivity : ComponentActivity() {
                     onSetAppManualOffline = viewModel::setAppManualOffline,
                     onResetAppToDefault = viewModel::resetAppToDefault,
                     onRefreshAccessChecks = viewModel::refreshAccessChecks,
-                    onProbeAirplaneModeState = viewModel::probeAirplaneModeState,
-                    onToggleAirplaneModeState = viewModel::toggleAirplaneModeState,
+                    onProbeCurrentNetworkControlState = viewModel::probeCurrentNetworkControlState,
+                    onToggleCurrentNetworkControlState = viewModel::toggleCurrentNetworkControlState,
                     onSimulateScreenOff = viewModel::simulateScreenOff,
                     onSimulateScreenOn = viewModel::simulateScreenOn,
                     onClearExecutionLogs = viewModel::clearExecutionLogs,
+                    onRequestBluetoothPermission = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                            ContextCompat.checkSelfPermission(
+                                this,
+                                Manifest.permission.BLUETOOTH_CONNECT,
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        }
+                    },
                     onRequestShizukuPermission = {
                         runCatching {
                             Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)

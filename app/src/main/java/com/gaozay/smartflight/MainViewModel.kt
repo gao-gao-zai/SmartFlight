@@ -23,6 +23,8 @@ import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.permission.AccessGateState
 import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.runtime.AutomationServiceController
+import com.gaozay.smartflight.runtime.isDisconnected
+import com.gaozay.smartflight.runtime.mobileDataNoOpSuffix
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
@@ -86,6 +88,11 @@ class MainViewModel @Inject constructor(
             runtimeLastCheck = base.runtimeSnapshot.runtimeStatusSummary,
             runtimeLastResult = base.runtimeSnapshot.runtimeStatusResult.label,
             runtimeUpdatedAtMillis = base.runtimeSnapshot.updatedAtMillis,
+            unifiedNetworkState = base.runtimeSnapshot.unifiedNetworkState.label,
+            wifiStatus = buildWifiStatus(base.runtimeSnapshot),
+            bluetoothStatus = buildBluetoothStatus(base.runtimeSnapshot),
+            mobileDataStatus = buildMobileDataStatus(base.runtimeSnapshot),
+            bluetoothReadable = base.runtimeSnapshot.isBluetoothStateReadable,
             executorDiagnostics = emptyList(),
             recentExecutionLogs = recentLogs.map { it.toUiItem() },
             triggerSummary = buildString {
@@ -210,15 +217,21 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun probeAirplaneModeState() {
+    fun syncCurrentNetworkControlState() {
         viewModelScope.launch {
-            accessRepository.probeAirplaneModeState()
+            accessRepository.syncCurrentNetworkControlState()
         }
     }
 
-    fun toggleAirplaneModeState() {
+    fun probeCurrentNetworkControlState() {
         viewModelScope.launch {
-            accessRepository.toggleAirplaneModeState()
+            accessRepository.probeCurrentNetworkControlState()
+        }
+    }
+
+    fun toggleCurrentNetworkControlState() {
+        viewModelScope.launch {
+            accessRepository.toggleCurrentNetworkControlState()
         }
     }
 
@@ -367,6 +380,11 @@ data class SmartFlightUiState(
     val runtimeLastCheck: String = "尚未执行自检",
     val runtimeLastResult: String = ExecutionResult.Pending.label,
     val runtimeUpdatedAtMillis: Long = 0,
+    val unifiedNetworkState: String = "Unknown",
+    val wifiStatus: String = "未知",
+    val bluetoothStatus: String = "未知",
+    val mobileDataStatus: String = "未知",
+    val bluetoothReadable: Boolean = false,
     val executorDiagnostics: List<ExecutorDiagnosticItem> = emptyList(),
     val recentExecutionLogs: List<ExecutionLogItem> = emptyList(),
     val triggerSummary: String = "项目已初始化，运行时引擎待接入。",
@@ -408,7 +426,8 @@ data class ExecutionLogItem(
 
 private fun ExecutionLogEntity.toUiItem(): ExecutionLogItem {
     val actionLabel = when {
-        errorMessage?.startsWith("飞行模式状态探测：") == true -> "状态探测"
+        errorMessage?.startsWith("飞行模式状态探测：") == true ||
+            errorMessage?.startsWith("移动数据状态探测：") == true -> "状态探测"
         actionType == ExecutionAction.ReconnectNow.name -> "立即恢复联网"
         actionType == ExecutionAction.DisconnectNow.name -> "立即断网"
         actionType == ExecutionAction.DoNothing.name -> "未执行动作"
@@ -432,10 +451,11 @@ private fun ExecutionLogEntity.toUiItem(): ExecutionLogItem {
     )
 }
 
-private fun buildRuntimeSummary(
+internal fun buildRuntimeSummary(
     settings: UserSettings,
     snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
 ): String {
+    val mode = settings.networkControlMode
     if (snapshot.isAppExitDisconnectScheduled) {
         val pendingAt = snapshot.pendingAppExitDisconnectAtMillis
         val remainingSeconds = pendingAt?.let {
@@ -496,31 +516,88 @@ private fun buildRuntimeSummary(
         snapshot.lastTriggerSource == com.gaozay.smartflight.domain.model.TriggerSource.Manual
     ) {
         return when (snapshot.lastActionResult) {
-            ExecutionResult.Success -> when (snapshot.isAirplaneModeEnabled) {
-                true -> "飞行模式当前已开启"
-                false -> "飞行模式当前已关闭"
-                null -> "飞行模式状态已同步"
-            }
-
-            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { "飞行模式状态探测失败" }
-            else -> snapshot.lastActionReason.ifBlank { "飞行模式状态待确认" }
+            ExecutionResult.Success -> buildProbeSuccessSummary(mode, snapshot)
+            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { "${mode.label}状态探测失败" }
+            else -> snapshot.lastActionReason.ifBlank { "${mode.label}状态待确认" }
         }
     }
     if (snapshot.lastAction == ExecutionAction.DisconnectNow) {
         return when (snapshot.lastActionResult) {
-            ExecutionResult.Success -> "已开启飞行模式，当前处于断网状态"
-            ExecutionResult.Skipped -> "飞行模式原本已开启，无需重复断网"
-            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { "开启飞行模式失败" }
+            ExecutionResult.Success -> when (mode) {
+                NetworkControlMode.AirplaneMode -> "已开启飞行模式，当前处于断网状态"
+                NetworkControlMode.MobileData -> "已关闭移动数据，当前处于断网状态${settings.mobileDataNoOpSuffix()}"
+            }
+            ExecutionResult.Skipped -> when (mode) {
+                NetworkControlMode.AirplaneMode -> "飞行模式原本已开启，无需重复断网"
+                NetworkControlMode.MobileData -> "移动数据原本已关闭，无需重复断网${settings.mobileDataNoOpSuffix()}"
+            }
+            ExecutionResult.PartialSuccess -> snapshot.lastActionReason.ifBlank { "${mode.label}写入后校验异常" }
+            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank {
+                when (mode) {
+                    NetworkControlMode.AirplaneMode -> "开启飞行模式失败"
+                    NetworkControlMode.MobileData -> "关闭移动数据失败"
+                }
+            }
             else -> snapshot.lastActionReason.ifBlank { "正在执行断网" }
         }
     }
     if (snapshot.lastAction == ExecutionAction.ReconnectNow) {
         return when (snapshot.lastActionResult) {
-            ExecutionResult.Success -> "已关闭飞行模式，当前已恢复联网"
-            ExecutionResult.Skipped -> "飞行模式原本已关闭，无需重复恢复联网"
-            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { "关闭飞行模式失败" }
+            ExecutionResult.Success -> when (mode) {
+                NetworkControlMode.AirplaneMode -> "已关闭飞行模式，当前已恢复联网"
+                NetworkControlMode.MobileData -> "已开启移动数据，当前已恢复联网${settings.mobileDataNoOpSuffix()}"
+            }
+            ExecutionResult.Skipped -> when (mode) {
+                NetworkControlMode.AirplaneMode -> "飞行模式原本已关闭，无需重复恢复联网"
+                NetworkControlMode.MobileData -> "移动数据原本已开启，无需重复恢复联网${settings.mobileDataNoOpSuffix()}"
+            }
+            ExecutionResult.PartialSuccess -> snapshot.lastActionReason.ifBlank { "${mode.label}写入后校验异常" }
+            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank {
+                when (mode) {
+                    NetworkControlMode.AirplaneMode -> "关闭飞行模式失败"
+                    NetworkControlMode.MobileData -> "开启移动数据失败"
+                }
+            }
             else -> snapshot.lastActionReason.ifBlank { "正在执行恢复联网" }
         }
     }
     return snapshot.lastActionReason
 }
+
+private fun buildProbeSuccessSummary(
+    mode: NetworkControlMode,
+    snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
+): String = when (mode) {
+    NetworkControlMode.AirplaneMode -> when (snapshot.isAirplaneModeEnabled) {
+        true -> "飞行模式当前已开启"
+        false -> "飞行模式当前已关闭"
+        null -> "飞行模式状态已同步"
+    }
+    NetworkControlMode.MobileData -> when (snapshot.isMobileDataEnabled) {
+        true -> "移动数据当前已开启"
+        false -> "移动数据当前已关闭"
+        null -> "移动数据状态已同步"
+    }
+}
+
+private fun buildWifiStatus(snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot): String = when {
+    snapshot.isWifiConnected -> "已连接"
+    snapshot.isWifiEnabled -> "已开启，未连接"
+    else -> "已关闭"
+}
+
+private fun buildBluetoothStatus(snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot): String =
+    if (!snapshot.isBluetoothStateReadable) {
+        "未授权，不可读"
+    } else if (snapshot.isBluetoothEnabled) {
+        "已开启"
+    } else {
+        "已关闭"
+    }
+
+private fun buildMobileDataStatus(snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot): String =
+    when (snapshot.isMobileDataEnabled) {
+        true -> "已开启"
+        false -> "已关闭"
+        null -> "未知"
+    }

@@ -14,12 +14,14 @@ interface AccessRepository {
 
     suspend fun autoGrantCompanionPermissions()
 
-    suspend fun probeAirplaneModeState()
+    suspend fun syncCurrentNetworkControlState()
 
-    suspend fun toggleAirplaneModeState()
+    suspend fun probeCurrentNetworkControlState()
 
-    suspend fun setAirplaneModeState(
-        enabled: Boolean,
+    suspend fun toggleCurrentNetworkControlState()
+
+    suspend fun setDisconnectedState(
+        disconnected: Boolean,
         triggerSource: TriggerSource = TriggerSource.Manual,
         reason: String? = null,
     )

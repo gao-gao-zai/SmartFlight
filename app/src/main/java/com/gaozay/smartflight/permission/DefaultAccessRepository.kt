@@ -4,12 +4,14 @@ import android.os.Build
 import com.gaozay.smartflight.data.local.entity.ExecutionLogEntity
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
+import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
-import com.gaozay.smartflight.executor.ExecutorWriteCommands
 import com.gaozay.smartflight.executor.ExecutorProbeService
 import com.gaozay.smartflight.executor.ExecutorCommandResult
+import com.gaozay.smartflight.executor.ExecutorWriteCommands
 import com.gaozay.smartflight.logs.ExecutionLogRepository
+import com.gaozay.smartflight.runtime.withDerivedUnifiedNetworkState
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -107,58 +109,89 @@ class DefaultAccessRepository @Inject constructor(
         refresh()
     }
 
-    override suspend fun probeAirplaneModeState() {
-        val result = executorProbeService.probeAirplaneModeState()
-        val airplaneModeEnabled = parseAirplaneModeEnabled(result)
-        val executionResult = if (result.executed && result.exitCode == 0 && airplaneModeEnabled != null) {
+    override suspend fun syncCurrentNetworkControlState() {
+        val result = executorProbeService.probeCurrentNetworkControlState()
+        applyProbeResult(
+            result = result,
+            triggerSource = TriggerSource.ServiceRestored,
+            shouldLog = false,
+        )
+    }
+
+    override suspend fun probeCurrentNetworkControlState() {
+        val result = executorProbeService.probeCurrentNetworkControlState()
+        applyProbeResult(
+            result = result,
+            triggerSource = TriggerSource.Manual,
+            shouldLog = true,
+        )
+    }
+
+    private suspend fun applyProbeResult(
+        result: ExecutorCommandResult,
+        triggerSource: TriggerSource,
+        shouldLog: Boolean,
+    ) {
+        val controlledEnabled = result.controlledEnabled
+        val executionResult = if (result.executed && result.exitCode == 0 && controlledEnabled != null) {
             ExecutionResult.Success
         } else {
             ExecutionResult.Failed
         }
         val detailReason = buildProbeDetailReason(result)
         runtimeStatusRepository.updateSnapshot { snapshot ->
-            snapshot.copy(
+            updateControlStateSnapshot(snapshot, result).copy(
                 activeExecutorType = result.executorType,
                 lastAction = ExecutionAction.DoNothing,
-                lastTriggerSource = TriggerSource.Manual,
+                lastTriggerSource = triggerSource,
                 lastActionResult = executionResult,
                 lastActionReason = if (executionResult == ExecutionResult.Failed) {
                     detailReason
                 } else {
                     ""
                 },
-                isAirplaneModeEnabled = airplaneModeEnabled,
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
-        addExecutionLog(
-            action = ExecutionAction.DoNothing,
-            result = executionResult,
-            reason = detailReason,
-            probeResult = result,
-            triggerSource = TriggerSource.Manual,
-        )
+        if (shouldLog) {
+            addExecutionLog(
+                action = ExecutionAction.DoNothing,
+                result = executionResult,
+                reason = detailReason,
+                probeResult = result,
+                triggerSource = triggerSource,
+            )
+        }
     }
 
-    override suspend fun toggleAirplaneModeState() {
-        val result = executorProbeService.toggleAirplaneModeState()
-        applyAirplaneModeResult(
+    override suspend fun toggleCurrentNetworkControlState() {
+        val result = executorProbeService.toggleCurrentNetworkControlState()
+        applyNetworkControlResult(
             result = result,
             triggerSource = TriggerSource.Manual,
-            reasonPrefix = "手动切换飞行模式",
+            reasonPrefix = when (result.controlMode ?: NetworkControlMode.AirplaneMode) {
+                NetworkControlMode.AirplaneMode -> "手动切换飞行模式"
+                NetworkControlMode.MobileData -> "手动切换移动数据"
+            },
         )
     }
 
-    override suspend fun setAirplaneModeState(
-        enabled: Boolean,
+    override suspend fun setDisconnectedState(
+        disconnected: Boolean,
         triggerSource: TriggerSource,
         reason: String?,
     ) {
-        val result = executorProbeService.setAirplaneModeState(enabled)
-        applyAirplaneModeResult(
+        val result = executorProbeService.setDisconnectedState(disconnected)
+        val mode = result.controlMode ?: NetworkControlMode.AirplaneMode
+        applyNetworkControlResult(
             result = result,
             triggerSource = triggerSource,
-            reasonPrefix = reason ?: if (enabled) "自动开启飞行模式" else "自动关闭飞行模式",
+            reasonPrefix = reason ?: when (mode) {
+                NetworkControlMode.AirplaneMode ->
+                    if (disconnected) "自动开启飞行模式" else "自动关闭飞行模式"
+                NetworkControlMode.MobileData ->
+                    if (disconnected) "自动关闭移动数据" else "自动开启移动数据"
+            },
         )
     }
 
@@ -189,35 +222,42 @@ class DefaultAccessRepository @Inject constructor(
         )
     }
 
-    private suspend fun applyAirplaneModeResult(
+    private suspend fun applyNetworkControlResult(
         result: ExecutorCommandResult,
         triggerSource: TriggerSource,
         reasonPrefix: String,
     ) {
-        val action = when (result.summary) {
-            "飞行模式已开启", "飞行模式已处于开启状态" -> ExecutionAction.DisconnectNow
-            "飞行模式已关闭", "飞行模式已处于关闭状态" -> ExecutionAction.ReconnectNow
-            else -> ExecutionAction.DoNothing
+        val mode = result.controlMode ?: NetworkControlMode.AirplaneMode
+        val action = when (mode) {
+            NetworkControlMode.AirplaneMode -> when (result.controlledEnabled) {
+                true -> ExecutionAction.DisconnectNow
+                false -> ExecutionAction.ReconnectNow
+                null -> ExecutionAction.DoNothing
+            }
+            NetworkControlMode.MobileData -> when (result.controlledEnabled) {
+                false -> ExecutionAction.DisconnectNow
+                true -> ExecutionAction.ReconnectNow
+                null -> ExecutionAction.DoNothing
+            }
         }
         val executionResult = when {
             result.summary.contains("已处于") -> ExecutionResult.Skipped
-            result.executed && result.exitCode == 0 -> ExecutionResult.Success
+            result.executed && result.exitCode == 0 && result.controlledEnabled != null -> ExecutionResult.Success
+            result.executed && result.exitCode == 0 -> ExecutionResult.PartialSuccess
             else -> ExecutionResult.Failed
         }
-        val airplaneModeEnabled = parseAirplaneModeEnabled(result)
         val detailReason = buildActionDetailReason(reasonPrefix, result)
         runtimeStatusRepository.updateSnapshot { snapshot ->
-            snapshot.copy(
+            updateControlStateSnapshot(snapshot, result).copy(
                 activeExecutorType = result.executorType,
                 lastAction = action,
                 lastTriggerSource = triggerSource,
                 lastActionResult = executionResult,
-                lastActionReason = if (executionResult == ExecutionResult.Failed) {
-                    detailReason
-                } else {
+                lastActionReason = if (executionResult == ExecutionResult.Success || executionResult == ExecutionResult.Skipped) {
                     ""
+                } else {
+                    detailReason
                 },
-                isAirplaneModeEnabled = airplaneModeEnabled ?: snapshot.isAirplaneModeEnabled,
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
@@ -230,22 +270,14 @@ class DefaultAccessRepository @Inject constructor(
         )
     }
 
-    private fun parseAirplaneModeEnabled(result: ExecutorCommandResult): Boolean? =
-        when (result.stdout.trim()) {
-            "1" -> true
-            "0" -> false
-            else -> null
-        }
-
     private fun buildProbeDetailReason(result: ExecutorCommandResult): String = buildString {
-        append("飞行模式状态探测：")
-        append(
-            when (result.stdout.trim()) {
-                "1" -> "已开启"
-                "0" -> "已关闭"
-                else -> result.summary
-            },
-        )
+        val mode = result.controlMode ?: NetworkControlMode.AirplaneMode
+        append(if (mode == NetworkControlMode.AirplaneMode) "飞行模式状态探测：" else "移动数据状态探测：")
+        append(when (result.controlledEnabled) {
+            true -> if (mode == NetworkControlMode.AirplaneMode) "已开启" else "已开启"
+            false -> if (mode == NetworkControlMode.AirplaneMode) "已关闭" else "已关闭"
+            null -> result.summary
+        })
         append(" · 执行器：")
         append(result.executorType.label)
         if (result.stdout.isNotBlank() && result.stdout.trim() !in setOf("0", "1")) {
@@ -271,6 +303,21 @@ class DefaultAccessRepository @Inject constructor(
         if (result.stderr.isNotBlank()) {
             append(" · 错误：")
             append(result.stderr.trim())
+        }
+    }
+
+    private fun updateControlStateSnapshot(
+        snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
+        result: ExecutorCommandResult,
+    ): com.gaozay.smartflight.runtime.RuntimeSnapshot {
+        val controlledEnabled = result.controlledEnabled
+        return when (result.controlMode ?: NetworkControlMode.AirplaneMode) {
+            NetworkControlMode.AirplaneMode -> snapshot.copy(
+                isAirplaneModeEnabled = controlledEnabled ?: snapshot.isAirplaneModeEnabled,
+            ).withDerivedUnifiedNetworkState()
+            NetworkControlMode.MobileData -> snapshot.copy(
+                isMobileDataEnabled = controlledEnabled ?: snapshot.isMobileDataEnabled,
+            ).withDerivedUnifiedNetworkState()
         }
     }
 

@@ -1,6 +1,7 @@
 package com.gaozay.smartflight.executor
 
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -14,13 +15,7 @@ class ExecutorProbeService @Inject constructor(
     private val shizukuExecutorCommandRunner: ShizukuExecutorCommandRunner,
     private val adbExecutorCommandRunner: AdbExecutorCommandRunner,
 ) {
-    private fun parseAirplaneModeEnabled(result: ExecutorCommandResult): Boolean? {
-        return when (result.stdout.trim()) {
-            "1" -> true
-            "0" -> false
-            else -> null
-        }
-    }
+    private val mobileDataUnsupportedSummary = "当前设备不支持移动数据切换，请改用飞行模式"
 
     private suspend fun currentRunner(): Pair<ExecutorType, ExecutorCommandRunner?> {
         val validations = executorValidationService.validateAll()
@@ -35,6 +30,56 @@ class ExecutorProbeService @Inject constructor(
         return selected.executorType to runner
     }
 
+    private suspend fun currentMode(): NetworkControlMode = settingsRepository.settings.first().networkControlMode
+
+    private fun readCommandFor(mode: NetworkControlMode): ExecutorCommand =
+        when (mode) {
+            NetworkControlMode.AirplaneMode -> ExecutorReadonlyCommands.ReadAirplaneModeState
+            NetworkControlMode.MobileData -> ExecutorReadonlyCommands.ReadMobileDataState
+        }
+
+    private fun writeCommandFor(mode: NetworkControlMode, enabled: Boolean): ExecutorCommand =
+        when (mode) {
+            NetworkControlMode.AirplaneMode -> ExecutorWriteCommands.setAirplaneModeState(enabled)
+            NetworkControlMode.MobileData -> ExecutorWriteCommands.setMobileDataEnabled(enabled)
+        }
+
+    private fun labelFor(mode: NetworkControlMode): String =
+        when (mode) {
+            NetworkControlMode.AirplaneMode -> "飞行模式"
+            NetworkControlMode.MobileData -> "移动数据"
+        }
+
+    private suspend fun ensureMobileDataSupported(
+        executorType: ExecutorType,
+        runner: ExecutorCommandRunner,
+    ): ExecutorCommandResult? {
+        val checkResult = runner.run(ExecutorReadonlyCommands.CheckPhoneService)
+        return if (isPhoneServiceUnavailable(checkResult.stdout, checkResult.stderr)) {
+            ExecutorCommandResult(
+                executorType = executorType,
+                controlMode = NetworkControlMode.MobileData,
+                executed = false,
+                exitCode = checkResult.exitCode,
+                stdout = checkResult.stdout,
+                stderr = checkResult.stderr,
+                summary = mobileDataUnsupportedSummary,
+            )
+        } else {
+            null
+        }
+    }
+
+    private fun withMode(
+        mode: NetworkControlMode,
+        result: ExecutorCommandResult,
+        summary: String = result.summary,
+    ): ExecutorCommandResult = result.copy(
+        controlMode = mode,
+        controlledEnabled = parseBinaryToggleState(result.stdout),
+        summary = summary,
+    )
+
     suspend fun runCommand(command: ExecutorCommand): ExecutorCommandResult {
         val (executorType, runner) = currentRunner()
         return runner?.run(command) ?: ExecutorCommandResult(
@@ -44,105 +89,130 @@ class ExecutorProbeService @Inject constructor(
         )
     }
 
-    suspend fun probeAirplaneModeState(): ExecutorCommandResult {
-        return runCommand(ExecutorReadonlyCommands.ReadAirplaneModeState).let { result ->
+    suspend fun probeCurrentNetworkControlState(): ExecutorCommandResult {
+        val mode = currentMode()
+        val (executorType, runner) = currentRunner()
+        if (mode == NetworkControlMode.MobileData && runner != null) {
+            ensureMobileDataSupported(executorType, runner)?.let { return it }
+        }
+        return runCommand(readCommandFor(mode)).let { result ->
             if (!result.executed && result.summary.startsWith("没有可用于")) {
-                result.copy(summary = "没有可用于读取飞行模式状态的执行器")
+                withMode(mode, result, "没有可用于读取${labelFor(mode)}状态的执行器")
             } else {
-                result
+                withMode(mode, result)
             }
         }
     }
 
-    suspend fun toggleAirplaneModeState(): ExecutorCommandResult {
+    suspend fun toggleCurrentNetworkControlState(): ExecutorCommandResult {
+        val mode = currentMode()
         val (executorType, runner) = currentRunner()
         if (runner == null) {
             return ExecutorCommandResult(
                 executorType = ExecutorType.Unavailable,
+                controlMode = mode,
                 executed = false,
-                summary = "没有可用于切换飞行模式的执行器",
+                summary = "没有可用于切换${labelFor(mode)}的执行器",
             )
         }
+        if (mode == NetworkControlMode.MobileData) {
+            ensureMobileDataSupported(executorType, runner)?.let { return it }
+        }
 
-        val currentState = runner.run(ExecutorReadonlyCommands.ReadAirplaneModeState)
-        val currentEnabled = parseAirplaneModeEnabled(currentState)
+        val currentState = withMode(mode, runner.run(readCommandFor(mode)))
+        val currentEnabled = currentState.controlledEnabled
         if (currentEnabled == null) {
-            return ExecutorCommandResult(
-                executorType = executorType,
+            return currentState.copy(
                 executed = false,
-                exitCode = currentState.exitCode,
-                stdout = currentState.stdout,
-                stderr = currentState.stderr,
-                summary = "无法解析当前飞行模式状态，已取消切换",
+                summary = "无法解析当前${labelFor(mode)}状态，已取消切换",
             )
         }
 
         val targetEnabled = !currentEnabled
-        val writeResult = runner.run(ExecutorWriteCommands.setAirplaneModeState(targetEnabled))
+        val writeResult = withMode(mode, runner.run(writeCommandFor(mode, targetEnabled)))
         if (!writeResult.executed || writeResult.exitCode != 0) {
             return writeResult.copy(
-                summary = "飞行模式写入失败",
+                summary = "${labelFor(mode)}写入失败",
             )
         }
 
-        val verification = runner.run(ExecutorReadonlyCommands.ReadAirplaneModeState)
-        val finalEnabled = parseAirplaneModeEnabled(verification)
+        val verification = withMode(mode, runner.run(readCommandFor(mode)))
+        val finalEnabled = verification.controlledEnabled
         if (finalEnabled == targetEnabled) {
             return verification.copy(
-                summary = if (targetEnabled) "飞行模式已开启" else "飞行模式已关闭",
+                summary = when (mode) {
+                    NetworkControlMode.AirplaneMode ->
+                        if (targetEnabled) "飞行模式已开启" else "飞行模式已关闭"
+                    NetworkControlMode.MobileData ->
+                        if (targetEnabled) "移动数据已开启" else "移动数据已关闭"
+                },
             )
         }
 
         return verification.copy(
-            executed = false,
-            summary = "飞行模式写入后校验失败",
+            summary = "${labelFor(mode)}写入后校验异常",
         )
     }
 
-    suspend fun setAirplaneModeState(enabled: Boolean): ExecutorCommandResult {
+    suspend fun setDisconnectedState(disconnected: Boolean): ExecutorCommandResult {
+        val mode = currentMode()
         val (executorType, runner) = currentRunner()
         if (runner == null) {
             return ExecutorCommandResult(
                 executorType = ExecutorType.Unavailable,
+                controlMode = mode,
                 executed = false,
-                summary = "没有可用于设置飞行模式的执行器",
+                summary = "没有可用于设置${labelFor(mode)}的执行器",
             )
         }
+        if (mode == NetworkControlMode.MobileData) {
+            ensureMobileDataSupported(executorType, runner)?.let { return it }
+        }
 
-        val currentState = runner.run(ExecutorReadonlyCommands.ReadAirplaneModeState)
-        val currentEnabled = parseAirplaneModeEnabled(currentState)
+        val currentState = withMode(mode, runner.run(readCommandFor(mode)))
+        val currentEnabled = currentState.controlledEnabled
         if (currentEnabled == null) {
-            return ExecutorCommandResult(
-                executorType = executorType,
-                executed = false,
-                exitCode = currentState.exitCode,
-                stdout = currentState.stdout,
-                stderr = currentState.stderr,
-                summary = "无法解析当前飞行模式状态，已取消设置",
-            )
-        }
-        if (currentEnabled == enabled) {
             return currentState.copy(
-                summary = if (enabled) "飞行模式已处于开启状态" else "飞行模式已处于关闭状态",
+                executed = false,
+                summary = "无法解析当前${labelFor(mode)}状态，已取消设置",
             )
         }
 
-        val writeResult = runner.run(ExecutorWriteCommands.setAirplaneModeState(enabled))
-        if (!writeResult.executed || writeResult.exitCode != 0) {
-            return writeResult.copy(summary = "飞行模式写入失败")
+        val targetEnabled = when (mode) {
+            NetworkControlMode.AirplaneMode -> disconnected
+            NetworkControlMode.MobileData -> !disconnected
+        }
+        if (currentEnabled == targetEnabled) {
+            return currentState.copy(
+                summary = when (mode) {
+                    NetworkControlMode.AirplaneMode ->
+                        if (targetEnabled) "飞行模式已处于开启状态" else "飞行模式已处于关闭状态"
+                    NetworkControlMode.MobileData ->
+                        if (targetEnabled) "移动数据已处于开启状态" else "移动数据已处于关闭状态"
+                },
+            )
         }
 
-        val verification = runner.run(ExecutorReadonlyCommands.ReadAirplaneModeState)
-        val finalEnabled = parseAirplaneModeEnabled(verification)
-        if (finalEnabled == enabled) {
+        val writeResult = withMode(mode, runner.run(writeCommandFor(mode, targetEnabled)))
+        if (!writeResult.executed || writeResult.exitCode != 0) {
+            return writeResult.copy(summary = "${labelFor(mode)}写入失败")
+        }
+
+        val verification = withMode(mode, runner.run(readCommandFor(mode)))
+        val finalEnabled = verification.controlledEnabled
+        if (finalEnabled == targetEnabled) {
             return verification.copy(
-                summary = if (enabled) "飞行模式已开启" else "飞行模式已关闭",
+                summary = when (mode) {
+                    NetworkControlMode.AirplaneMode ->
+                        if (targetEnabled) "飞行模式已开启" else "飞行模式已关闭"
+                    NetworkControlMode.MobileData ->
+                        if (targetEnabled) "移动数据已开启" else "移动数据已关闭"
+                },
             )
         }
 
         return verification.copy(
-            executed = false,
-            summary = "飞行模式写入后校验失败",
+            summary = "${labelFor(mode)}写入后校验异常",
         )
     }
 }
