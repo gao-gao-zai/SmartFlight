@@ -11,6 +11,7 @@ import javax.inject.Singleton
 data class ForegroundAppInfo(
     val packageName: String,
     val appLabel: String,
+    val eventTimestampMillis: Long,
 )
 
 @Singleton
@@ -48,6 +49,7 @@ class ForegroundAppDetector @Inject constructor(
         return ForegroundAppInfo(
             packageName = packageName,
             appLabel = appLabel,
+            eventTimestampMillis = latestForegroundTimestamp,
         ).also { lastKnownForegroundApp = it }
     }
 

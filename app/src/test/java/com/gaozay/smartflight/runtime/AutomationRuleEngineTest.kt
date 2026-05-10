@@ -153,6 +153,24 @@ class AutomationRuleEngineTest {
     }
 
     @Test
+    fun leavingOnlineAppForBlacklistStillSchedulesDisconnectFirst() {
+        val decision = engine.evaluateForegroundChange(
+            context(
+                settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = true, appExitDelaySeconds = 45),
+                packageName = "com.example.black",
+                isInOnlineList = false,
+                isInBlacklist = true,
+                previousTargetAppActive = true,
+            ),
+        )
+
+        val action = decision.action
+        assertTrue(action is ForegroundAction.ScheduleDisconnect)
+        assertEquals(45, (action as ForegroundAction.ScheduleDisconnect).delaySeconds)
+        assertEquals(listOf("AppExitDisconnect"), decision.matchedRules)
+    }
+
+    @Test
     fun screenOffDisconnectRequiresEnabledAutomationExecutorAndNoWifiSkip() {
         assertTrue(
             engine.shouldExecuteScreenOffDisconnect(

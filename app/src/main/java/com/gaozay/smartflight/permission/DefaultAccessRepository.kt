@@ -13,6 +13,9 @@ import com.gaozay.smartflight.executor.ExecutorWriteCommands
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.runtime.withDerivedUnifiedNetworkState
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
+import com.gaozay.smartflight.runtime.isDisconnected
+import com.gaozay.smartflight.runtime.snapshotState
+import com.gaozay.smartflight.settings.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +30,7 @@ class DefaultAccessRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val advancedAccessChecker: AdvancedAccessChecker,
     private val systemPermissionChecker: SystemPermissionChecker,
+    private val settingsRepository: SettingsRepository,
     private val adbBootstrapRepository: AdbBootstrapRepository,
     private val rootAccessChecker: RootAccessChecker,
     private val executorProbeService: ExecutorProbeService,
@@ -165,7 +169,14 @@ class DefaultAccessRepository @Inject constructor(
     }
 
     override suspend fun toggleCurrentNetworkControlState() {
-        val result = executorProbeService.toggleCurrentNetworkControlState()
+        val snapshot = runtimeStatusRepository.snapshotState()
+        val knownControlledEnabled = when (settingsRepository.settings.first().networkControlMode) {
+            NetworkControlMode.AirplaneMode -> snapshot.isAirplaneModeEnabled
+            NetworkControlMode.MobileData -> snapshot.isMobileDataEnabled
+        }
+        val result = executorProbeService.toggleCurrentNetworkControlState(
+            knownControlledEnabled = knownControlledEnabled,
+        )
         applyNetworkControlResult(
             result = result,
             triggerSource = TriggerSource.Manual,
@@ -181,7 +192,13 @@ class DefaultAccessRepository @Inject constructor(
         triggerSource: TriggerSource,
         reason: String?,
     ) {
-        val result = executorProbeService.setDisconnectedState(disconnected)
+        val knownDisconnected = runtimeStatusRepository.snapshotState().isDisconnected(
+            settingsRepository.settings.first().networkControlMode,
+        )
+        val result = executorProbeService.setDisconnectedState(
+            disconnected = disconnected,
+            knownDisconnected = knownDisconnected,
+        )
         val mode = result.controlMode ?: NetworkControlMode.AirplaneMode
         applyNetworkControlResult(
             result = result,

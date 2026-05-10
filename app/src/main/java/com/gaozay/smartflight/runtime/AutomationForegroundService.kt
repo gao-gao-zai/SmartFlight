@@ -12,6 +12,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.gaozay.smartflight.MainActivity
@@ -114,7 +115,6 @@ class AutomationForegroundService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         serviceScope.launch {
             runtimeEnvironmentMonitor.refreshSnapshot()
-            accessRepository.syncCurrentNetworkControlState()
         }
     }
 
@@ -265,7 +265,38 @@ class AutomationForegroundService : Service() {
                 isWifiConnected = runtimeSnapshot.isWifiConnected,
                 executorAvailable = executorAvailable,
                 previousTargetAppActive = lastTargetAppActive,
+                isCurrentlyDisconnected = runtimeSnapshot.isDisconnected(settings.networkControlMode),
+                isAppExitDisconnectScheduled = runtimeSnapshot.isAppExitDisconnectScheduled,
             ),
+        )
+        Log.d(
+            LOG_TAG,
+            buildString {
+                append("foreground decision")
+                append(" pkg=")
+                append(packageName ?: "<none>")
+                append(" label=")
+                append(foregroundApp?.appLabel ?: "<none>")
+                append(" prevTarget=")
+                append(lastTargetAppActive)
+                append(" target=")
+                append(decision.targetAppActive)
+                append(" disconnected=")
+                append(runtimeSnapshot.isDisconnected(settings.networkControlMode))
+                append(" appExitScheduled=")
+                append(runtimeSnapshot.isAppExitDisconnectScheduled)
+                append(" screenOffScheduled=")
+                append(runtimeSnapshot.isScreenOffDisconnectScheduled)
+                append(" delay=")
+                append(settings.appExitDelaySeconds)
+                append("s")
+                append(" action=")
+                append(decision.action::class.simpleName)
+                append(" rules=")
+                append(decision.matchedRules.joinToString(","))
+                append(" reason=")
+                append(decision.reason)
+            },
         )
         lastTargetAppActive = decision.targetAppActive
 
@@ -298,7 +329,12 @@ class AutomationForegroundService : Service() {
             }
 
             is ForegroundAction.ScheduleDisconnect -> {
-                scheduleAppExitDisconnect(action.reason, action.delaySeconds)
+                val eventTimestampMillis = foregroundApp?.eventTimestampMillis ?: System.currentTimeMillis()
+                scheduleAppExitDisconnect(
+                    reason = action.reason,
+                    delaySeconds = action.delaySeconds,
+                    baseTimestampMillis = eventTimestampMillis,
+                )
             }
 
             is ForegroundAction.CancelScheduledDisconnect -> {
@@ -329,14 +365,17 @@ class AutomationForegroundService : Service() {
                 executorAvailable = executorAvailable,
             )
         ) {
+            Log.d(LOG_TAG, "skip screen-off schedule: conditions not met")
             cancelScreenOffDisconnect()
             return
         }
         if (runtimeSnapshot.isDisconnected(settings.networkControlMode) == true) {
+            Log.d(LOG_TAG, "skip screen-off schedule: already disconnected")
             cancelScreenOffDisconnect()
             return
         }
         if (screenOffDisconnectJob?.isActive == true) {
+            Log.d(LOG_TAG, "skip screen-off schedule: job already active")
             return
         }
         val delayMillis = settings.screenOffDelaySeconds.coerceAtLeast(0) * 1_000L
@@ -351,6 +390,10 @@ class AutomationForegroundService : Service() {
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
+        Log.d(
+            LOG_TAG,
+            "scheduled screen-off disconnect delay=${settings.screenOffDelaySeconds}s executeAt=$executeAtMillis now=${System.currentTimeMillis()}",
+        )
         screenOffDisconnectJob = serviceScope.launch {
             if (delayMillis > 0L) {
                 delay(delayMillis)
@@ -373,8 +416,10 @@ class AutomationForegroundService : Service() {
             }
             screenOffDisconnectJob = null
             if (!shouldDisconnect) {
+                Log.d(LOG_TAG, "skip screen-off execution after delay: conditions changed")
                 return@launch
             }
+            Log.d(LOG_TAG, "execute screen-off disconnect after delay")
             executeAirplaneModeChange(
                 currentDisconnected = latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode),
                 targetDisconnected = true,
@@ -385,18 +430,28 @@ class AutomationForegroundService : Service() {
         }
     }
 
-    private suspend fun scheduleAppExitDisconnect(reason: String, delaySeconds: Int) {
+    private suspend fun scheduleAppExitDisconnect(
+        reason: String,
+        delaySeconds: Int,
+        baseTimestampMillis: Long = System.currentTimeMillis(),
+    ) {
         val runtimeSnapshot = runtimeStatusRepository.snapshot.first()
         val currentSettings = settingsRepository.settings.first()
         if (runtimeSnapshot.isDisconnected(currentSettings.networkControlMode) == true) {
+            Log.d(LOG_TAG, "skip app-exit schedule: already disconnected")
             cancelAppExitDisconnect(updateRuntimeState = false)
             return
         }
         if (appExitDisconnectJob?.isActive == true) {
+            Log.d(LOG_TAG, "skip app-exit schedule: job already active")
             return
         }
-        val delayMillis = delaySeconds.coerceAtLeast(0) * 1_000L
-        val executeAtMillis = System.currentTimeMillis() + delayMillis
+        val totalDelayMillis = delaySeconds.coerceAtLeast(0) * 1_000L
+        val now = System.currentTimeMillis()
+        val effectiveBaseMillis = baseTimestampMillis.coerceAtMost(now)
+        val elapsedMillis = (now - effectiveBaseMillis).coerceAtLeast(0L)
+        val delayMillis = (totalDelayMillis - elapsedMillis).coerceAtLeast(0L)
+        val executeAtMillis = now + delayMillis
         runtimeStatusRepository.updateSnapshot { snapshot ->
             snapshot.copy(
                 isAppExitDisconnectScheduled = true,
@@ -407,6 +462,10 @@ class AutomationForegroundService : Service() {
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
+        Log.d(
+            LOG_TAG,
+            "scheduled app-exit disconnect delay=${delaySeconds}s base=$baseTimestampMillis now=$now remainingMs=$delayMillis executeAt=$executeAtMillis reason=$reason",
+        )
         appExitDisconnectJob = serviceScope.launch {
             if (delayMillis > 0L) {
                 delay(delayMillis)
@@ -429,8 +488,13 @@ class AutomationForegroundService : Service() {
             }
             appExitDisconnectJob = null
             if (!shouldDisconnect) {
+                Log.d(
+                    LOG_TAG,
+                    "skip app-exit execution after delay: targetActive=$lastTargetAppActive disconnected=${latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode)} wifi=${latestRuntimeSnapshot.isWifiConnected}",
+                )
                 return@launch
             }
+            Log.d(LOG_TAG, "execute app-exit disconnect after delay reason=$reason")
             executeAirplaneModeChange(
                 currentDisconnected = latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode),
                 targetDisconnected = true,
@@ -449,17 +513,49 @@ class AutomationForegroundService : Service() {
         onPrompt: suspend () -> Unit,
     ) {
         if (currentDisconnected == targetDisconnected) {
+            Log.d(
+                LOG_TAG,
+                "skip network change: already target state trigger=$triggerSource current=$currentDisconnected target=$targetDisconnected reason=$reason",
+            )
             return
         }
+        Log.d(
+            LOG_TAG,
+            "execute network change trigger=$triggerSource current=$currentDisconnected target=$targetDisconnected reason=$reason",
+        )
         accessRepository.setDisconnectedState(
             disconnected = targetDisconnected,
             triggerSource = triggerSource,
             reason = reason,
         )
         val updatedSnapshot = runtimeStatusRepository.snapshot.first()
+        Log.d(
+            LOG_TAG,
+            "network change result trigger=$triggerSource result=${updatedSnapshot.lastActionResult} action=${updatedSnapshot.lastAction} reason=${updatedSnapshot.lastActionReason}",
+        )
         if (updatedSnapshot.lastActionResult == ExecutionResult.Success) {
+            if (targetDisconnected) {
+                clearPendingDisconnects()
+            }
             onPrompt()
         }
+    }
+
+    private suspend fun clearPendingDisconnects() {
+        screenOffDisconnectJob?.cancel()
+        screenOffDisconnectJob = null
+        appExitDisconnectJob?.cancel()
+        appExitDisconnectJob = null
+        runtimeStatusRepository.updateSnapshot { snapshot ->
+            snapshot.copy(
+                isScreenOffDisconnectScheduled = false,
+                pendingScreenOffDisconnectAtMillis = null,
+                isAppExitDisconnectScheduled = false,
+                pendingAppExitDisconnectAtMillis = null,
+                updatedAtMillis = System.currentTimeMillis(),
+            )
+        }
+        Log.d(LOG_TAG, "cleared pending disconnect jobs")
     }
 
     private suspend fun showReconnectPrompt(settings: com.gaozay.smartflight.settings.UserSettings) {
@@ -513,6 +609,7 @@ class AutomationForegroundService : Service() {
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
+        Log.d(LOG_TAG, "cancel screen-off disconnect scheduled=$wasScheduled")
     }
 
     private suspend fun cancelAppExitDisconnect(updateRuntimeState: Boolean) {
@@ -528,6 +625,7 @@ class AutomationForegroundService : Service() {
                     updatedAtMillis = System.currentTimeMillis(),
                 )
             }
+            Log.d(LOG_TAG, "cancel app-exit disconnect without runtime update scheduled=$wasScheduled")
             return
         }
         runtimeStatusRepository.updateSnapshot { snapshot ->
@@ -540,6 +638,7 @@ class AutomationForegroundService : Service() {
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
+        Log.d(LOG_TAG, "cancel app-exit disconnect scheduled=$wasScheduled")
     }
 
     private fun detectCurrentScreenState(): ScreenState {
@@ -583,6 +682,7 @@ class AutomationForegroundService : Service() {
     }
 
     companion object {
+        private const val LOG_TAG = "SmartFlightRuntime"
         private const val NOTIFICATION_CHANNEL_ID = "automation_runtime"
         private const val NOTIFICATION_ID = 1002
 
