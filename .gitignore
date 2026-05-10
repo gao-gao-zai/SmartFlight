@@ -7,7 +7,7 @@
 *.iml
 *.log
 captures/
-
+.agents/
 .tmp/
 /skills/
 .windsurf/
