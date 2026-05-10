@@ -21,6 +21,19 @@ class ExecutorValidationService @Inject constructor(
         return selectBestExecutor(results)
     }
 
+    fun selectPreferredExecutor(
+        results: List<ExecutorValidationResult>,
+        preferredExecutorType: ExecutorType,
+    ): ExecutorValidationResult {
+        val preferredResult = results.firstOrNull {
+            it.executorType == preferredExecutorType && it.isReady
+        }
+        if (preferredExecutorType != ExecutorType.Auto && preferredResult != null) {
+            return preferredResult
+        }
+        return selectBestExecutor(results)
+    }
+
     fun selectBestExecutor(results: List<ExecutorValidationResult>): ExecutorValidationResult {
         return results.firstOrNull { it.isReady }
             ?: ExecutorValidationResult(

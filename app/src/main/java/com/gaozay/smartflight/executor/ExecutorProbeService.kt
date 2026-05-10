@@ -1,12 +1,15 @@
 package com.gaozay.smartflight.executor
 
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.settings.SettingsRepository
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ExecutorProbeService @Inject constructor(
     private val executorValidationService: ExecutorValidationService,
+    private val settingsRepository: SettingsRepository,
     private val rootExecutorCommandRunner: RootExecutorCommandRunner,
     private val shizukuExecutorCommandRunner: ShizukuExecutorCommandRunner,
     private val adbExecutorCommandRunner: AdbExecutorCommandRunner,
@@ -21,7 +24,8 @@ class ExecutorProbeService @Inject constructor(
 
     private suspend fun currentRunner(): Pair<ExecutorType, ExecutorCommandRunner?> {
         val validations = executorValidationService.validateAll()
-        val selected = executorValidationService.selectBestExecutor(validations)
+        val preferredExecutorType = settingsRepository.settings.first().preferredExecutorType
+        val selected = executorValidationService.selectPreferredExecutor(validations, preferredExecutorType)
         val runner = when (selected.executorType) {
             ExecutorType.Root -> rootExecutorCommandRunner
             ExecutorType.Shizuku -> shizukuExecutorCommandRunner

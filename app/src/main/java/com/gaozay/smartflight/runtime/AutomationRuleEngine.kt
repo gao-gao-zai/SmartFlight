@@ -28,6 +28,15 @@ class AutomationRuleEngine @Inject constructor() {
 
     fun evaluateForegroundChange(context: ForegroundRuleContext): ForegroundRuleDecision {
         val targetAppActive = context.isTargetAppActive()
+        if (context.previousTargetAppActive == null) {
+            return ForegroundRuleDecision(
+                targetAppActive = targetAppActive,
+                action = ForegroundAction.None("首次同步前台应用状态，不执行自动动作"),
+                reason = "首次同步前台应用状态，不执行自动动作",
+                matchedRules = listOf("InitialForegroundSync"),
+                shouldLog = false,
+            )
+        }
         if (!context.settings.automationEnabled) {
             return ForegroundRuleDecision(
                 targetAppActive = targetAppActive,

@@ -7,7 +7,6 @@ import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.executor.ExecutorProbeService
 import com.gaozay.smartflight.executor.ExecutorCommandResult
-import com.gaozay.smartflight.executor.ExecutorValidationService
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +23,6 @@ class DefaultAccessRepository @Inject constructor(
     private val adbBootstrapRepository: AdbBootstrapRepository,
     private val rootAccessChecker: RootAccessChecker,
     private val executorProbeService: ExecutorProbeService,
-    private val executorValidationService: ExecutorValidationService,
     private val executionLogRepository: ExecutionLogRepository,
     private val runtimeStatusRepository: RuntimeStatusRepository,
 ) : AccessRepository {
@@ -43,21 +41,25 @@ class DefaultAccessRepository @Inject constructor(
         )
         mutableAccessGateState.value = state
 
-        val allExecutors = executorValidationService.validateAll()
-        val bestExecutor = executorValidationService.selectBestExecutor(allExecutors)
         runtimeStatusRepository.updateSnapshot { snapshot ->
+            val shouldResetRuntimeStatus = shouldRefreshRuntimeStatusSummary(snapshot)
+            val passiveSummary = buildPassiveAccessSummary(advancedAccess)
             snapshot.copy(
                 activeExecutorType = advancedAccess.selectedExecutorType,
-                lastAction = ExecutionAction.DoNothing,
+                lastAction = if (shouldResetRuntimeStatus) ExecutionAction.DoNothing else snapshot.lastAction,
                 lastTriggerSource = TriggerSource.ServiceRestored,
-                lastActionResult = if (bestExecutor.isReady) ExecutionResult.Success else ExecutionResult.Pending,
-                lastActionReason = if (snapshot.lastAction == ExecutionAction.DoNothing &&
-                    snapshot.lastActionReason == "Runtime not started yet"
-                ) {
-                    bestExecutor.summary
+                lastActionResult = if (shouldResetRuntimeStatus) {
+                    if (advancedAccess.isAvailable) ExecutionResult.Success else ExecutionResult.Pending
+                } else {
+                    snapshot.lastActionResult
+                },
+                lastActionReason = if (shouldResetRuntimeStatus) {
+                    passiveSummary
                 } else {
                     snapshot.lastActionReason
                 },
+                runtimeStatusResult = if (advancedAccess.isAvailable) ExecutionResult.Success else ExecutionResult.Pending,
+                runtimeStatusSummary = passiveSummary,
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
@@ -238,5 +240,25 @@ class DefaultAccessRepository @Inject constructor(
             append(" · 错误：")
             append(result.stderr.trim())
         }
+    }
+
+    private fun buildPassiveAccessSummary(advancedAccess: AdvancedAccessState): String {
+        if (advancedAccess.selectedExecutorType != com.gaozay.smartflight.domain.model.ExecutorType.Unavailable) {
+            return "当前可用通道：${advancedAccess.selectedExecutorType.label}"
+        }
+        return advancedAccess.gatingIssues.firstOrNull()?.summary ?: "尚无可用执行器"
+    }
+
+    private fun shouldRefreshRuntimeStatusSummary(snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot): Boolean {
+        if (snapshot.lastAction == ExecutionAction.DoNothing &&
+            snapshot.lastActionReason == "Runtime not started yet"
+        ) {
+            return true
+        }
+        if (snapshot.lastAction == ExecutionAction.PauseAutomation) {
+            return true
+        }
+        return snapshot.lastTriggerSource == TriggerSource.ServiceRestored &&
+            snapshot.lastAction == ExecutionAction.DoNothing
     }
 }

@@ -264,22 +264,24 @@ class AutomationForegroundService : Service() {
             }
             is ForegroundAction.Reconnect -> {
                 cancelAppExitDisconnect(updateRuntimeState = true)
-                accessRepository.setAirplaneModeState(
-                    enabled = false,
+                executeAirplaneModeChange(
+                    currentEnabled = runtimeSnapshot.isAirplaneModeEnabled,
+                    targetEnabled = false,
                     triggerSource = TriggerSource.AppForegroundChanged,
                     reason = action.reason,
+                    onPrompt = { showReconnectPrompt(settings) },
                 )
-                showReconnectPrompt(settings)
             }
 
             is ForegroundAction.Disconnect -> {
                 cancelAppExitDisconnect(updateRuntimeState = false)
-                accessRepository.setAirplaneModeState(
-                    enabled = true,
+                executeAirplaneModeChange(
+                    currentEnabled = runtimeSnapshot.isAirplaneModeEnabled,
+                    targetEnabled = true,
                     triggerSource = TriggerSource.AppForegroundChanged,
                     reason = action.reason,
+                    onPrompt = { showDisconnectPrompt(settings) },
                 )
-                showDisconnectPrompt(settings)
             }
 
             is ForegroundAction.ScheduleDisconnect -> {
@@ -317,6 +319,10 @@ class AutomationForegroundService : Service() {
             cancelScreenOffDisconnect()
             return
         }
+        if (runtimeSnapshot.isAirplaneModeEnabled == true) {
+            cancelScreenOffDisconnect()
+            return
+        }
         if (screenOffDisconnectJob?.isActive == true) {
             return
         }
@@ -344,7 +350,7 @@ class AutomationForegroundService : Service() {
                 screenState = currentScreenState,
                 isWifiConnected = latestRuntimeSnapshot.isWifiConnected,
                 executorAvailable = latestExecutorAvailable,
-            )
+            ) && latestRuntimeSnapshot.isAirplaneModeEnabled != true
             runtimeStatusRepository.updateSnapshot { snapshot ->
                 snapshot.copy(
                     isScreenOffDisconnectScheduled = false,
@@ -356,16 +362,22 @@ class AutomationForegroundService : Service() {
             if (!shouldDisconnect) {
                 return@launch
             }
-            accessRepository.setAirplaneModeState(
-                enabled = true,
+            executeAirplaneModeChange(
+                currentEnabled = latestRuntimeSnapshot.isAirplaneModeEnabled,
+                targetEnabled = true,
                 triggerSource = TriggerSource.ScreenOff,
                 reason = "息屏延迟 ${latestSettings.screenOffDelaySeconds} 秒后执行断网",
+                onPrompt = { showDisconnectPrompt(latestSettings) },
             )
-            showDisconnectPrompt(latestSettings)
         }
     }
 
     private suspend fun scheduleAppExitDisconnect(reason: String, delaySeconds: Int) {
+        val runtimeSnapshot = runtimeStatusRepository.snapshot.first()
+        if (runtimeSnapshot.isAirplaneModeEnabled == true) {
+            cancelAppExitDisconnect(updateRuntimeState = false)
+            return
+        }
         if (appExitDisconnectJob?.isActive == true) {
             return
         }
@@ -392,6 +404,7 @@ class AutomationForegroundService : Service() {
                 latestSettings.appExitDisconnectEnabled &&
                 lastTargetAppActive == false &&
                 latestExecutorAvailable &&
+                latestRuntimeSnapshot.isAirplaneModeEnabled != true &&
                 !(latestRuntimeSnapshot.isWifiConnected && latestSettings.skipDisconnectOnWifi)
             runtimeStatusRepository.updateSnapshot { snapshot ->
                 snapshot.copy(
@@ -404,12 +417,34 @@ class AutomationForegroundService : Service() {
             if (!shouldDisconnect) {
                 return@launch
             }
-            accessRepository.setAirplaneModeState(
-                enabled = true,
+            executeAirplaneModeChange(
+                currentEnabled = latestRuntimeSnapshot.isAirplaneModeEnabled,
+                targetEnabled = true,
                 triggerSource = TriggerSource.AppForegroundChanged,
                 reason = reason,
+                onPrompt = { showDisconnectPrompt(latestSettings) },
             )
-            showDisconnectPrompt(latestSettings)
+        }
+    }
+
+    private suspend fun executeAirplaneModeChange(
+        currentEnabled: Boolean?,
+        targetEnabled: Boolean,
+        triggerSource: TriggerSource,
+        reason: String,
+        onPrompt: suspend () -> Unit,
+    ) {
+        if (currentEnabled == targetEnabled) {
+            return
+        }
+        accessRepository.setAirplaneModeState(
+            enabled = targetEnabled,
+            triggerSource = triggerSource,
+            reason = reason,
+        )
+        val updatedSnapshot = runtimeStatusRepository.snapshot.first()
+        if (updatedSnapshot.lastActionResult == ExecutionResult.Success) {
+            onPrompt()
         }
     }
 

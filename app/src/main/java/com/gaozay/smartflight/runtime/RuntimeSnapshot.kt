@@ -25,6 +25,8 @@ data class RuntimeSnapshot(
     val lastTriggerSource: TriggerSource = TriggerSource.ServiceRestored,
     val lastActionResult: ExecutionResult = ExecutionResult.Pending,
     val lastActionReason: String = "Runtime not started yet",
+    val runtimeStatusResult: ExecutionResult = ExecutionResult.Pending,
+    val runtimeStatusSummary: String = "尚未执行自检",
     val activeExecutorType: ExecutorType = ExecutorType.Unavailable,
     val updatedAtMillis: Long = 0,
 )

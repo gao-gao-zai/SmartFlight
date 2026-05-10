@@ -63,6 +63,11 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
                 default = ExecutionResult.Pending,
             ),
             lastActionReason = preferences[Keys.LastActionReason] ?: "Runtime not started yet",
+            runtimeStatusResult = enumValueOrDefault(
+                value = preferences[Keys.RuntimeStatusResult],
+                default = ExecutionResult.Pending,
+            ),
+            runtimeStatusSummary = preferences[Keys.RuntimeStatusSummary] ?: "尚未执行自检",
             activeExecutorType = enumValueOrDefault(
                 value = preferences[Keys.ActiveExecutorType],
                 default = ExecutorType.Unavailable,
@@ -101,6 +106,8 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
             preferences[Keys.LastTriggerSource] = updated.lastTriggerSource.name
             preferences[Keys.LastActionResult] = updated.lastActionResult.name
             preferences[Keys.LastActionReason] = updated.lastActionReason
+            preferences[Keys.RuntimeStatusResult] = updated.runtimeStatusResult.name
+            preferences[Keys.RuntimeStatusSummary] = updated.runtimeStatusSummary
             preferences[Keys.ActiveExecutorType] = updated.activeExecutorType.name
             preferences[Keys.UpdatedAtMillis] = updated.updatedAtMillis
         }
@@ -127,6 +134,8 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
         val LastTriggerSource = stringPreferencesKey("last_trigger_source")
         val LastActionResult = stringPreferencesKey("last_action_result")
         val LastActionReason = stringPreferencesKey("last_action_reason")
+        val RuntimeStatusResult = stringPreferencesKey("runtime_status_result")
+        val RuntimeStatusSummary = stringPreferencesKey("runtime_status_summary")
         val ActiveExecutorType = stringPreferencesKey("active_executor_type")
         val UpdatedAtMillis = longPreferencesKey("updated_at_millis")
     }

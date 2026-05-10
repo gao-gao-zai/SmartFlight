@@ -20,7 +20,6 @@ import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
-import com.gaozay.smartflight.executor.ExecutorValidationService
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.permission.AccessGateState
 import com.gaozay.smartflight.permission.AccessRepository
@@ -48,7 +47,6 @@ class MainViewModel @Inject constructor(
     private val installedAppRepository: InstalledAppRepository,
     private val executionLogRepository: ExecutionLogRepository,
     private val accessRepository: AccessRepository,
-    private val executorValidationService: ExecutorValidationService,
     private val automationServiceController: AutomationServiceController,
 ) : ViewModel() {
     private val appQuery = MutableStateFlow("")
@@ -58,7 +56,6 @@ class MainViewModel @Inject constructor(
     private val appLauncherFilter = MutableStateFlow(LauncherFilter.All)
     private val appScanning = MutableStateFlow(false)
     private val appLastScanSummary = MutableStateFlow("尚未扫描")
-    private val diagnosticsState = MutableStateFlow<List<ExecutorDiagnosticItem>>(emptyList())
     private val recentLogs = executionLogRepository.observeRecentLogs(limit = 6)
 
     val uiState: StateFlow<SmartFlightUiState> = combine(
@@ -87,10 +84,10 @@ class MainViewModel @Inject constructor(
                 ?: base.runtimeSnapshot.currentForegroundPackageName
                 ?: "Not connected yet",
             runtimeExecutor = base.runtimeSnapshot.activeExecutorType.label,
-            runtimeLastCheck = buildRuntimeSummary(base.settings, base.runtimeSnapshot),
-            runtimeLastResult = base.runtimeSnapshot.lastActionResult.label,
+            runtimeLastCheck = base.runtimeSnapshot.runtimeStatusSummary,
+            runtimeLastResult = base.runtimeSnapshot.runtimeStatusResult.label,
             runtimeUpdatedAtMillis = base.runtimeSnapshot.updatedAtMillis,
-            executorDiagnostics = diagnosticsState.value,
+            executorDiagnostics = emptyList(),
             recentExecutionLogs = recentLogs.map { it.toUiItem() },
             triggerSummary = buildString {
                 append(buildRuntimeSummary(base.settings, base.runtimeSnapshot))
@@ -193,16 +190,6 @@ class MainViewModel @Inject constructor(
     fun refreshAccessChecks() {
         viewModelScope.launch {
             accessRepository.refresh()
-            diagnosticsState.value = executorValidationService.validateAll().map { result ->
-                ExecutorDiagnosticItem(
-                    executor = result.executorType.label,
-                    summary = result.summary,
-                    detail = result.detail.orEmpty(),
-                    command = result.command.orEmpty(),
-                    output = result.commandOutput.orEmpty(),
-                    ready = result.isReady,
-                )
-            }
         }
     }
 
@@ -221,32 +208,12 @@ class MainViewModel @Inject constructor(
     fun probeAirplaneModeState() {
         viewModelScope.launch {
             accessRepository.probeAirplaneModeState()
-            diagnosticsState.value = executorValidationService.validateAll().map { result ->
-                ExecutorDiagnosticItem(
-                    executor = result.executorType.label,
-                    summary = result.summary,
-                    detail = result.detail.orEmpty(),
-                    command = result.command.orEmpty(),
-                    output = result.commandOutput.orEmpty(),
-                    ready = result.isReady,
-                )
-            }
         }
     }
 
     fun toggleAirplaneModeState() {
         viewModelScope.launch {
             accessRepository.toggleAirplaneModeState()
-            diagnosticsState.value = executorValidationService.validateAll().map { result ->
-                ExecutorDiagnosticItem(
-                    executor = result.executorType.label,
-                    summary = result.summary,
-                    detail = result.detail.orEmpty(),
-                    command = result.command.orEmpty(),
-                    output = result.commandOutput.orEmpty(),
-                    ready = result.isReady,
-                )
-            }
         }
     }
 
@@ -278,7 +245,14 @@ class MainViewModel @Inject constructor(
 
     fun setNetworkControlMode(mode: NetworkControlMode) = updateSettings { it.copy(networkControlMode = mode) }
 
-    fun setPreferredExecutorType(type: ExecutorType) = updateSettings { it.copy(preferredExecutorType = type) }
+    fun setPreferredExecutorType(type: ExecutorType) {
+        viewModelScope.launch {
+            settingsRepository.updateSettings { current ->
+                current.copy(preferredExecutorType = type)
+            }
+            accessRepository.refresh()
+        }
+    }
 
     fun setThemeMode(mode: ThemeMode) = updateSettings { it.copy(themeMode = mode) }
 

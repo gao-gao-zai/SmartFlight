@@ -54,6 +54,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,6 +62,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,6 +81,8 @@ import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
+import com.gaozay.smartflight.permission.AccessActionType
+import com.gaozay.smartflight.permission.AccessCheckResult
 import com.gaozay.smartflight.settings.UserSettings
 import java.text.DateFormat
 import java.util.Date
@@ -162,7 +167,22 @@ fun SmartFlightRoot(
                     onSetListStatus = onSetAppListStatus,
                 )
                 SmartFlightScreen.Rules -> RulesScreen(state.settings, innerPadding, onUpdateSettings, onSetNetworkControlMode, onSetPreferredExecutorType, onSetMonitorForegroundWhenScreenOff)
-                SmartFlightScreen.Diagnostics -> DiagnosticsScreen(state, innerPadding, onRefreshAccessChecks, onProbeAirplaneModeState, onToggleAirplaneModeState, onSimulateScreenOff, onSimulateScreenOn, onClearExecutionLogs)
+                SmartFlightScreen.Diagnostics -> DiagnosticsScreen(
+                    state = state,
+                    innerPadding = innerPadding,
+                    onRefreshAccessChecks = onRefreshAccessChecks,
+                    onProbeAirplaneModeState = onProbeAirplaneModeState,
+                    onToggleAirplaneModeState = onToggleAirplaneModeState,
+                    onSimulateScreenOff = onSimulateScreenOff,
+                    onSimulateScreenOn = onSimulateScreenOn,
+                    onClearExecutionLogs = onClearExecutionLogs,
+                    onRequestShizukuPermission = onRequestShizukuPermission,
+                    onProbeRootAccess = onProbeRootAccess,
+                    onSetAdbBootstrapped = onSetAdbBootstrapped,
+                    onOpenUsageAccessSettings = onOpenUsageAccessSettings,
+                    onOpenNotificationSettings = onOpenNotificationSettings,
+                    onOpenBatteryOptimizationSettings = onOpenBatteryOptimizationSettings,
+                )
                 SmartFlightScreen.Appearance -> AppearanceScreen(state.settings, innerPadding, onSetThemeMode, onSetThemePalette, onSetCustomSeedColor, onSetThemeIntensity, onSetCornerStyle)
             }
         }
@@ -391,19 +411,65 @@ private fun DiagnosticsScreen(
     onSimulateScreenOff: () -> Unit,
     onSimulateScreenOn: () -> Unit,
     onClearExecutionLogs: () -> Unit,
+    onRequestShizukuPermission: () -> Unit,
+    onProbeRootAccess: () -> Unit,
+    onSetAdbBootstrapped: (Boolean) -> Unit,
+    onOpenUsageAccessSettings: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenBatteryOptimizationSettings: () -> Unit,
 ) {
+    val clipboardManager = LocalClipboardManager.current
     var advancedExpanded by rememberSaveable { mutableStateOf(false) }
     var pendingAction by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedAccessResult by remember { mutableStateOf<AccessCheckResult?>(null) }
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 20.dp),
         contentPadding = PaddingValues(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { SettingsSection("运行条件") {
-            AccessSummaryRow("使用情况访问", state.accessGateState.usageStatsAccess.summary, state.accessGateState.usageStatsAccess.satisfiesRequirement)
-            AccessSummaryRow("通知权限", state.accessGateState.notificationAccess.summary, state.accessGateState.notificationAccess.satisfiesRequirement)
-            AccessSummaryRow("电池优化", state.accessGateState.batteryOptimization.summary, state.accessGateState.batteryOptimization.satisfiesRequirement)
-            state.accessGateState.advancedAccess.checks.forEach { AccessSummaryRow(it.title, it.summary, it.satisfiesRequirement) }
+            AccessSummaryRow(
+                title = "使用情况访问",
+                summary = state.accessGateState.usageStatsAccess.summary,
+                ready = state.accessGateState.usageStatsAccess.satisfiesRequirement,
+                onBadgeClick = if (state.accessGateState.usageStatsAccess.actionType != AccessActionType.None) {
+                    { selectedAccessResult = state.accessGateState.usageStatsAccess }
+                } else {
+                    null
+                },
+            )
+            AccessSummaryRow(
+                title = "通知权限",
+                summary = state.accessGateState.notificationAccess.summary,
+                ready = state.accessGateState.notificationAccess.satisfiesRequirement,
+                onBadgeClick = if (state.accessGateState.notificationAccess.actionType != AccessActionType.None) {
+                    { selectedAccessResult = state.accessGateState.notificationAccess }
+                } else {
+                    null
+                },
+            )
+            AccessSummaryRow(
+                title = "电池优化",
+                summary = state.accessGateState.batteryOptimization.summary,
+                ready = state.accessGateState.batteryOptimization.satisfiesRequirement,
+                onBadgeClick = if (state.accessGateState.batteryOptimization.actionType != AccessActionType.None) {
+                    { selectedAccessResult = state.accessGateState.batteryOptimization }
+                } else {
+                    null
+                },
+            )
+            state.accessGateState.advancedAccess.checks.forEach {
+                AccessSummaryRow(
+                    title = it.title,
+                    summary = it.summary,
+                    ready = it.satisfiesRequirement,
+                    onBadgeClick = if (it.actionType != AccessActionType.None || it.copyText != null || it.title == "ADB 初始化") {
+                        { selectedAccessResult = it }
+                    } else {
+                        null
+                    },
+                )
+            }
         } }
         item { SettingsSection("执行器检测") {
             Button(onClick = onRefreshAccessChecks, modifier = Modifier.fillMaxWidth()) {
@@ -447,6 +513,43 @@ private fun DiagnosticsScreen(
             }
             pendingAction = null
         }
+    }
+    selectedAccessResult?.let { result ->
+        AccessHandlingDialog(
+            result = result,
+            onDismiss = { selectedAccessResult = null },
+            onRefresh = {
+                onRefreshAccessChecks()
+                selectedAccessResult = null
+            },
+            onRequestShizukuPermission = {
+                onRequestShizukuPermission()
+                selectedAccessResult = null
+            },
+            onProbeRootAccess = {
+                onProbeRootAccess()
+                selectedAccessResult = null
+            },
+            onCopyAdbCommands = {
+                result.copyText?.let { clipboardManager.setText(AnnotatedString(it)) }
+            },
+            onSetAdbBootstrapped = {
+                onSetAdbBootstrapped(it)
+                selectedAccessResult = null
+            },
+            onOpenUsageAccessSettings = {
+                onOpenUsageAccessSettings()
+                selectedAccessResult = null
+            },
+            onOpenNotificationSettings = {
+                onOpenNotificationSettings()
+                selectedAccessResult = null
+            },
+            onOpenBatteryOptimizationSettings = {
+                onOpenBatteryOptimizationSettings()
+                selectedAccessResult = null
+            },
+        )
     }
 }
 
@@ -584,9 +687,18 @@ private fun InfoRow(title: String, value: String) {
 }
 
 @Composable
-private fun AccessSummaryRow(title: String, summary: String, ready: Boolean) {
+private fun AccessSummaryRow(
+    title: String,
+    summary: String,
+    ready: Boolean,
+    onBadgeClick: (() -> Unit)? = null,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        StatusBadge(if (ready) "正常" else "处理", if (ready) StatusKind.Success else StatusKind.Warning)
+        StatusBadge(
+            text = if (ready) "正常" else "处理",
+            kind = if (ready) StatusKind.Success else StatusKind.Warning,
+            onClick = onBadgeClick,
+        )
         Spacer(Modifier.size(10.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
@@ -598,14 +710,14 @@ private fun AccessSummaryRow(title: String, summary: String, ready: Boolean) {
 private enum class StatusKind { Success, Warning, Error }
 
 @Composable
-private fun StatusBadge(text: String, kind: StatusKind) {
+private fun StatusBadge(text: String, kind: StatusKind, onClick: (() -> Unit)? = null) {
     val color = when (kind) {
         StatusKind.Success -> Color(0xFF2E7D5B)
         StatusKind.Warning -> Color(0xFF9A6A00)
         StatusKind.Error -> MaterialTheme.colorScheme.error
     }
     AssistChip(
-        onClick = {},
+        onClick = { onClick?.invoke() },
         label = { Text(text) },
         leadingIcon = {
             Icon(
@@ -618,6 +730,74 @@ private fun StatusBadge(text: String, kind: StatusKind) {
                 tint = color,
             )
         },
+        enabled = onClick != null,
+    )
+}
+
+@Composable
+private fun AccessHandlingDialog(
+    result: AccessCheckResult,
+    onDismiss: () -> Unit,
+    onRefresh: () -> Unit,
+    onRequestShizukuPermission: () -> Unit,
+    onProbeRootAccess: () -> Unit,
+    onCopyAdbCommands: () -> Unit,
+    onSetAdbBootstrapped: (Boolean) -> Unit,
+    onOpenUsageAccessSettings: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenBatteryOptimizationSettings: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = if (result.satisfiesRequirement) Icons.Rounded.CheckCircle else Icons.Rounded.Schedule,
+                contentDescription = null,
+            )
+        },
+        title = { Text(result.title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(result.summary)
+                Text(result.recommendation, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                result.detail?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                when (result.title) {
+                    "使用情况访问权限" -> TextButton(onClick = onOpenUsageAccessSettings) { Text("去设置") }
+                    "通知权限" -> TextButton(onClick = onOpenNotificationSettings) { Text("去设置") }
+                    "电池优化" -> TextButton(onClick = onOpenBatteryOptimizationSettings) { Text("去设置") }
+                    "Shizuku" -> when (result.actionType) {
+                        AccessActionType.RequestPermission -> TextButton(onClick = onRequestShizukuPermission) { Text("请求授权") }
+                        AccessActionType.Refresh -> TextButton(onClick = onRefresh) { Text("重新检测") }
+                        else -> Unit
+                    }
+                    "Root" -> when (result.actionType) {
+                        AccessActionType.RequestPermission -> TextButton(onClick = onProbeRootAccess) { Text("测试授权") }
+                        AccessActionType.Refresh -> TextButton(onClick = onRefresh) { Text("重新检测") }
+                        else -> Unit
+                    }
+                    "ADB 初始化" -> {
+                        result.copyText?.let {
+                            TextButton(onClick = onCopyAdbCommands) {
+                                Text(result.copyLabel ?: "复制命令")
+                            }
+                        }
+                        TextButton(onClick = { onSetAdbBootstrapped(!result.satisfiesRequirement) }) {
+                            Text(if (result.satisfiesRequirement) "重置状态" else "标记完成")
+                        }
+                    }
+                    else -> if (result.actionType == AccessActionType.Refresh) {
+                        TextButton(onClick = onRefresh) { Text("重新检测") }
+                    }
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
 }
 
