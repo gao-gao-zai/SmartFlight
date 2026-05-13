@@ -43,6 +43,7 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
             ),
             isAirplaneModeEnabled = preferences[Keys.IsAirplaneModeEnabled],
             isMobileDataEnabled = preferences[Keys.IsMobileDataEnabled],
+            rememberedMobileDataEnabledBeforeAirplaneMode = preferences[Keys.RememberedMobileDataEnabledBeforeAirplaneMode],
             isWifiConnected = preferences[Keys.IsWifiConnected] ?: false,
             isWifiEnabled = preferences[Keys.IsWifiEnabled] ?: false,
             isBluetoothEnabled = preferences[Keys.IsBluetoothEnabled] ?: false,
@@ -95,6 +96,9 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
             updated.isMobileDataEnabled?.let {
                 preferences[Keys.IsMobileDataEnabled] = it
             } ?: preferences.remove(Keys.IsMobileDataEnabled)
+            updated.rememberedMobileDataEnabledBeforeAirplaneMode?.let {
+                preferences[Keys.RememberedMobileDataEnabledBeforeAirplaneMode] = it
+            } ?: preferences.remove(Keys.RememberedMobileDataEnabledBeforeAirplaneMode)
             preferences[Keys.IsWifiConnected] = updated.isWifiConnected
             preferences[Keys.IsWifiEnabled] = updated.isWifiEnabled
             preferences[Keys.IsBluetoothEnabled] = updated.isBluetoothEnabled
@@ -129,6 +133,8 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
         val UnifiedNetworkState = stringPreferencesKey("unified_network_state")
         val IsAirplaneModeEnabled = booleanPreferencesKey("is_airplane_mode_enabled")
         val IsMobileDataEnabled = booleanPreferencesKey("is_mobile_data_enabled")
+        val RememberedMobileDataEnabledBeforeAirplaneMode =
+            booleanPreferencesKey("remembered_mobile_data_enabled_before_airplane_mode")
         val IsWifiConnected = booleanPreferencesKey("is_wifi_connected")
         val IsWifiEnabled = booleanPreferencesKey("is_wifi_enabled")
         val IsBluetoothEnabled = booleanPreferencesKey("is_bluetooth_enabled")

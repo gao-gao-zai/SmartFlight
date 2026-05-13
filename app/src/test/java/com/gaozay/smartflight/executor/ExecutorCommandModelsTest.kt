@@ -29,4 +29,15 @@ class ExecutorCommandModelsTest {
         assertFalse(isPhoneServiceUnavailable("Service phone: found", ""))
         assertFalse(isPhoneServiceUnavailable("1", ""))
     }
+
+    @Test
+    fun setAirplaneModeStateAlsoBroadcastsSystemIntent() {
+        val enableCommand = ExecutorWriteCommands.setAirplaneModeState(enabled = true)
+        val disableCommand = ExecutorWriteCommands.setAirplaneModeState(enabled = false)
+
+        assertTrue(enableCommand.rawCommand.contains("settings put global airplane_mode_on 1"))
+        assertTrue(enableCommand.rawCommand.contains("am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true"))
+        assertTrue(disableCommand.rawCommand.contains("settings put global airplane_mode_on 0"))
+        assertTrue(disableCommand.rawCommand.contains("am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false"))
+    }
 }

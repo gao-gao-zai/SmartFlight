@@ -14,6 +14,7 @@ data class RuntimeSnapshot(
     val unifiedNetworkState: UnifiedNetworkState = UnifiedNetworkState.Unknown,
     val isAirplaneModeEnabled: Boolean? = null,
     val isMobileDataEnabled: Boolean? = null,
+    val rememberedMobileDataEnabledBeforeAirplaneMode: Boolean? = null,
     val isWifiConnected: Boolean = false,
     val isWifiEnabled: Boolean = false,
     val isBluetoothEnabled: Boolean = false,

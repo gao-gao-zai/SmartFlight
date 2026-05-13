@@ -28,7 +28,12 @@ object ExecutorReadonlyCommands {
 
 object ExecutorWriteCommands {
     fun setAirplaneModeState(enabled: Boolean): ExecutorCommand = ExecutorCommand(
-        rawCommand = "settings put global airplane_mode_on ${if (enabled) "1" else "0"}",
+        rawCommand = buildString {
+            append("settings put global airplane_mode_on ")
+            append(if (enabled) "1" else "0")
+            append(" && am broadcast -a android.intent.action.AIRPLANE_MODE --ez state ")
+            append(if (enabled) "true" else "false")
+        },
         purpose = if (enabled) "开启飞行模式" else "关闭飞行模式",
     )
 

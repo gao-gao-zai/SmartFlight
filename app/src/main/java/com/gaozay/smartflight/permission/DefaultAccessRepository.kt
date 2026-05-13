@@ -170,10 +170,26 @@ class DefaultAccessRepository @Inject constructor(
 
     override suspend fun toggleCurrentNetworkControlState() {
         val snapshot = runtimeStatusRepository.snapshotState()
-        val knownControlledEnabled = when (settingsRepository.settings.first().networkControlMode) {
-            NetworkControlMode.AirplaneMode -> snapshot.isAirplaneModeEnabled
-            NetworkControlMode.MobileData -> snapshot.isMobileDataEnabled
+        val mode = settingsRepository.settings.first().networkControlMode
+        if (mode == NetworkControlMode.AirplaneMode) {
+            val currentEnabled = snapshot.isAirplaneModeEnabled
+                ?: executorProbeService.probeNetworkControlState(NetworkControlMode.AirplaneMode).controlledEnabled
+            if (currentEnabled == null) {
+                applyNetworkControlResult(
+                    result = executorProbeService.probeNetworkControlState(NetworkControlMode.AirplaneMode),
+                    triggerSource = TriggerSource.Manual,
+                    reasonPrefix = "手动切换飞行模式",
+                )
+                return
+            }
+            setDisconnectedState(
+                disconnected = !currentEnabled,
+                triggerSource = TriggerSource.Manual,
+                reason = "手动切换飞行模式",
+            )
+            return
         }
+        val knownControlledEnabled = snapshot.isMobileDataEnabled
         val result = executorProbeService.toggleCurrentNetworkControlState(
             knownControlledEnabled = knownControlledEnabled,
         )
@@ -192,14 +208,20 @@ class DefaultAccessRepository @Inject constructor(
         triggerSource: TriggerSource,
         reason: String?,
     ) {
-        val knownDisconnected = runtimeStatusRepository.snapshotState().isDisconnected(
-            settingsRepository.settings.first().networkControlMode,
-        )
+        val mode = settingsRepository.settings.first().networkControlMode
+        if (mode == NetworkControlMode.AirplaneMode) {
+            applyAirplaneModeResult(
+                disconnected = disconnected,
+                triggerSource = triggerSource,
+                reasonPrefix = reason ?: if (disconnected) "自动开启飞行模式" else "自动关闭飞行模式",
+            )
+            return
+        }
+        val knownDisconnected = runtimeStatusRepository.snapshotState().isDisconnected(mode)
         val result = executorProbeService.setDisconnectedState(
             disconnected = disconnected,
             knownDisconnected = knownDisconnected,
         )
-        val mode = result.controlMode ?: NetworkControlMode.AirplaneMode
         applyNetworkControlResult(
             result = result,
             triggerSource = triggerSource,
@@ -209,6 +231,92 @@ class DefaultAccessRepository @Inject constructor(
                 NetworkControlMode.MobileData ->
                     if (disconnected) "自动关闭移动数据" else "自动开启移动数据"
             },
+        )
+    }
+
+    private suspend fun applyAirplaneModeResult(
+        disconnected: Boolean,
+        triggerSource: TriggerSource,
+        reasonPrefix: String,
+    ) {
+        val snapshot = runtimeStatusRepository.snapshotState()
+        val mobileDataStateToRemember = if (disconnected) {
+            snapshot.isMobileDataEnabled
+                ?: executorProbeService.probeNetworkControlState(NetworkControlMode.MobileData).controlledEnabled
+        } else {
+            snapshot.rememberedMobileDataEnabledBeforeAirplaneMode
+        }
+        val airplaneResult = executorProbeService.setNetworkControlEnabled(
+            mode = NetworkControlMode.AirplaneMode,
+            enabled = disconnected,
+            knownCurrentEnabled = snapshot.isAirplaneModeEnabled,
+        )
+        val airplaneExecutionResult = executionResultFor(airplaneResult)
+        val restoreMobileDataResult = if (!disconnected &&
+            airplaneExecutionResult != ExecutionResult.Failed &&
+            mobileDataStateToRemember != null
+        ) {
+            executorProbeService.setNetworkControlEnabled(
+                mode = NetworkControlMode.MobileData,
+                enabled = mobileDataStateToRemember,
+                knownCurrentEnabled = snapshot.isMobileDataEnabled,
+            )
+        } else {
+            null
+        }
+        val action = if (disconnected) ExecutionAction.DisconnectNow else ExecutionAction.ReconnectNow
+        val finalResult = mergeAirplaneModeExecutionResult(
+            disconnected = disconnected,
+            airplaneResult = airplaneResult,
+            restoreMobileDataResult = restoreMobileDataResult,
+        )
+        val detailReason = buildAirplaneModeDetailReason(
+            reasonPrefix = reasonPrefix,
+            airplaneResult = airplaneResult,
+            restoreMobileDataResult = restoreMobileDataResult,
+        )
+        runtimeStatusRepository.updateSnapshot { current ->
+            var updated = updateControlStateSnapshot(current, airplaneResult)
+            if (disconnected && airplaneExecutionResult != ExecutionResult.Failed) {
+                updated = updated.copy(
+                    rememberedMobileDataEnabledBeforeAirplaneMode = mobileDataStateToRemember,
+                )
+            }
+            if (!disconnected) {
+                updated = when {
+                    restoreMobileDataResult?.controlledEnabled != null -> updated.copy(
+                        isMobileDataEnabled = restoreMobileDataResult.controlledEnabled,
+                    )
+                    finalResult != ExecutionResult.Failed && mobileDataStateToRemember != null -> updated.copy(
+                        isMobileDataEnabled = mobileDataStateToRemember,
+                    )
+                    else -> updated
+                }
+                if (restoreMobileDataResult == null || executionResultFor(restoreMobileDataResult) != ExecutionResult.Failed) {
+                    updated = updated.copy(
+                        rememberedMobileDataEnabledBeforeAirplaneMode = null,
+                    )
+                }
+            }
+            updated.copy(
+                activeExecutorType = airplaneResult.executorType,
+                lastAction = action,
+                lastTriggerSource = triggerSource,
+                lastActionResult = finalResult,
+                lastActionReason = if (finalResult == ExecutionResult.Success || finalResult == ExecutionResult.Skipped) {
+                    ""
+                } else {
+                    detailReason
+                },
+                updatedAtMillis = System.currentTimeMillis(),
+            )
+        }
+        addExecutionLog(
+            action = action,
+            result = finalResult,
+            reason = detailReason,
+            probeResult = restoreMobileDataResult ?: airplaneResult,
+            triggerSource = triggerSource,
         )
     }
 
@@ -245,24 +353,8 @@ class DefaultAccessRepository @Inject constructor(
         reasonPrefix: String,
     ) {
         val mode = result.controlMode ?: NetworkControlMode.AirplaneMode
-        val action = when (mode) {
-            NetworkControlMode.AirplaneMode -> when (result.controlledEnabled) {
-                true -> ExecutionAction.DisconnectNow
-                false -> ExecutionAction.ReconnectNow
-                null -> ExecutionAction.DoNothing
-            }
-            NetworkControlMode.MobileData -> when (result.controlledEnabled) {
-                false -> ExecutionAction.DisconnectNow
-                true -> ExecutionAction.ReconnectNow
-                null -> ExecutionAction.DoNothing
-            }
-        }
-        val executionResult = when {
-            result.summary.contains("已处于") -> ExecutionResult.Skipped
-            result.executed && result.exitCode == 0 && result.controlledEnabled != null -> ExecutionResult.Success
-            result.executed && result.exitCode == 0 -> ExecutionResult.PartialSuccess
-            else -> ExecutionResult.Failed
-        }
+        val action = actionFor(mode, result.controlledEnabled)
+        val executionResult = executionResultFor(result)
         val detailReason = buildActionDetailReason(reasonPrefix, result)
         runtimeStatusRepository.updateSnapshot { snapshot ->
             updateControlStateSnapshot(snapshot, result).copy(
@@ -304,6 +396,71 @@ class DefaultAccessRepository @Inject constructor(
         if (result.stderr.isNotBlank()) {
             append(" · 错误：")
             append(result.stderr.trim())
+        }
+    }
+
+    private fun actionFor(
+        mode: NetworkControlMode,
+        controlledEnabled: Boolean?,
+    ): ExecutionAction = when (mode) {
+        NetworkControlMode.AirplaneMode -> when (controlledEnabled) {
+            true -> ExecutionAction.DisconnectNow
+            false -> ExecutionAction.ReconnectNow
+            null -> ExecutionAction.DoNothing
+        }
+        NetworkControlMode.MobileData -> when (controlledEnabled) {
+            false -> ExecutionAction.DisconnectNow
+            true -> ExecutionAction.ReconnectNow
+            null -> ExecutionAction.DoNothing
+        }
+    }
+
+    private fun executionResultFor(result: ExecutorCommandResult): ExecutionResult = when {
+        result.summary.contains("已处于") -> ExecutionResult.Skipped
+        result.executed && result.exitCode == 0 && result.controlledEnabled != null -> ExecutionResult.Success
+        result.executed && result.exitCode == 0 -> ExecutionResult.PartialSuccess
+        else -> ExecutionResult.Failed
+    }
+
+    private fun mergeAirplaneModeExecutionResult(
+        disconnected: Boolean,
+        airplaneResult: ExecutorCommandResult,
+        restoreMobileDataResult: ExecutorCommandResult?,
+    ): ExecutionResult {
+        val airplaneExecution = executionResultFor(airplaneResult)
+        if (airplaneExecution == ExecutionResult.Failed) {
+            return ExecutionResult.Failed
+        }
+        if (disconnected || restoreMobileDataResult == null) {
+            return airplaneExecution
+        }
+        val restoreExecution = executionResultFor(restoreMobileDataResult)
+        return when {
+            restoreExecution == ExecutionResult.Failed -> ExecutionResult.PartialSuccess
+            airplaneExecution == ExecutionResult.Skipped && restoreExecution == ExecutionResult.Skipped -> ExecutionResult.Skipped
+            else -> ExecutionResult.Success
+        }
+    }
+
+    private fun buildAirplaneModeDetailReason(
+        reasonPrefix: String,
+        airplaneResult: ExecutorCommandResult,
+        restoreMobileDataResult: ExecutorCommandResult?,
+    ): String = buildString {
+        append(buildActionDetailReason(reasonPrefix, airplaneResult))
+        if (restoreMobileDataResult != null) {
+            append(" · 移动数据恢复：")
+            append(restoreMobileDataResult.summary)
+            if (restoreMobileDataResult.stdout.isNotBlank() &&
+                restoreMobileDataResult.stdout.trim() !in setOf("0", "1")
+            ) {
+                append(" · 输出：")
+                append(restoreMobileDataResult.stdout.trim())
+            }
+            if (restoreMobileDataResult.stderr.isNotBlank()) {
+                append(" · 错误：")
+                append(restoreMobileDataResult.stderr.trim())
+            }
         }
     }
 

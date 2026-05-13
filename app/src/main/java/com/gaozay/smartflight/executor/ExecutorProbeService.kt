@@ -99,8 +99,7 @@ class ExecutorProbeService @Inject constructor(
         )
     }
 
-    suspend fun probeCurrentNetworkControlState(): ExecutorCommandResult {
-        val mode = currentMode()
+    suspend fun probeNetworkControlState(mode: NetworkControlMode): ExecutorCommandResult {
         val selected = currentRunner()
         val executorType = selected.executorType
         val runner = selected.runner
@@ -120,10 +119,13 @@ class ExecutorProbeService @Inject constructor(
         }
     }
 
-    suspend fun toggleCurrentNetworkControlState(
-        knownControlledEnabled: Boolean? = null,
+    suspend fun probeCurrentNetworkControlState(): ExecutorCommandResult = probeNetworkControlState(currentMode())
+
+    suspend fun setNetworkControlEnabled(
+        mode: NetworkControlMode,
+        enabled: Boolean,
+        knownCurrentEnabled: Boolean? = null,
     ): ExecutorCommandResult {
-        val mode = currentMode()
         val selected = currentRunner()
         val executorType = selected.executorType
         val runner = selected.runner
@@ -139,68 +141,6 @@ class ExecutorProbeService @Inject constructor(
             ensureMobileDataSupported(executorType, runner)?.let { return it }
         }
 
-        val currentEnabled = knownControlledEnabled ?: withMode(
-            mode,
-            runner.run(readCommandFor(mode)),
-        ).controlledEnabled
-        if (currentEnabled == null) {
-            return ExecutorCommandResult(
-                executorType = executorType,
-                controlMode = mode,
-                executed = false,
-                summary = "无法解析当前${labelFor(mode)}状态，已取消切换",
-            )
-        }
-
-        val targetEnabled = !currentEnabled
-        val writeResult = withMode(mode, runner.run(writeCommandFor(mode, targetEnabled)))
-        if (!writeResult.executed || writeResult.exitCode != 0) {
-            return writeResult.copy(
-                summary = "${labelFor(mode)}写入失败",
-            )
-        }
-
-        return writeResult.copy(
-            controlledEnabled = targetEnabled,
-            summary = when (mode) {
-                NetworkControlMode.AirplaneMode ->
-                    if (targetEnabled) "飞行模式已开启" else "飞行模式已关闭"
-                NetworkControlMode.MobileData ->
-                    if (targetEnabled) "移动数据已开启" else "移动数据已关闭"
-            },
-        )
-    }
-
-    suspend fun setDisconnectedState(
-        disconnected: Boolean,
-        knownDisconnected: Boolean? = null,
-    ): ExecutorCommandResult {
-        val mode = currentMode()
-        val selected = currentRunner()
-        val executorType = selected.executorType
-        val runner = selected.runner
-        if (runner == null) {
-            return ExecutorCommandResult(
-                executorType = ExecutorType.Unavailable,
-                controlMode = mode,
-                executed = false,
-                summary = "没有可用于设置${labelFor(mode)}的执行器",
-            )
-        }
-        if (mode == NetworkControlMode.MobileData) {
-            ensureMobileDataSupported(executorType, runner)?.let { return it }
-        }
-
-        val targetEnabled = when (mode) {
-            NetworkControlMode.AirplaneMode -> disconnected
-            NetworkControlMode.MobileData -> !disconnected
-        }
-        val knownCurrentEnabled = knownDisconnected?.let {
-            when (mode) {
-                NetworkControlMode.AirplaneMode -> it
-                NetworkControlMode.MobileData -> !it
-            }
-        }
         val currentEnabled = knownCurrentEnabled ?: withMode(
             mode,
             runner.run(readCommandFor(mode)),
@@ -213,34 +153,79 @@ class ExecutorProbeService @Inject constructor(
                 summary = "无法解析当前${labelFor(mode)}状态，已取消设置",
             )
         }
-        if (currentEnabled == targetEnabled) {
+
+        if (currentEnabled == enabled) {
             return ExecutorCommandResult(
                 executorType = executorType,
                 controlMode = mode,
-                controlledEnabled = targetEnabled,
+                controlledEnabled = enabled,
                 executed = false,
                 summary = when (mode) {
                     NetworkControlMode.AirplaneMode ->
-                        if (targetEnabled) "飞行模式已处于开启状态" else "飞行模式已处于关闭状态"
+                        if (enabled) "飞行模式已处于开启状态" else "飞行模式已处于关闭状态"
                     NetworkControlMode.MobileData ->
-                        if (targetEnabled) "移动数据已处于开启状态" else "移动数据已处于关闭状态"
+                        if (enabled) "移动数据已处于开启状态" else "移动数据已处于关闭状态"
                 },
             )
         }
 
-        val writeResult = withMode(mode, runner.run(writeCommandFor(mode, targetEnabled)))
+        val writeResult = withMode(mode, runner.run(writeCommandFor(mode, enabled)))
         if (!writeResult.executed || writeResult.exitCode != 0) {
-            return writeResult.copy(summary = "${labelFor(mode)}写入失败")
+            return writeResult.copy(
+                summary = "${labelFor(mode)}写入失败",
+            )
         }
 
         return writeResult.copy(
-            controlledEnabled = targetEnabled,
+            controlledEnabled = enabled,
             summary = when (mode) {
                 NetworkControlMode.AirplaneMode ->
-                    if (targetEnabled) "飞行模式已开启" else "飞行模式已关闭"
+                    if (enabled) "飞行模式已开启" else "飞行模式已关闭"
                 NetworkControlMode.MobileData ->
-                    if (targetEnabled) "移动数据已开启" else "移动数据已关闭"
+                    if (enabled) "移动数据已开启" else "移动数据已关闭"
             },
+        )
+    }
+
+    suspend fun toggleCurrentNetworkControlState(
+        knownControlledEnabled: Boolean? = null,
+    ): ExecutorCommandResult {
+        val mode = currentMode()
+        val currentEnabled = knownControlledEnabled ?: probeNetworkControlState(mode).controlledEnabled
+        if (currentEnabled == null) {
+            return ExecutorCommandResult(
+                executorType = currentRunner().executorType,
+                controlMode = mode,
+                executed = false,
+                summary = "无法解析当前${labelFor(mode)}状态，已取消切换",
+            )
+        }
+        return setNetworkControlEnabled(
+            mode = mode,
+            enabled = !currentEnabled,
+            knownCurrentEnabled = currentEnabled,
+        )
+    }
+
+    suspend fun setDisconnectedState(
+        disconnected: Boolean,
+        knownDisconnected: Boolean? = null,
+    ): ExecutorCommandResult {
+        val mode = currentMode()
+        val targetEnabled = when (mode) {
+            NetworkControlMode.AirplaneMode -> disconnected
+            NetworkControlMode.MobileData -> !disconnected
+        }
+        val knownCurrentEnabled = knownDisconnected?.let {
+            when (mode) {
+                NetworkControlMode.AirplaneMode -> it
+                NetworkControlMode.MobileData -> !it
+            }
+        }
+        return setNetworkControlEnabled(
+            mode = mode,
+            enabled = targetEnabled,
+            knownCurrentEnabled = knownCurrentEnabled,
         )
     }
 }
