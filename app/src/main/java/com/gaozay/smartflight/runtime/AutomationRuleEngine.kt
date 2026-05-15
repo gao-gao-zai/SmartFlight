@@ -132,16 +132,14 @@ class AutomationRuleEngine @Inject constructor() {
                 shouldLog = true,
             )
         }
-        if (context.previousTargetAppActive == targetAppActive) {
-            return ForegroundRuleDecision(
-                targetAppActive = targetAppActive,
-                action = ForegroundAction.None("前台应用目标状态未变化"),
-                reason = "前台应用目标状态未变化",
-                matchedRules = emptyList(),
-                shouldLog = false,
+        val shouldReconnectForTargetApp = targetAppActive &&
+            context.settings.reconnectOnTargetAppLaunch &&
+            (
+                context.previousTargetAppActive != targetAppActive ||
+                    context.allowReconnectWhenTargetAppAlreadyActive ||
+                    context.isCurrentlyDisconnected == true
             )
-        }
-        if (targetAppActive && context.settings.reconnectOnTargetAppLaunch) {
+        if (shouldReconnectForTargetApp) {
             val targetRule = when (context.onlineSource) {
                 AppOnlineSourceTag.Manual -> "ManualOnline"
                 AppOnlineSourceTag.Auto -> "AutoOnline"
@@ -166,6 +164,15 @@ class AutomationRuleEngine @Inject constructor() {
                 reason = "检测到联网应用进入前台：${context.displayName()}",
                 matchedRules = listOf(targetRule),
                 shouldLog = true,
+            )
+        }
+        if (context.previousTargetAppActive == targetAppActive) {
+            return ForegroundRuleDecision(
+                targetAppActive = targetAppActive,
+                action = ForegroundAction.None("前台应用目标状态未变化"),
+                reason = "前台应用目标状态未变化",
+                matchedRules = emptyList(),
+                shouldLog = false,
             )
         }
         if (!targetAppActive && context.settings.appExitDisconnectEnabled) {
@@ -277,6 +284,7 @@ data class ForegroundRuleContext(
     val previousTargetAppActive: Boolean?,
     val isCurrentlyDisconnected: Boolean? = null,
     val isAppExitDisconnectScheduled: Boolean = false,
+    val allowReconnectWhenTargetAppAlreadyActive: Boolean = false,
 ) {
     fun displayName(): String = appLabel ?: packageName ?: "未知应用"
 

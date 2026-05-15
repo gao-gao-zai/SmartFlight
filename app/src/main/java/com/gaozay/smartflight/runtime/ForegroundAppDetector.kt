@@ -4,6 +4,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,17 +31,26 @@ class ForegroundAppDetector @Inject constructor(
         val event = UsageEvents.Event()
         var latestForegroundPackage: String? = null
         var latestForegroundTimestamp = startTime
+        var processedEvents = 0
+        var resumedEvents = 0
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
+            processedEvents++
             if (event.timeStamp > latestForegroundTimestamp) {
                 latestForegroundTimestamp = event.timeStamp
             }
             if (isForegroundEvent(event) && !event.packageName.isNullOrBlank()) {
+                resumedEvents++
                 latestForegroundPackage = event.packageName
             }
         }
         lastEventTimestampMillis = (latestForegroundTimestamp + 1L).coerceAtMost(endTime + 1L)
-        val packageName = latestForegroundPackage ?: return lastKnownForegroundApp
+        val packageName = latestForegroundPackage ?: return lastKnownForegroundApp.also {
+            Log.d(
+                LOG_TAG,
+                "detect fallback processed=$processedEvents resumed=$resumedEvents start=$startTime end=$endTime latestTs=$latestForegroundTimestamp fallbackPkg=${it?.packageName ?: "<none>"}",
+            )
+        }
         val appLabel = runCatching {
             val packageManager = context.packageManager
             val applicationInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
@@ -50,7 +60,13 @@ class ForegroundAppDetector @Inject constructor(
             packageName = packageName,
             appLabel = appLabel,
             eventTimestampMillis = latestForegroundTimestamp,
-        ).also { lastKnownForegroundApp = it }
+        ).also {
+            lastKnownForegroundApp = it
+            Log.d(
+                LOG_TAG,
+                "detect resolved processed=$processedEvents resumed=$resumedEvents start=$startTime end=$endTime latestTs=$latestForegroundTimestamp pkg=${it.packageName} label=${it.appLabel}",
+            )
+        }
     }
 
     private fun isForegroundEvent(event: UsageEvents.Event): Boolean {
@@ -61,6 +77,7 @@ class ForegroundAppDetector @Inject constructor(
     }
 
     companion object {
+        private const val LOG_TAG = "SmartFlightFgDetect"
         private const val INITIAL_LOOKBACK_MILLIS = 10_000L
     }
 }

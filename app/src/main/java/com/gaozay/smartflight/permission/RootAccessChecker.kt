@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.permission
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -13,6 +14,7 @@ class RootAccessChecker @Inject constructor(
 ) {
     suspend fun check(): AccessCheckResult = withContext(Dispatchers.IO) {
         val suPath = findSuPath()
+        Log.d(LOG_TAG, "check suPath=${suPath ?: "<none>"}")
         if (suPath == null) {
             return@withContext AccessCheckResult(
                 title = "Root",
@@ -53,6 +55,7 @@ class RootAccessChecker @Inject constructor(
 
     suspend fun probeAuthorization(): AccessCheckResult = withContext(Dispatchers.IO) {
         val suPath = findSuPath()
+        Log.d(LOG_TAG, "probeAuthorization suPath=${suPath ?: "<none>"}")
         if (suPath == null) {
             val result = AccessCheckResult(
                 title = "Root",
@@ -87,6 +90,10 @@ class RootAccessChecker @Inject constructor(
                 output = output,
             )
         }.getOrNull()
+        Log.d(
+            LOG_TAG,
+            "probeAuthorization result finished=${probe?.finished} exit=${probe?.exitCode} output=${probe?.output?.lineSequence()?.firstOrNull() ?: "<none>"}",
+        )
 
         val confirmed = probe?.finished == true &&
             probe.exitCode == 0 &&
@@ -130,13 +137,50 @@ class RootAccessChecker @Inject constructor(
         )
     }
 
-    private fun findSuPath(): String? = listOf(
-        "/system/bin/su",
-        "/system/xbin/su",
-        "/sbin/su",
-        "/su/bin/su",
-        "/vendor/bin/su",
-    ).firstOrNull { File(it).exists() }
+    private fun findSuPath(): String? {
+        val knownPaths = listOf(
+            "/system/bin/su",
+            "/system/xbin/su",
+            "/sbin/su",
+            "/su/bin/su",
+            "/vendor/bin/su",
+        )
+        knownPaths.firstOrNull { File(it).exists() }?.let {
+            Log.d(LOG_TAG, "findSuPath matched known path=$it")
+            return it
+        }
+
+        commandSuPath("command -v su")?.let {
+            Log.d(LOG_TAG, "findSuPath matched command -v path=$it")
+            return it
+        }
+        commandSuPath("which su")?.let {
+            Log.d(LOG_TAG, "findSuPath matched which path=$it")
+            return it
+        }
+
+        Log.d(LOG_TAG, "findSuPath no match knownPaths=${knownPaths.joinToString()}")
+        return null
+    }
+
+    private fun commandSuPath(command: String): String? = runCatching {
+        val process = ProcessBuilder("sh", "-c", command)
+            .redirectErrorStream(true)
+            .start()
+        val finished = process.waitFor(1200, TimeUnit.MILLISECONDS)
+        val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+        if (!finished) {
+            process.destroy()
+            return@runCatching null
+        }
+        output.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.startsWith("/") && it.endsWith("su") }
+    }.getOrNull()
+
+    private companion object {
+        const val LOG_TAG = "SmartFlightRoot"
+    }
 }
 
 private data class RootCommandResult(

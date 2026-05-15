@@ -76,6 +76,7 @@ class AutomationForegroundService : Service() {
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val action = intent?.action
+            Log.d(LOG_TAG, "screen broadcast action=$action currentScreenState=$currentScreenState")
             currentScreenState = when (action) {
                 Intent.ACTION_SCREEN_OFF -> ScreenState.ScreenOff
                 Intent.ACTION_USER_PRESENT -> ScreenState.Unlocked
@@ -85,9 +86,8 @@ class AutomationForegroundService : Service() {
             serviceScope.launch {
                 when (action) {
                     Intent.ACTION_SCREEN_OFF -> scheduleScreenOffDisconnectIfNeeded()
-                    Intent.ACTION_SCREEN_ON -> cancelScreenOffDisconnect()
-
-                    Intent.ACTION_USER_PRESENT -> cancelScreenOffDisconnect()
+                    Intent.ACTION_SCREEN_ON -> handleScreenWake(TriggerSource.ScreenOn)
+                    Intent.ACTION_USER_PRESENT -> handleScreenWake(TriggerSource.UserUnlocked)
                 }
                 runtimeStatusRepository.updateSnapshot { snapshot ->
                     snapshot.copy(
@@ -102,6 +102,7 @@ class AutomationForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         currentScreenState = detectCurrentScreenState()
+        Log.d(LOG_TAG, "service onCreate screenState=$currentScreenState")
         registerReceiver(
             screenStateReceiver,
             IntentFilter().apply {
@@ -114,11 +115,14 @@ class AutomationForegroundService : Service() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
         serviceScope.launch {
+            accessRepository.refresh()
+            accessRepository.syncCurrentNetworkControlState()
             runtimeEnvironmentMonitor.refreshSnapshot()
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(LOG_TAG, "service onStartCommand action=${intent?.action} startId=$startId screenState=$currentScreenState")
         when (intent?.action) {
             ACTION_DEBUG_SCREEN_OFF -> {
                 currentScreenState = ScreenState.ScreenOff
@@ -136,7 +140,7 @@ class AutomationForegroundService : Service() {
             ACTION_DEBUG_SCREEN_ON -> {
                 currentScreenState = ScreenState.ScreenOn
                 serviceScope.launch {
-                    cancelScreenOffDisconnect()
+                    handleScreenWake(TriggerSource.ScreenOn)
                     runtimeStatusRepository.updateSnapshot { snapshot ->
                         snapshot.copy(
                             screenState = currentScreenState,
@@ -151,6 +155,7 @@ class AutomationForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        Log.d(LOG_TAG, "service onDestroy screenState=$currentScreenState lastTargetAppActive=$lastTargetAppActive")
         automationJob?.cancel()
         screenOffDisconnectJob?.cancel()
         appExitDisconnectJob?.cancel()
@@ -177,8 +182,10 @@ class AutomationForegroundService : Service() {
 
     private fun startAutomationLoopIfNeeded() {
         if (automationJob?.isActive == true) {
+            Log.d(LOG_TAG, "automation loop already active")
             return
         }
+        Log.d(LOG_TAG, "starting automation loop")
         automationJob = serviceScope.launch {
             launch {
                 installedAppRepository.observeApps().collect { apps ->
@@ -202,12 +209,14 @@ class AutomationForegroundService : Service() {
             while (isActive) {
                 val enabled = settingsRepository.settings.first().automationEnabled
                 if (!enabled) {
+                    Log.d(LOG_TAG, "automation disabled during loop, stopping service")
                     stopSelf()
                     return@launch
                 }
                 runCatching {
                     automationTick()
                 }.onFailure { throwable ->
+                    Log.e(LOG_TAG, "automationTick failed", throwable)
                     runtimeStatusRepository.updateSnapshot { snapshot ->
                         snapshot.copy(
                             lastTriggerSource = TriggerSource.ServiceRestored,
@@ -227,9 +236,17 @@ class AutomationForegroundService : Service() {
         }
     }
 
-    private suspend fun automationTick() {
+    private suspend fun automationTick(
+        triggerSource: TriggerSource = TriggerSource.AppForegroundChanged,
+        allowReconnectWhenTargetAppAlreadyActive: Boolean = false,
+    ) {
         val settings = settingsRepository.settings.first()
+        Log.d(
+            LOG_TAG,
+            "automationTick trigger=$triggerSource screenState=$currentScreenState allowWakeReconnect=$allowReconnectWhenTargetAppAlreadyActive monitorWhenScreenOff=${settings.monitorForegroundWhenScreenOff} reconnectOnLaunch=${settings.reconnectOnTargetAppLaunch}",
+        )
         if (!automationRuleEngine.shouldMonitorForeground(settings, currentScreenState)) {
+            Log.d(LOG_TAG, "automationTick skipped: shouldMonitorForeground=false screenState=$currentScreenState")
             runtimeStatusRepository.updateSnapshot { snapshot ->
                 snapshot.copy(
                     screenState = currentScreenState,
@@ -254,6 +271,10 @@ class AutomationForegroundService : Service() {
         val runtimeSnapshot = runtimeStatusRepository.snapshot.first()
         val appRuleInfo = packageName?.let { appRulesByPackageName[it] }
         val executorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
+        Log.d(
+            LOG_TAG,
+            "automationTick snapshot pkg=${packageName ?: "<none>"} online=${appRuleInfo?.isInOnlineList == true} blacklist=${appRuleInfo?.isInBlacklist == true} executorAvailable=$executorAvailable disconnected=${runtimeSnapshot.isDisconnected(settings.networkControlMode)} wifi=${runtimeSnapshot.isWifiConnected} lastTarget=$lastTargetAppActive",
+        )
         val decision = automationRuleEngine.evaluateForegroundChange(
             ForegroundRuleContext(
                 settings = settings,
@@ -267,6 +288,7 @@ class AutomationForegroundService : Service() {
                 previousTargetAppActive = lastTargetAppActive,
                 isCurrentlyDisconnected = runtimeSnapshot.isDisconnected(settings.networkControlMode),
                 isAppExitDisconnectScheduled = runtimeSnapshot.isAppExitDisconnectScheduled,
+                allowReconnectWhenTargetAppAlreadyActive = allowReconnectWhenTargetAppAlreadyActive,
             ),
         )
         Log.d(
@@ -303,7 +325,7 @@ class AutomationForegroundService : Service() {
         when (val action = decision.action) {
             is ForegroundAction.None -> {
                 if (decision.shouldLog) {
-                    updateSkippedForegroundDecision(decision)
+                    updateSkippedForegroundDecision(decision, triggerSource)
                 }
             }
             is ForegroundAction.Reconnect -> {
@@ -311,7 +333,7 @@ class AutomationForegroundService : Service() {
                 executeAirplaneModeChange(
                     currentDisconnected = runtimeSnapshot.isDisconnected(settings.networkControlMode),
                     targetDisconnected = false,
-                    triggerSource = TriggerSource.AppForegroundChanged,
+                    triggerSource = triggerSource,
                     reason = action.reason + settings.mobileDataNoOpSuffix(),
                     onPrompt = { showReconnectPrompt(settings) },
                 )
@@ -322,7 +344,7 @@ class AutomationForegroundService : Service() {
                 executeAirplaneModeChange(
                     currentDisconnected = runtimeSnapshot.isDisconnected(settings.networkControlMode),
                     targetDisconnected = true,
-                    triggerSource = TriggerSource.AppForegroundChanged,
+                    triggerSource = triggerSource,
                     reason = action.reason + settings.mobileDataNoOpSuffix(),
                     onPrompt = { showDisconnectPrompt(settings) },
                 )
@@ -345,7 +367,7 @@ class AutomationForegroundService : Service() {
                 runtimeStatusRepository.updateSnapshot { snapshot ->
                     snapshot.copy(
                         lastAction = ExecutionAction.PauseAutomation,
-                        lastTriggerSource = TriggerSource.AppForegroundChanged,
+                        lastTriggerSource = triggerSource,
                         lastActionResult = ExecutionResult.Failed,
                         lastActionReason = action.reason,
                         updatedAtMillis = System.currentTimeMillis(),
@@ -353,6 +375,28 @@ class AutomationForegroundService : Service() {
                 }
             }
         }
+    }
+
+    private suspend fun handleScreenWake(triggerSource: TriggerSource) {
+        Log.d(LOG_TAG, "handleScreenWake trigger=$triggerSource screenState=$currentScreenState lastTarget=$lastTargetAppActive")
+        cancelScreenOffDisconnect()
+        accessRepository.refresh()
+        accessRepository.syncCurrentNetworkControlState()
+        runtimeEnvironmentMonitor.refreshSnapshot()
+        val settings = settingsRepository.settings.first()
+        val allowReconnectWhenTargetAppAlreadyActive = when (triggerSource) {
+            TriggerSource.ScreenOn -> !settings.disableScreenOnReconnect
+            TriggerSource.UserUnlocked -> !settings.disableUnlockReconnect
+            else -> false
+        }
+        Log.d(
+            LOG_TAG,
+            "handleScreenWake prepared trigger=$triggerSource allowReconnect=$allowReconnectWhenTargetAppAlreadyActive disableScreenOnReconnect=${settings.disableScreenOnReconnect} disableUnlockReconnect=${settings.disableUnlockReconnect}",
+        )
+        automationTick(
+            triggerSource = triggerSource,
+            allowReconnectWhenTargetAppAlreadyActive = allowReconnectWhenTargetAppAlreadyActive,
+        )
     }
 
     private suspend fun scheduleScreenOffDisconnectIfNeeded() {
@@ -578,11 +622,14 @@ class AutomationForegroundService : Service() {
         }
     }
 
-    private suspend fun updateSkippedForegroundDecision(decision: ForegroundRuleDecision) {
+    private suspend fun updateSkippedForegroundDecision(
+        decision: ForegroundRuleDecision,
+        triggerSource: TriggerSource,
+    ) {
         runtimeStatusRepository.updateSnapshot { snapshot ->
             snapshot.copy(
                 lastAction = ExecutionAction.DoNothing,
-                lastTriggerSource = TriggerSource.AppForegroundChanged,
+                lastTriggerSource = triggerSource,
                 lastActionResult = ExecutionResult.Skipped,
                 lastActionReason = decision.reason,
                 updatedAtMillis = System.currentTimeMillis(),

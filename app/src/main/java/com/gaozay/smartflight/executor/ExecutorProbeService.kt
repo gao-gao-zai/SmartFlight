@@ -171,6 +171,18 @@ class ExecutorProbeService @Inject constructor(
 
         val writeResult = withMode(mode, runner.run(writeCommandFor(mode, enabled)))
         if (!writeResult.executed || writeResult.exitCode != 0) {
+            val probedResult = withMode(mode, runner.run(readCommandFor(mode)))
+            if (probedResult.controlledEnabled == enabled) {
+                return writeResult.copy(
+                    controlledEnabled = enabled,
+                    summary = when (mode) {
+                        NetworkControlMode.AirplaneMode ->
+                            if (enabled) "飞行模式已开启" else "飞行模式已关闭"
+                        NetworkControlMode.MobileData ->
+                            if (enabled) "移动数据已开启" else "移动数据已关闭"
+                    },
+                )
+            }
             return writeResult.copy(
                 summary = "${labelFor(mode)}写入失败",
             )

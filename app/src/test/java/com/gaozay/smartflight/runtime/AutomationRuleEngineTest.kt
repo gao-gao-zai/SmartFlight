@@ -72,6 +72,52 @@ class AutomationRuleEngineTest {
     }
 
     @Test
+    fun screenWakeCanReconnectWhileTargetAppStaysForeground() {
+        val decision = engine.evaluateForegroundChange(
+            context(
+                isInOnlineList = true,
+                onlineSource = AppOnlineSourceTag.Manual,
+                previousTargetAppActive = true,
+                allowReconnectWhenTargetAppAlreadyActive = true,
+                isCurrentlyDisconnected = true,
+            ),
+        )
+
+        assertTrue(decision.action is ForegroundAction.Reconnect)
+        assertEquals(listOf("ManualOnline"), decision.matchedRules)
+    }
+
+    @Test
+    fun disconnectedTargetAppReconnectsWithoutWakeOverride() {
+        val decision = engine.evaluateForegroundChange(
+            context(
+                isInOnlineList = true,
+                onlineSource = AppOnlineSourceTag.Manual,
+                previousTargetAppActive = true,
+                isCurrentlyDisconnected = true,
+            ),
+        )
+
+        assertTrue(decision.action is ForegroundAction.Reconnect)
+        assertEquals(listOf("ManualOnline"), decision.matchedRules)
+    }
+
+    @Test
+    fun unchangedConnectedTargetAppDoesNotReconnectWithoutWakeOverride() {
+        val decision = engine.evaluateForegroundChange(
+            context(
+                isInOnlineList = true,
+                onlineSource = AppOnlineSourceTag.Manual,
+                previousTargetAppActive = true,
+                isCurrentlyDisconnected = false,
+            ),
+        )
+
+        assertTrue(decision.action is ForegroundAction.None)
+        assertEquals("前台应用目标状态未变化", decision.reason)
+    }
+
+    @Test
     fun offlineAppDoesNotTriggerReconnect() {
         val decision = engine.evaluateForegroundChange(
             context(
@@ -208,6 +254,8 @@ class AutomationRuleEngineTest {
         isWifiConnected: Boolean = false,
         executorAvailable: Boolean = true,
         previousTargetAppActive: Boolean? = false,
+        isCurrentlyDisconnected: Boolean? = null,
+        allowReconnectWhenTargetAppAlreadyActive: Boolean = false,
     ): ForegroundRuleContext = ForegroundRuleContext(
         settings = settings,
         packageName = packageName,
@@ -218,5 +266,7 @@ class AutomationRuleEngineTest {
         isWifiConnected = isWifiConnected,
         executorAvailable = executorAvailable,
         previousTargetAppActive = previousTargetAppActive,
+        isCurrentlyDisconnected = isCurrentlyDisconnected,
+        allowReconnectWhenTargetAppAlreadyActive = allowReconnectWhenTargetAppAlreadyActive,
     )
 }

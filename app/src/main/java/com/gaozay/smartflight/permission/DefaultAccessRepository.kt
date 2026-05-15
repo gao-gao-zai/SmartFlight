@@ -1,6 +1,8 @@
 package com.gaozay.smartflight.permission
 
+import android.content.Context
 import android.os.Build
+import android.util.Log
 import com.gaozay.smartflight.data.local.entity.ExecutionLogEntity
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
@@ -21,7 +23,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import dagger.hilt.android.qualifiers.ApplicationContext
-import android.content.Context
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -51,6 +52,10 @@ class DefaultAccessRepository @Inject constructor(
             lastCheckedAtMillis = System.currentTimeMillis(),
         )
         mutableAccessGateState.value = state
+        Log.d(
+            LOG_TAG,
+            "refresh executor=${advancedAccess.selectedExecutorType} available=${advancedAccess.isAvailable} issues=${advancedAccess.gatingIssues.joinToString { it.summary }}",
+        )
 
         runtimeStatusRepository.updateSnapshot { snapshot ->
             val shouldResetRuntimeStatus = shouldRefreshRuntimeStatusSummary(snapshot)
@@ -115,6 +120,10 @@ class DefaultAccessRepository @Inject constructor(
 
     override suspend fun syncCurrentNetworkControlState() {
         val result = executorProbeService.probeCurrentNetworkControlState()
+        Log.d(
+            LOG_TAG,
+            "syncCurrentNetworkControlState mode=${result.controlMode} enabled=${result.controlledEnabled} executed=${result.executed} exit=${result.exitCode} executor=${result.executorType} summary=${result.summary}",
+        )
         applyProbeResult(
             result = result,
             triggerSource = TriggerSource.ServiceRestored,
@@ -124,6 +133,10 @@ class DefaultAccessRepository @Inject constructor(
 
     override suspend fun probeCurrentNetworkControlState() {
         val result = executorProbeService.probeCurrentNetworkControlState()
+        Log.d(
+            LOG_TAG,
+            "probeCurrentNetworkControlState mode=${result.controlMode} enabled=${result.controlledEnabled} executed=${result.executed} exit=${result.exitCode} executor=${result.executorType} summary=${result.summary}",
+        )
         applyProbeResult(
             result = result,
             triggerSource = TriggerSource.Manual,
@@ -157,6 +170,10 @@ class DefaultAccessRepository @Inject constructor(
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
+        Log.d(
+            LOG_TAG,
+            "applyProbeResult trigger=$triggerSource mode=${result.controlMode} enabled=$controlledEnabled result=$executionResult executor=${result.executorType} shouldLog=$shouldLog reason=$detailReason",
+        )
         if (shouldLog) {
             addExecutionLog(
                 action = ExecutionAction.DoNothing,
@@ -275,6 +292,10 @@ class DefaultAccessRepository @Inject constructor(
             airplaneResult = airplaneResult,
             restoreMobileDataResult = restoreMobileDataResult,
         )
+        Log.d(
+            LOG_TAG,
+            "applyAirplaneModeResult disconnected=$disconnected trigger=$triggerSource airplaneEnabled=${airplaneResult.controlledEnabled} airplaneExit=${airplaneResult.exitCode} restoreMobile=${restoreMobileDataResult?.controlledEnabled} finalResult=$finalResult executor=${airplaneResult.executorType} reason=$detailReason",
+        )
         runtimeStatusRepository.updateSnapshot { current ->
             var updated = updateControlStateSnapshot(current, airplaneResult)
             if (disconnected && airplaneExecutionResult != ExecutionResult.Failed) {
@@ -356,6 +377,10 @@ class DefaultAccessRepository @Inject constructor(
         val action = actionFor(mode, result.controlledEnabled)
         val executionResult = executionResultFor(result)
         val detailReason = buildActionDetailReason(reasonPrefix, result)
+        Log.d(
+            LOG_TAG,
+            "applyNetworkControlResult trigger=$triggerSource mode=$mode enabled=${result.controlledEnabled} exit=${result.exitCode} executed=${result.executed} result=$executionResult executor=${result.executorType} reason=$detailReason",
+        )
         runtimeStatusRepository.updateSnapshot { snapshot ->
             updateControlStateSnapshot(snapshot, result).copy(
                 activeExecutorType = result.executorType,
@@ -513,5 +538,9 @@ class DefaultAccessRepository @Inject constructor(
         }
         return snapshot.lastTriggerSource == TriggerSource.ServiceRestored &&
             snapshot.lastAction == ExecutionAction.DoNothing
+    }
+
+    private companion object {
+        const val LOG_TAG = "SmartFlightAccess"
     }
 }
