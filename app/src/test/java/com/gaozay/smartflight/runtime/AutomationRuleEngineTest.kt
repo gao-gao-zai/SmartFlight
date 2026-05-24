@@ -244,6 +244,45 @@ class AutomationRuleEngineTest {
         )
     }
 
+    @Test
+    fun screenOffWithoutMonitoringDoesNotMonitorForeground() {
+        assertFalse(
+            engine.shouldMonitorForeground(
+                settings = UserSettings(
+                    automationEnabled = true,
+                    monitorForegroundWhenScreenOff = false,
+                ),
+                screenState = ScreenState.ScreenOff,
+            ),
+        )
+    }
+
+    @Test
+    fun screenOffWithMonitoringCanMonitorForeground() {
+        assertTrue(
+            engine.shouldMonitorForeground(
+                settings = UserSettings(
+                    automationEnabled = true,
+                    monitorForegroundWhenScreenOff = true,
+                ),
+                screenState = ScreenState.ScreenOff,
+            ),
+        )
+    }
+
+    @Test
+    fun screenOnAlwaysMonitorsForeground() {
+        assertTrue(
+            engine.shouldMonitorForeground(
+                settings = UserSettings(
+                    automationEnabled = true,
+                    monitorForegroundWhenScreenOff = false,
+                ),
+                screenState = ScreenState.ScreenOn,
+            ),
+        )
+    }
+
     private fun context(
         settings: UserSettings = UserSettings(automationEnabled = true),
         packageName: String? = "com.example.app",

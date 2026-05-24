@@ -13,19 +13,6 @@ class AutomationRuleEngine @Inject constructor() {
         screenState: ScreenState,
     ): Boolean = settings.monitorForegroundWhenScreenOff || screenState != ScreenState.ScreenOff
 
-    fun nextPollIntervalMillis(
-        settings: UserSettings,
-        screenState: ScreenState,
-    ): Long {
-        if (screenState == ScreenState.ScreenOff && !settings.monitorForegroundWhenScreenOff) {
-            return SCREEN_OFF_IDLE_POLL_INTERVAL_MILLIS
-        }
-        return when (screenState) {
-            ScreenState.ScreenOff -> SCREEN_OFF_POLL_INTERVAL_MILLIS
-            ScreenState.ScreenOn, ScreenState.Unlocked, ScreenState.Unknown -> SCREEN_ON_POLL_INTERVAL_MILLIS
-        }
-    }
-
     fun evaluateForegroundChange(context: ForegroundRuleContext): ForegroundRuleDecision {
         val targetAppActive = context.isTargetAppActive()
         if (context.previousTargetAppActive == null) {
@@ -265,11 +252,6 @@ class AutomationRuleEngine @Inject constructor() {
         screenState == ScreenState.ScreenOff &&
         !(isWifiConnected && settings.skipDisconnectOnWifi)
 
-    companion object {
-        const val SCREEN_ON_POLL_INTERVAL_MILLIS = 1_500L
-        const val SCREEN_OFF_POLL_INTERVAL_MILLIS = 8_000L
-        const val SCREEN_OFF_IDLE_POLL_INTERVAL_MILLIS = 30_000L
-    }
 }
 
 data class ForegroundRuleContext(
