@@ -4,11 +4,13 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gaozay.smartflight.apps.AppFilter
+import com.gaozay.smartflight.apps.AppFilterState
 import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.apps.InternetPermissionFilter
 import com.gaozay.smartflight.apps.LauncherFilter
 import com.gaozay.smartflight.apps.InstalledAppRepository
+import com.gaozay.smartflight.apps.buildAppsUiState
 import com.gaozay.smartflight.apps.isOnline
 import com.gaozay.smartflight.data.local.entity.ExecutionLogEntity
 import com.gaozay.smartflight.domain.model.CornerStyle
@@ -23,9 +25,8 @@ import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.permission.AccessGateState
 import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.runtime.AutomationServiceController
-import com.gaozay.smartflight.runtime.isDisconnected
-import com.gaozay.smartflight.runtime.mobileDataNoOpSuffix
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
+import com.gaozay.smartflight.runtime.buildRuntimeSummary
 import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
@@ -139,55 +140,10 @@ class MainViewModel @Inject constructor(
         appScanning.asStateFlow(),
         appLastScanSummary.asStateFlow(),
     ) { apps, query, filterState, isScanning, lastScanSummary ->
-        val filter = filterState.filter
-        val internetPermissionFilter = filterState.internetPermissionFilter
-        val typeFilter = filterState.typeFilter
-        val launcherFilter = filterState.launcherFilter
-        val filteredApps = apps.filter { app ->
-            val matchesQuery = query.isBlank() ||
-                app.label.contains(query, ignoreCase = true) ||
-                app.packageName.contains(query, ignoreCase = true)
-            val matchesStatusFilter = when (filter) {
-                AppFilter.All -> true
-                AppFilter.Online -> app.isOnline()
-                AppFilter.Offline -> !app.isOnline()
-                AppFilter.Whitelist -> app.isInWhitelist
-                AppFilter.Blacklist -> app.isInBlacklist
-            }
-            val matchesInternetPermissionFilter = when (internetPermissionFilter) {
-                InternetPermissionFilter.All -> true
-                InternetPermissionFilter.Declared -> app.declaresInternetPermission
-                InternetPermissionFilter.NotDeclared -> !app.declaresInternetPermission
-            }
-            val matchesTypeFilter = when (typeFilter) {
-                AppTypeFilter.All -> true
-                AppTypeFilter.User -> !app.isSystemApp
-                AppTypeFilter.System -> app.isSystemApp
-            }
-            val matchesLauncherFilter = when (launcherFilter) {
-                LauncherFilter.All -> true
-                LauncherFilter.HasLauncher -> app.hasLauncherEntry
-                LauncherFilter.NoLauncher -> !app.hasLauncherEntry
-            }
-            matchesQuery &&
-                matchesStatusFilter &&
-                matchesInternetPermissionFilter &&
-                matchesTypeFilter &&
-                matchesLauncherFilter
-        }
-        AppsUiState(
-            apps = filteredApps,
+        buildAppsUiState(
+            apps = apps,
             query = query,
-            filter = filter,
-            internetPermissionFilter = internetPermissionFilter,
-            appTypeFilter = typeFilter,
-            launcherFilter = launcherFilter,
-            totalCount = apps.size,
-            onlineCount = apps.count { it.isOnline() },
-            offlineCount = apps.count { !it.isOnline() },
-            whitelistCount = apps.count { it.isInWhitelist },
-            blacklistCount = apps.count { it.isInBlacklist },
-            filteredCount = filteredApps.size,
+            filterState = filterState,
             isScanning = isScanning,
             lastScanSummary = lastScanSummary,
         )
@@ -433,13 +389,6 @@ data class ExecutorDiagnosticItem(
     val ready: Boolean,
 )
 
-private data class AppFilterState(
-    val filter: AppFilter,
-    val internetPermissionFilter: InternetPermissionFilter,
-    val typeFilter: AppTypeFilter,
-    val launcherFilter: LauncherFilter,
-)
-
 private data class UiStateBase(
     val settings: UserSettings,
     val runtimeSnapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
@@ -482,142 +431,6 @@ private fun ExecutionLogEntity.toUiItem(): ExecutionLogItem {
         result = resultLabel,
         detail = errorMessage ?: "无附加信息",
     )
-}
-
-internal fun buildRuntimeSummary(
-    settings: UserSettings,
-    snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
-): String {
-    val mode = settings.networkControlMode
-    settings.temporaryDisableSummary()?.let { return it }
-    if (!settings.automationEnabled &&
-        snapshot.lastAction == ExecutionAction.DoNothing &&
-        snapshot.lastActionResult == ExecutionResult.Pending
-    ) {
-        return "自动化已永久禁用"
-    }
-    if (snapshot.isAppExitDisconnectScheduled) {
-        val pendingAt = snapshot.pendingAppExitDisconnectAtMillis
-        val remainingSeconds = pendingAt?.let {
-            ((it - System.currentTimeMillis()).coerceAtLeast(0L) + 999L) / 1000L
-        } ?: settings.appExitDelaySeconds.toLong()
-        return "联网应用已离开前台，将在 ${remainingSeconds} 秒后断网"
-    }
-    if (snapshot.isScreenOffDisconnectScheduled) {
-        val pendingAt = snapshot.pendingScreenOffDisconnectAtMillis
-        val remainingSeconds = pendingAt?.let {
-            ((it - System.currentTimeMillis()).coerceAtLeast(0L) + 999L) / 1000L
-        } ?: settings.screenOffDelaySeconds.toLong()
-        return "屏幕已熄灭，将在 ${remainingSeconds} 秒后断网"
-    }
-    if (snapshot.screenState == com.gaozay.smartflight.domain.model.ScreenState.ScreenOff &&
-        !settings.monitorForegroundWhenScreenOff
-    ) {
-        return "屏幕已熄灭，已按设置暂停前台应用监听"
-    }
-    if (snapshot.lastAction == ExecutionAction.CancelScheduledDisconnect) {
-        return when (snapshot.lastActionResult) {
-            ExecutionResult.Success -> when (snapshot.lastTriggerSource) {
-                com.gaozay.smartflight.domain.model.TriggerSource.UserUnlocked ->
-                    "用户已解锁，已取消待执行的息屏延迟断网"
-
-                com.gaozay.smartflight.domain.model.TriggerSource.ScreenOn ->
-                    "屏幕已点亮，已取消待执行的息屏延迟断网"
-
-                com.gaozay.smartflight.domain.model.TriggerSource.AppForegroundChanged ->
-                    "联网应用已重新进入前台，已取消待执行的离开应用延迟断网"
-
-                else -> "已取消待执行的息屏延迟断网"
-            }
-
-            ExecutionResult.Skipped -> when (snapshot.lastTriggerSource) {
-                com.gaozay.smartflight.domain.model.TriggerSource.UserUnlocked ->
-                    "用户已解锁，当前没有待取消的息屏延迟断网"
-
-                com.gaozay.smartflight.domain.model.TriggerSource.ScreenOn ->
-                    "屏幕已点亮，当前没有待取消的息屏延迟断网"
-
-                com.gaozay.smartflight.domain.model.TriggerSource.AppForegroundChanged ->
-                    "当前没有待取消的离开应用延迟断网"
-
-                else -> "当前没有待取消的息屏延迟断网"
-            }
-
-            else -> snapshot.lastActionReason
-        }
-    }
-    if (snapshot.lastAction == ExecutionAction.ScheduleAppExitDisconnect) {
-        val remainingSeconds = snapshot.pendingAppExitDisconnectAtMillis?.let {
-            ((it - System.currentTimeMillis()).coerceAtLeast(0L) + 999L) / 1000L
-        } ?: settings.appExitDelaySeconds.toLong()
-        return "联网应用已离开前台，将在 ${remainingSeconds} 秒后断网"
-    }
-    if (snapshot.lastAction == ExecutionAction.DoNothing &&
-        snapshot.lastTriggerSource == com.gaozay.smartflight.domain.model.TriggerSource.Manual
-    ) {
-        return when (snapshot.lastActionResult) {
-            ExecutionResult.Success -> buildProbeSuccessSummary(mode, snapshot)
-            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { "${mode.label}状态探测失败" }
-            else -> snapshot.lastActionReason.ifBlank { "${mode.label}状态待确认" }
-        }
-    }
-    if (snapshot.lastAction == ExecutionAction.DisconnectNow) {
-        return when (snapshot.lastActionResult) {
-            ExecutionResult.Success -> when (mode) {
-                NetworkControlMode.AirplaneMode -> "已开启飞行模式，当前处于断网状态"
-                NetworkControlMode.MobileData -> "已关闭移动数据，当前处于断网状态${settings.mobileDataNoOpSuffix()}"
-            }
-            ExecutionResult.Skipped -> when (mode) {
-                NetworkControlMode.AirplaneMode -> "飞行模式原本已开启，无需重复断网"
-                NetworkControlMode.MobileData -> "移动数据原本已关闭，无需重复断网${settings.mobileDataNoOpSuffix()}"
-            }
-            ExecutionResult.PartialSuccess -> snapshot.lastActionReason.ifBlank { "${mode.label}写入后校验异常" }
-            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank {
-                when (mode) {
-                    NetworkControlMode.AirplaneMode -> "开启飞行模式失败"
-                    NetworkControlMode.MobileData -> "关闭移动数据失败"
-                }
-            }
-            else -> snapshot.lastActionReason.ifBlank { "正在执行断网" }
-        }
-    }
-    if (snapshot.lastAction == ExecutionAction.ReconnectNow) {
-        return when (snapshot.lastActionResult) {
-            ExecutionResult.Success -> when (mode) {
-                NetworkControlMode.AirplaneMode -> "已关闭飞行模式，当前已恢复联网"
-                NetworkControlMode.MobileData -> "已开启移动数据，当前已恢复联网${settings.mobileDataNoOpSuffix()}"
-            }
-            ExecutionResult.Skipped -> when (mode) {
-                NetworkControlMode.AirplaneMode -> "飞行模式原本已关闭，无需重复恢复联网"
-                NetworkControlMode.MobileData -> "移动数据原本已开启，无需重复恢复联网${settings.mobileDataNoOpSuffix()}"
-            }
-            ExecutionResult.PartialSuccess -> snapshot.lastActionReason.ifBlank { "${mode.label}写入后校验异常" }
-            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank {
-                when (mode) {
-                    NetworkControlMode.AirplaneMode -> "关闭飞行模式失败"
-                    NetworkControlMode.MobileData -> "开启移动数据失败"
-                }
-            }
-            else -> snapshot.lastActionReason.ifBlank { "正在执行恢复联网" }
-        }
-    }
-    return snapshot.lastActionReason
-}
-
-private fun buildProbeSuccessSummary(
-    mode: NetworkControlMode,
-    snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
-): String = when (mode) {
-    NetworkControlMode.AirplaneMode -> when (snapshot.isAirplaneModeEnabled) {
-        true -> "飞行模式当前已开启"
-        false -> "飞行模式当前已关闭"
-        null -> "飞行模式状态已同步"
-    }
-    NetworkControlMode.MobileData -> when (snapshot.isMobileDataEnabled) {
-        true -> "移动数据当前已开启"
-        false -> "移动数据当前已关闭"
-        null -> "移动数据状态已同步"
-    }
 }
 
 private fun buildWifiStatus(snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot): String = when {
