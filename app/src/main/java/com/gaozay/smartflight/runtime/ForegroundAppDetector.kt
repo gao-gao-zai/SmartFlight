@@ -15,15 +15,19 @@ data class ForegroundAppInfo(
     val eventTimestampMillis: Long,
 )
 
+interface ForegroundAppSource {
+    fun detect(): ForegroundAppInfo?
+}
+
 @Singleton
 class ForegroundAppDetector @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : ForegroundAppSource {
     private var lastEventTimestampMillis: Long = (System.currentTimeMillis() - INITIAL_LOOKBACK_MILLIS).coerceAtLeast(0L)
     private var lastKnownForegroundApp: ForegroundAppInfo? = null
 
     @Synchronized
-    fun detect(): ForegroundAppInfo? {
+    override fun detect(): ForegroundAppInfo? {
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val endTime = System.currentTimeMillis()
         val startTime = lastEventTimestampMillis.coerceAtMost(endTime)

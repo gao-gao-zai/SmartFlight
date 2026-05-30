@@ -18,7 +18,6 @@ import com.gaozay.smartflight.MainActivity
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ScreenState
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -84,9 +83,7 @@ class AutomationForegroundService : Service() {
 
     override fun onDestroy() {
         Log.d(LOG_TAG, "service onDestroy screenState=$currentScreenState")
-        runBlocking {
-            runtimeCoordinator.stop(currentScreenState)
-        }
+        runtimeCoordinator.requestStop(currentScreenState)
         runCatching { unregisterReceiver(screenStateReceiver) }
         super.onDestroy()
     }

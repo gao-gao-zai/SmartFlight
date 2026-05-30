@@ -16,7 +16,11 @@ import com.gaozay.smartflight.permission.DataStoreRootAccessProbeRepository
 import com.gaozay.smartflight.permission.DefaultAccessRepository
 import com.gaozay.smartflight.permission.RootAccessProbeRepository
 import com.gaozay.smartflight.runtime.DataStoreRuntimeStatusRepository
+import com.gaozay.smartflight.runtime.ForegroundAppDetector
+import com.gaozay.smartflight.runtime.ForegroundAppSource
+import com.gaozay.smartflight.runtime.RuntimePromptNotifier
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
+import com.gaozay.smartflight.runtime.ToastRuntimePromptNotifier
 import com.gaozay.smartflight.settings.DataStoreSettingsRepository
 import com.gaozay.smartflight.settings.SettingsRepository
 import dagger.Binds
@@ -75,6 +79,18 @@ abstract class RepositoryModule {
     abstract fun bindRuntimeStatusRepository(
         repository: DataStoreRuntimeStatusRepository,
     ): RuntimeStatusRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindForegroundAppSource(
+        detector: ForegroundAppDetector,
+    ): ForegroundAppSource
+
+    @Binds
+    @Singleton
+    abstract fun bindRuntimePromptNotifier(
+        notifier: ToastRuntimePromptNotifier,
+    ): RuntimePromptNotifier
 
     @Binds
     @Singleton
