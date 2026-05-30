@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.gaozay.smartflight.domain.model.CornerStyle
@@ -32,6 +33,13 @@ class DataStoreSettingsRepository @Inject constructor(
     override val settings: Flow<UserSettings> = context.settingsDataStore.data.map { preferences ->
         UserSettings(
             automationEnabled = preferences[Keys.AutomationEnabled] ?: false,
+            temporaryDisableMode = enumValueOrDefault(
+                value = preferences[Keys.TemporaryDisableMode],
+                default = AutomationDisableMode.None,
+            ),
+            temporaryDisableStartedAtMillis = preferences[Keys.TemporaryDisableStartedAtMillis] ?: 0L,
+            temporaryDisableUntilMillis = preferences[Keys.TemporaryDisableUntilMillis],
+            temporaryDisableForegroundPackageName = preferences[Keys.TemporaryDisableForegroundPackageName],
             networkControlMode = enumValueOrDefault(
                 value = preferences[Keys.NetworkControlMode],
                 default = NetworkControlMode.AirplaneMode,
@@ -86,6 +94,14 @@ class DataStoreSettingsRepository @Inject constructor(
         val updated = transform(settings.first())
         context.settingsDataStore.edit { preferences ->
             preferences[Keys.AutomationEnabled] = updated.automationEnabled
+            preferences[Keys.TemporaryDisableMode] = updated.temporaryDisableMode.name
+            preferences[Keys.TemporaryDisableStartedAtMillis] = updated.temporaryDisableStartedAtMillis
+            updated.temporaryDisableUntilMillis?.let {
+                preferences[Keys.TemporaryDisableUntilMillis] = it
+            } ?: preferences.remove(Keys.TemporaryDisableUntilMillis)
+            updated.temporaryDisableForegroundPackageName?.let {
+                preferences[Keys.TemporaryDisableForegroundPackageName] = it
+            } ?: preferences.remove(Keys.TemporaryDisableForegroundPackageName)
             preferences[Keys.NetworkControlMode] = updated.networkControlMode.name
             preferences[Keys.PreferredExecutorType] = updated.preferredExecutorType.name
             preferences[Keys.ScreenOffDisconnectEnabled] = updated.screenOffDisconnectEnabled
@@ -117,6 +133,10 @@ class DataStoreSettingsRepository @Inject constructor(
 
     private object Keys {
         val AutomationEnabled = booleanPreferencesKey("automation_enabled")
+        val TemporaryDisableMode = stringPreferencesKey("temporary_disable_mode")
+        val TemporaryDisableStartedAtMillis = longPreferencesKey("temporary_disable_started_at_millis")
+        val TemporaryDisableUntilMillis = longPreferencesKey("temporary_disable_until_millis")
+        val TemporaryDisableForegroundPackageName = stringPreferencesKey("temporary_disable_foreground_package_name")
         val NetworkControlMode = stringPreferencesKey("network_control_mode")
         val PreferredExecutorType = stringPreferencesKey("preferred_executor_type")
         val ScreenOffDisconnectEnabled = booleanPreferencesKey("screen_off_disconnect_enabled")

@@ -26,8 +26,13 @@ import com.gaozay.smartflight.runtime.AutomationServiceController
 import com.gaozay.smartflight.runtime.isDisconnected
 import com.gaozay.smartflight.runtime.mobileDataNoOpSuffix
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
+import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
+import com.gaozay.smartflight.settings.isAutomationEffectivelyEnabled
+import com.gaozay.smartflight.settings.temporaryDisableSummary
+import com.gaozay.smartflight.settings.withAutomationDisabled
+import com.gaozay.smartflight.settings.withAutomationEnabled
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +42,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
@@ -79,7 +85,10 @@ class MainViewModel @Inject constructor(
             settings = base.settings,
             advancedAccess = base.accessGateState.advancedAccess.selectedExecutorType.label,
             currentMode = base.settings.networkControlMode.label,
-            automationEnabled = base.settings.automationEnabled,
+            automationEnabled = base.settings.isAutomationEffectivelyEnabled(),
+            automationDisabled = !base.settings.automationEnabled || base.settings.temporaryDisableSummary() != null,
+            automationDisableSummary = base.settings.temporaryDisableSummary()
+                ?: if (base.settings.automationEnabled) null else "已永久禁用",
             monitorForegroundWhenScreenOff = base.settings.monitorForegroundWhenScreenOff,
             foregroundApp = base.runtimeSnapshot.currentForegroundAppLabel
                 ?: base.runtimeSnapshot.currentForegroundPackageName
@@ -237,7 +246,29 @@ class MainViewModel @Inject constructor(
 
     fun setAutomationEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            settingsRepository.setAutomationEnabled(enabled)
+            if (enabled) {
+                settingsRepository.updateSettings { it.withAutomationEnabled() }
+            } else {
+                val foregroundPackageName = runtimeStatusRepository.snapshot.first().currentForegroundPackageName
+                settingsRepository.updateSettings {
+                    it.withAutomationDisabled(
+                        mode = AutomationDisableMode.Permanent,
+                        foregroundPackageName = foregroundPackageName,
+                    )
+                }
+            }
+        }
+    }
+
+    fun disableAutomation(mode: AutomationDisableMode) {
+        viewModelScope.launch {
+            val foregroundPackageName = runtimeStatusRepository.snapshot.first().currentForegroundPackageName
+            settingsRepository.updateSettings {
+                it.withAutomationDisabled(
+                    mode = mode,
+                    foregroundPackageName = foregroundPackageName,
+                )
+            }
         }
     }
 
@@ -374,6 +405,8 @@ data class SmartFlightUiState(
     val advancedAccess: String = "需要 Shizuku / ADB / Root",
     val currentMode: String = "飞行模式",
     val automationEnabled: Boolean = false,
+    val automationDisabled: Boolean = true,
+    val automationDisableSummary: String? = "已永久禁用",
     val monitorForegroundWhenScreenOff: Boolean = false,
     val foregroundApp: String = "尚未连接",
     val runtimeExecutor: String = "不可用",
@@ -456,6 +489,13 @@ internal fun buildRuntimeSummary(
     snapshot: com.gaozay.smartflight.runtime.RuntimeSnapshot,
 ): String {
     val mode = settings.networkControlMode
+    settings.temporaryDisableSummary()?.let { return it }
+    if (!settings.automationEnabled &&
+        snapshot.lastAction == ExecutionAction.DoNothing &&
+        snapshot.lastActionResult == ExecutionResult.Pending
+    ) {
+        return "自动化已永久禁用"
+    }
     if (snapshot.isAppExitDisconnectScheduled) {
         val pendingAt = snapshot.pendingAppExitDisconnectAtMillis
         val remainingSeconds = pendingAt?.let {

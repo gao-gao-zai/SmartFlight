@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
                     onSetThemeIntensity = viewModel::setThemeIntensity,
                     onSetCornerStyle = viewModel::setCornerStyle,
                     onSetAutomationEnabled = viewModel::setAutomationEnabled,
+                    onDisableAutomation = viewModel::disableAutomation,
                     onSetMonitorForegroundWhenScreenOff = viewModel::setMonitorForegroundWhenScreenOff,
                     onAppQueryChange = viewModel::updateAppQuery,
                     onAppFilterChange = viewModel::updateAppFilter,

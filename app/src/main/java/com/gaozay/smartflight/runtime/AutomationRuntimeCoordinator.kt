@@ -11,8 +11,13 @@ import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.permission.AccessRepository
+import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
+import com.gaozay.smartflight.settings.isAutomationEffectivelyEnabled
+import com.gaozay.smartflight.settings.isTemporaryDisableActive
+import com.gaozay.smartflight.settings.shouldClearExpiredTemporaryDisable
+import com.gaozay.smartflight.settings.withTemporaryDisableCleared
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +52,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
     private var foregroundProbeJob: Job? = null
     private var screenOffDisconnectJob: Job? = null
     private var appExitDisconnectJob: Job? = null
+    private var temporaryDisableExpiryJob: Job? = null
     private var state = RuntimeState()
 
     fun start(initialScreenState: ScreenState) {
@@ -124,6 +130,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
                 state = state.copy(appRulesByPackageName = event.appRulesByPackageName)
             }
             RuntimeEvent.NetworkChanged -> runtimeEnvironmentMonitor.refreshSnapshot()
+            RuntimeEvent.TemporaryDisableExpired -> handleTemporaryDisableExpired()
             RuntimeEvent.ScreenOffDisconnectDue -> handleScreenOffDisconnectDue()
             RuntimeEvent.AppExitDisconnectDue -> handleAppExitDisconnectDue()
         }
@@ -193,6 +200,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
         cancelForegroundProbe()
         cancelScreenOffDisconnect(updateRuntimeState = false)
         cancelAppExitDisconnect(updateRuntimeState = false)
+        cancelTemporaryDisableExpiry()
         settingsJob?.cancel()
         appsJob?.cancel()
         settingsJob = null
@@ -219,6 +227,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
             cancelForegroundProbe()
             cancelScreenOffDisconnect(updateRuntimeState = true)
             cancelAppExitDisconnect(updateRuntimeState = true)
+            cancelTemporaryDisableExpiry()
             runtimeStatusRepository.updateSnapshot { snapshot ->
                 snapshot.copy(
                     isForegroundServiceRunning = true,
@@ -228,8 +237,17 @@ class AutomationRuntimeCoordinator @Inject constructor(
             return
         }
 
+        if (settings.isTemporaryDisableActive()) {
+            cancelScreenOffDisconnect(updateRuntimeState = true)
+            cancelAppExitDisconnect(updateRuntimeState = true)
+            scheduleTemporaryDisableExpiry(settings)
+        } else {
+            cancelTemporaryDisableExpiry()
+        }
+
         if (previous.monitorForegroundWhenScreenOff != settings.monitorForegroundWhenScreenOff ||
-            previous.automationEnabled != settings.automationEnabled
+            previous.automationEnabled != settings.automationEnabled ||
+            previous.temporaryDisableMode != settings.temporaryDisableMode
         ) {
             scheduleForegroundProbe(immediate = true)
         }
@@ -238,6 +256,11 @@ class AutomationRuntimeCoordinator @Inject constructor(
     private suspend fun handleScreenOff() {
         state = state.copy(screenState = ScreenState.ScreenOff)
         cancelForegroundProbe()
+        if (state.settings.temporaryDisableMode == AutomationDisableMode.UntilScreenOff &&
+            state.settings.isTemporaryDisableActive()
+        ) {
+            clearTemporaryDisable("已息屏，恢复自动化")
+        }
         runtimeStatusRepository.updateSnapshot { snapshot ->
             snapshot.copy(
                 screenState = ScreenState.ScreenOff,
@@ -259,9 +282,16 @@ class AutomationRuntimeCoordinator @Inject constructor(
         accessRepository.syncCurrentNetworkControlState()
         runtimeEnvironmentMonitor.refreshSnapshot()
         val settings = state.settings
+        if (settings.shouldClearExpiredTemporaryDisable()) {
+            clearTemporaryDisable("临时禁用已到期，恢复自动化")
+        }
+        if (state.settings.isTemporaryDisableActive()) {
+            scheduleForegroundProbe(immediate = false)
+            return
+        }
         val allowReconnectWhenTargetAppAlreadyActive = when (triggerSource) {
-            TriggerSource.ScreenOn -> !settings.disableScreenOnReconnect
-            TriggerSource.UserUnlocked -> !settings.disableUnlockReconnect
+            TriggerSource.ScreenOn -> !state.settings.disableScreenOnReconnect
+            TriggerSource.UserUnlocked -> !state.settings.disableUnlockReconnect
             else -> false
         }
         Log.d(
@@ -280,8 +310,20 @@ class AutomationRuntimeCoordinator @Inject constructor(
         if (!state.settings.automationEnabled) {
             return
         }
+        if (state.settings.shouldClearExpiredTemporaryDisable()) {
+            clearTemporaryDisable("临时禁用已到期，恢复自动化")
+        }
         automationTick()
         scheduleForegroundProbe(immediate = false)
+    }
+
+    private suspend fun handleTemporaryDisableExpired() {
+        temporaryDisableExpiryJob = null
+        if (state.settings.shouldClearExpiredTemporaryDisable()) {
+            clearTemporaryDisable("临时禁用已到期，恢复自动化")
+            scheduleScreenOffDisconnectIfNeeded()
+            scheduleForegroundProbe(immediate = true)
+        }
     }
 
     private fun scheduleForegroundProbe(immediate: Boolean) {
@@ -305,6 +347,20 @@ class AutomationRuntimeCoordinator @Inject constructor(
     private fun cancelForegroundProbe() {
         foregroundProbeJob?.cancel()
         foregroundProbeJob = null
+    }
+
+    private fun scheduleTemporaryDisableExpiry(settings: UserSettings) {
+        val untilMillis = settings.temporaryDisableUntilMillis ?: return
+        temporaryDisableExpiryJob?.cancel()
+        temporaryDisableExpiryJob = scope.launch {
+            delay((untilMillis - System.currentTimeMillis()).coerceAtLeast(0L))
+            send(RuntimeEvent.TemporaryDisableExpired)
+        }
+    }
+
+    private fun cancelTemporaryDisableExpiry() {
+        temporaryDisableExpiryJob?.cancel()
+        temporaryDisableExpiryJob = null
     }
 
     private suspend fun automationTick(
@@ -340,17 +396,38 @@ class AutomationRuntimeCoordinator @Inject constructor(
         }
 
         val packageName = foregroundApp?.packageName
+        if (settings.isTemporaryDisableActive()) {
+            if (settings.temporaryDisableMode == AutomationDisableMode.UntilAppSwitch &&
+                packageName != null &&
+                settings.temporaryDisableForegroundPackageName != null &&
+                packageName != settings.temporaryDisableForegroundPackageName
+            ) {
+                clearTemporaryDisable("检测到应用切换，恢复自动化")
+            } else {
+                runtimeStatusRepository.updateSnapshot { snapshot ->
+                    snapshot.copy(
+                        lastAction = ExecutionAction.PauseAutomation,
+                        lastTriggerSource = triggerSource,
+                        lastActionResult = ExecutionResult.Pending,
+                        lastActionReason = settings.temporaryDisableMode.label,
+                        updatedAtMillis = System.currentTimeMillis(),
+                    )
+                }
+                return
+            }
+        }
+        val effectiveSettings = state.settings
         val runtimeSnapshot = runtimeStatusRepository.snapshot.first()
         val appRuleInfo = packageName?.let { state.appRulesByPackageName[it] }
         val executorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
-        val isDisconnected = runtimeSnapshot.isDisconnected(settings.networkControlMode)
+        val isDisconnected = runtimeSnapshot.isDisconnected(effectiveSettings.networkControlMode)
         Log.d(
             LOG_TAG,
             "automationTick snapshot pkg=${packageName ?: "<none>"} online=${appRuleInfo?.isInOnlineList == true} blacklist=${appRuleInfo?.isInBlacklist == true} executorAvailable=$executorAvailable disconnected=$isDisconnected wifi=${runtimeSnapshot.isWifiConnected} lastTarget=${state.lastTargetAppActive}",
         )
         val decision = automationRuleEngine.evaluateForegroundChange(
             ForegroundRuleContext(
-                settings = settings,
+                settings = effectiveSettings,
                 packageName = packageName,
                 appLabel = foregroundApp?.appLabel,
                 isInOnlineList = appRuleInfo?.isInOnlineList == true,
@@ -383,7 +460,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
                 append(" screenOffScheduled=")
                 append(screenOffDisconnectJob?.isActive == true)
                 append(" delay=")
-                append(settings.appExitDelaySeconds)
+                append(effectiveSettings.appExitDelaySeconds)
                 append("s action=")
                 append(decision.action::class.simpleName)
                 append(" rules=")
@@ -406,8 +483,8 @@ class AutomationRuntimeCoordinator @Inject constructor(
                     currentDisconnected = isDisconnected,
                     targetDisconnected = false,
                     triggerSource = triggerSource,
-                    reason = action.reason + settings.mobileDataNoOpSuffix(),
-                    onPrompt = { showReconnectPrompt(settings) },
+                    reason = action.reason + effectiveSettings.mobileDataNoOpSuffix(),
+                    onPrompt = { showReconnectPrompt(effectiveSettings) },
                 )
             }
             is ForegroundAction.Disconnect -> {
@@ -416,8 +493,8 @@ class AutomationRuntimeCoordinator @Inject constructor(
                     currentDisconnected = isDisconnected,
                     targetDisconnected = true,
                     triggerSource = triggerSource,
-                    reason = action.reason + settings.mobileDataNoOpSuffix(),
-                    onPrompt = { showDisconnectPrompt(settings) },
+                    reason = action.reason + effectiveSettings.mobileDataNoOpSuffix(),
+                    onPrompt = { showDisconnectPrompt(effectiveSettings) },
                 )
             }
             is ForegroundAction.ScheduleDisconnect -> {
@@ -447,6 +524,11 @@ class AutomationRuntimeCoordinator @Inject constructor(
 
     private suspend fun scheduleScreenOffDisconnectIfNeeded() {
         val settings = state.settings
+        if (!settings.isAutomationEffectivelyEnabled()) {
+            Log.d(LOG_TAG, "skip screen-off schedule: automation temporarily disabled")
+            cancelScreenOffDisconnect(updateRuntimeState = true)
+            return
+        }
         val runtimeSnapshot = runtimeStatusRepository.snapshot.first()
         val executorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
         if (!automationRuleEngine.shouldScheduleScreenOffDisconnect(
@@ -495,6 +577,17 @@ class AutomationRuntimeCoordinator @Inject constructor(
     private suspend fun handleScreenOffDisconnectDue() {
         screenOffDisconnectJob = null
         val latestSettings = state.settings
+        if (!latestSettings.isAutomationEffectivelyEnabled()) {
+            Log.d(LOG_TAG, "skip screen-off execution after delay: automation temporarily disabled")
+            runtimeStatusRepository.updateSnapshot { snapshot ->
+                snapshot.copy(
+                    isScreenOffDisconnectScheduled = false,
+                    pendingScreenOffDisconnectAtMillis = null,
+                    updatedAtMillis = System.currentTimeMillis(),
+                )
+            }
+            return
+        }
         val latestRuntimeSnapshot = runtimeStatusRepository.snapshot.first()
         val latestExecutorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
         val shouldDisconnect = automationRuleEngine.shouldExecuteScreenOffDisconnect(
@@ -573,7 +666,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
         val latestSettings = state.settings
         val latestRuntimeSnapshot = runtimeStatusRepository.snapshot.first()
         val latestExecutorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
-        val shouldDisconnect = latestSettings.automationEnabled &&
+        val shouldDisconnect = latestSettings.isAutomationEffectivelyEnabled() &&
             latestSettings.appExitDisconnectEnabled &&
             state.lastTargetAppActive == false &&
             latestExecutorAvailable &&
@@ -669,6 +762,23 @@ class AutomationRuntimeCoordinator @Inject constructor(
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }
+    }
+
+    private suspend fun clearTemporaryDisable(reason: String) {
+        val restoredSettings = state.settings.withTemporaryDisableCleared()
+        state = state.copy(settings = restoredSettings)
+        cancelTemporaryDisableExpiry()
+        settingsRepository.updateSettings { it.withTemporaryDisableCleared() }
+        runtimeStatusRepository.updateSnapshot { snapshot ->
+            snapshot.copy(
+                lastAction = ExecutionAction.PauseAutomation,
+                lastTriggerSource = TriggerSource.SettingsChanged,
+                lastActionResult = ExecutionResult.Success,
+                lastActionReason = reason,
+                updatedAtMillis = System.currentTimeMillis(),
+            )
+        }
+        Log.d(LOG_TAG, "temporary disable cleared: $reason")
     }
 
     private suspend fun cancelScreenOffDisconnect(updateRuntimeState: Boolean) {
@@ -781,6 +891,7 @@ internal sealed interface RuntimeEvent {
         val appRulesByPackageName: Map<String, AppRuntimeRuleInfo>,
     ) : RuntimeEvent
     data object NetworkChanged : RuntimeEvent
+    data object TemporaryDisableExpired : RuntimeEvent
     data object ScreenOffDisconnectDue : RuntimeEvent
     data object AppExitDisconnectDue : RuntimeEvent
 }
@@ -795,6 +906,7 @@ private fun RuntimeEvent.nameForLog(): String = when (this) {
     is RuntimeEvent.SettingsChanged -> "SettingsChanged"
     is RuntimeEvent.AppsChanged -> "AppsChanged"
     RuntimeEvent.NetworkChanged -> "NetworkChanged"
+    RuntimeEvent.TemporaryDisableExpired -> "TemporaryDisableExpired"
     RuntimeEvent.ScreenOffDisconnectDue -> "ScreenOffDisconnectDue"
     RuntimeEvent.AppExitDisconnectDue -> "AppExitDisconnectDue"
 }

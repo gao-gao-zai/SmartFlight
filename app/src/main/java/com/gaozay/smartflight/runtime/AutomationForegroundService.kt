@@ -113,6 +113,7 @@ class AutomationForegroundService : Service() {
             .setContentText(getString(R.string.automation_notification_text))
             .setContentIntent(openAppIntent)
             .setOngoing(true)
+            .setSilent(true)
             .setOnlyAlertOnce(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()

@@ -82,13 +82,27 @@ import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
 import com.gaozay.smartflight.permission.AccessActionType
 import com.gaozay.smartflight.permission.AccessCheckResult
+import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.UserSettings
+import com.gaozay.smartflight.settings.withAutomationDisabled
+import com.gaozay.smartflight.settings.withAutomationEnabled
 import java.text.DateFormat
 import java.util.Date
 
 private enum class SmartFlightScreen(val title: String) {
     Dashboard("控制台"), Apps("应用范围"), Rules("自动化规则"), Diagnostics("诊断与日志"), Appearance("外观设置")
 }
+
+private val automationDisableOptions = listOf(
+    AutomationDisableMode.UntilAppSwitch,
+    AutomationDisableMode.UntilScreenOff,
+    AutomationDisableMode.For1Minute,
+    AutomationDisableMode.For5Minutes,
+    AutomationDisableMode.For10Minutes,
+    AutomationDisableMode.For20Minutes,
+    AutomationDisableMode.For30Minutes,
+    AutomationDisableMode.Permanent,
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,6 +118,7 @@ fun SmartFlightRoot(
     onSetThemeIntensity: (ThemeIntensity) -> Unit,
     onSetCornerStyle: (CornerStyle) -> Unit,
     onSetAutomationEnabled: (Boolean) -> Unit,
+    onDisableAutomation: (AutomationDisableMode) -> Unit,
     onSetMonitorForegroundWhenScreenOff: (Boolean) -> Unit,
     onAppQueryChange: (String) -> Unit,
     onAppFilterChange: (AppFilter) -> Unit,
@@ -157,7 +172,7 @@ fun SmartFlightRoot(
     ) { innerPadding ->
         Surface(Modifier.fillMaxSize()) {
             when (screen) {
-                SmartFlightScreen.Dashboard -> DashboardScreen(state, innerPadding, onSetAutomationEnabled, { screen = SmartFlightScreen.Apps }, { screen = SmartFlightScreen.Rules }, { screen = SmartFlightScreen.Diagnostics })
+                SmartFlightScreen.Dashboard -> DashboardScreen(state, innerPadding, onSetAutomationEnabled, onDisableAutomation, { screen = SmartFlightScreen.Apps }, { screen = SmartFlightScreen.Rules }, { screen = SmartFlightScreen.Diagnostics })
                 SmartFlightScreen.Apps -> AppManagementScreen(
                     state = appsState,
                     innerPadding = innerPadding,
@@ -238,6 +253,7 @@ private fun DashboardScreen(
     state: SmartFlightUiState,
     innerPadding: PaddingValues,
     onSetAutomationEnabled: (Boolean) -> Unit,
+    onDisableAutomation: (AutomationDisableMode) -> Unit,
     onOpenApps: () -> Unit,
     onOpenRules: () -> Unit,
     onOpenDiagnostics: () -> Unit,
@@ -247,7 +263,7 @@ private fun DashboardScreen(
         contentPadding = PaddingValues(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { MainStatusCard(state, onSetAutomationEnabled) }
+        item { MainStatusCard(state, onSetAutomationEnabled, onDisableAutomation) }
         item { ExplanationCard(state.triggerSummary) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -261,7 +277,12 @@ private fun DashboardScreen(
 }
 
 @Composable
-private fun MainStatusCard(state: SmartFlightUiState, onSetAutomationEnabled: (Boolean) -> Unit) {
+private fun MainStatusCard(
+    state: SmartFlightUiState,
+    onSetAutomationEnabled: (Boolean) -> Unit,
+    onDisableAutomation: (AutomationDisableMode) -> Unit,
+) {
+    var disableMenuExpanded by rememberSaveable { mutableStateOf(false) }
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         shape = MaterialTheme.shapes.large,
@@ -280,9 +301,37 @@ private fun MainStatusCard(state: SmartFlightUiState, onSetAutomationEnabled: (B
                 Spacer(Modifier.size(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(if (state.automationEnabled) "自动化运行中" else "自动化已暂停", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(if (state.automationEnabled) "规则正在监听" else "所有自动动作已暂停", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        state.automationDisableSummary ?: if (state.automationEnabled) "规则正在监听" else "所有自动动作已暂停",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 Switch(checked = state.automationEnabled, onCheckedChange = onSetAutomationEnabled)
+            }
+            Box {
+                OutlinedButton(
+                    onClick = { disableMenuExpanded = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Rounded.Schedule, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text(if (state.automationDisabled) "调整禁用模式" else "禁用")
+                }
+                DropdownMenu(
+                    expanded = disableMenuExpanded,
+                    onDismissRequest = { disableMenuExpanded = false },
+                ) {
+                    automationDisableOptions.forEach { mode ->
+                        DropdownMenuItem(
+                            text = { Text(mode.label) },
+                            leadingIcon = { Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null) },
+                            onClick = {
+                                disableMenuExpanded = false
+                                onDisableAutomation(mode)
+                            },
+                        )
+                    }
+                }
             }
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 StatusLine("控制模式", state.currentMode)
@@ -357,7 +406,11 @@ private fun RulesScreen(
     ) {
         item { RulePreviewCard(settings) }
         item { SettingsSection("总行为") {
-            SwitchRow("自动化总开关", "关闭后所有自动动作暂停", settings.automationEnabled) { onUpdateSettings { s -> s.copy(automationEnabled = it) } }
+            SwitchRow("自动化总开关", "关闭后永久禁用自动动作", settings.automationEnabled) { enabled ->
+                onUpdateSettings { s ->
+                    if (enabled) s.withAutomationEnabled() else s.withAutomationDisabled(AutomationDisableMode.Permanent)
+                }
+            }
             ChoiceRow("联网控制方式", NetworkControlMode.entries, settings.networkControlMode, onSetNetworkControlMode)
             ChoiceRow("执行器偏好", ExecutorType.entries.filterNot { it == ExecutorType.Unavailable }, settings.preferredExecutorType, onSetPreferredExecutorType)
         } }
@@ -677,6 +730,7 @@ private fun <T> ChoiceRow(title: String, options: List<T>, selected: T, onSelect
                 is ThemeMode -> option.label
                 is ThemeIntensity -> option.label
                 is CornerStyle -> option.label
+                is AutomationDisableMode -> option.label
                 else -> option.name
             }
             FilterChip(selected = selected == option, onClick = { onSelect(option) }, label = { Text(label) })

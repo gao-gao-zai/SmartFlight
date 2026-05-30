@@ -3,6 +3,7 @@ package com.gaozay.smartflight.runtime
 import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.settings.UserSettings
+import com.gaozay.smartflight.settings.isAutomationEffectivelyEnabled
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,7 +25,7 @@ class AutomationRuleEngine @Inject constructor() {
                 shouldLog = false,
             )
         }
-        if (!context.settings.automationEnabled) {
+        if (!context.settings.isAutomationEffectivelyEnabled()) {
             return ForegroundRuleDecision(
                 targetAppActive = targetAppActive,
                 action = ForegroundAction.None("自动化已关闭，跳过前台应用规则"),
@@ -236,7 +237,7 @@ class AutomationRuleEngine @Inject constructor() {
         isWifiConnected: Boolean = false,
         executorAvailable: Boolean = true,
     ): Boolean =
-        settings.automationEnabled &&
+        settings.isAutomationEffectivelyEnabled() &&
             executorAvailable &&
             settings.screenOffDisconnectEnabled &&
             !(isWifiConnected && settings.skipDisconnectOnWifi)
@@ -246,7 +247,7 @@ class AutomationRuleEngine @Inject constructor() {
         screenState: ScreenState,
         isWifiConnected: Boolean = false,
         executorAvailable: Boolean = true,
-    ): Boolean = settings.automationEnabled &&
+    ): Boolean = settings.isAutomationEffectivelyEnabled() &&
         executorAvailable &&
         settings.screenOffDisconnectEnabled &&
         screenState == ScreenState.ScreenOff &&
