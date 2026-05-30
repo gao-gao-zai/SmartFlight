@@ -47,48 +47,10 @@ class AutomationRuleEngine @Inject constructor() {
             !targetAppActive &&
             context.settings.appExitDisconnectEnabled
         ) {
-            if (context.isCurrentlyDisconnected == true) {
-                return ForegroundRuleDecision(
-                    targetAppActive = false,
-                    action = ForegroundAction.None("当前已断网，跳过离开目标应用后的重复断网"),
-                    reason = "当前已断网，跳过离开目标应用后的重复断网",
-                    matchedRules = listOf("AppExitDisconnect", "AlreadyDisconnected"),
-                    shouldLog = false,
-                )
-            }
-            if (context.isAppExitDisconnectScheduled) {
-                return ForegroundRuleDecision(
-                    targetAppActive = false,
-                    action = ForegroundAction.None("离开目标应用延时断网已在计时中"),
-                    reason = "离开目标应用延时断网已在计时中",
-                    matchedRules = listOf("AppExitDisconnect", "AlreadyScheduled"),
-                    shouldLog = false,
-                )
-            }
-            if (context.isWifiConnected && context.settings.skipDisconnectOnWifi) {
-                return ForegroundRuleDecision(
-                    targetAppActive = false,
-                    action = ForegroundAction.None("当前连接 Wi‑Fi，已跳过离开目标应用断网"),
-                    reason = "当前连接 Wi‑Fi，已跳过离开目标应用断网",
-                    matchedRules = listOf("AppExitDisconnect", "SkipDisconnectOnWifi"),
-                    shouldLog = true,
-                )
-            }
-            return ForegroundRuleDecision(
-                targetAppActive = false,
-                action = if (context.settings.appExitDelaySeconds > 0) {
-                    ForegroundAction.ScheduleDisconnect(
-                        reason = "联网应用已离开前台，将在 ${context.settings.appExitDelaySeconds} 秒后断网",
-                        delaySeconds = context.settings.appExitDelaySeconds,
-                    )
-                } else {
-                    ForegroundAction.Disconnect(
-                        reason = "联网应用已离开前台",
-                    )
-                },
+            return buildAppExitDisconnectDecision(
+                context = context,
                 reason = "联网应用已离开前台",
-                matchedRules = listOf("AppExitDisconnect"),
-                shouldLog = true,
+                alreadyDisconnectedReason = "当前已断网，跳过离开目标应用后的重复断网",
             )
         }
         if (context.isInBlacklist) {
@@ -163,56 +125,6 @@ class AutomationRuleEngine @Inject constructor() {
                 shouldLog = false,
             )
         }
-        if (!targetAppActive && context.settings.appExitDisconnectEnabled) {
-            if (context.isCurrentlyDisconnected == true) {
-                return ForegroundRuleDecision(
-                    targetAppActive = false,
-                    action = ForegroundAction.None("当前已断网，跳过重复断网"),
-                    reason = "当前已断网，跳过重复断网",
-                    matchedRules = listOf("AppExitDisconnect", "AlreadyDisconnected"),
-                    shouldLog = false,
-                )
-            }
-            if (context.isAppExitDisconnectScheduled) {
-                return ForegroundRuleDecision(
-                    targetAppActive = false,
-                    action = ForegroundAction.None("离开目标应用延时断网已在计时中"),
-                    reason = "离开目标应用延时断网已在计时中",
-                    matchedRules = listOf("AppExitDisconnect", "AlreadyScheduled"),
-                    shouldLog = false,
-                )
-            }
-            if (context.isWifiConnected && context.settings.skipDisconnectOnWifi) {
-                return ForegroundRuleDecision(
-                    targetAppActive = false,
-                    action = ForegroundAction.None("当前连接 Wi‑Fi，已跳过离开目标应用断网"),
-                    reason = "当前连接 Wi‑Fi，已跳过离开目标应用断网",
-                    matchedRules = listOf("AppExitDisconnect", "SkipDisconnectOnWifi"),
-                    shouldLog = true,
-                )
-            }
-            val reason = if (context.previousTargetAppActive == true) {
-                "联网应用已离开前台"
-            } else {
-                "当前前台应用不是联网应用"
-            }
-            return ForegroundRuleDecision(
-                targetAppActive = false,
-                action = if (context.settings.appExitDelaySeconds > 0) {
-                    ForegroundAction.ScheduleDisconnect(
-                        reason = "$reason，将在 ${context.settings.appExitDelaySeconds} 秒后断网",
-                        delaySeconds = context.settings.appExitDelaySeconds,
-                    )
-                } else {
-                    ForegroundAction.Disconnect(
-                        reason = reason,
-                    )
-                },
-                reason = reason,
-                matchedRules = listOf("AppExitDisconnect"),
-                shouldLog = true,
-            )
-        }
         return ForegroundRuleDecision(
             targetAppActive = targetAppActive,
             action = if (targetAppActive) {
@@ -229,6 +141,54 @@ class AutomationRuleEngine @Inject constructor() {
             },
             matchedRules = if (targetAppActive) listOf("CancelAppExitDisconnect") else emptyList(),
             shouldLog = targetAppActive,
+        )
+    }
+
+    private fun buildAppExitDisconnectDecision(
+        context: ForegroundRuleContext,
+        reason: String,
+        alreadyDisconnectedReason: String,
+    ): ForegroundRuleDecision {
+        if (context.isCurrentlyDisconnected == true) {
+            return ForegroundRuleDecision(
+                targetAppActive = false,
+                action = ForegroundAction.None(alreadyDisconnectedReason),
+                reason = alreadyDisconnectedReason,
+                matchedRules = listOf("AppExitDisconnect", "AlreadyDisconnected"),
+                shouldLog = false,
+            )
+        }
+        if (context.isAppExitDisconnectScheduled) {
+            return ForegroundRuleDecision(
+                targetAppActive = false,
+                action = ForegroundAction.None("离开目标应用延时断网已在计时中"),
+                reason = "离开目标应用延时断网已在计时中",
+                matchedRules = listOf("AppExitDisconnect", "AlreadyScheduled"),
+                shouldLog = false,
+            )
+        }
+        if (context.isWifiConnected && context.settings.skipDisconnectOnWifi) {
+            return ForegroundRuleDecision(
+                targetAppActive = false,
+                action = ForegroundAction.None("当前连接 Wi‑Fi，已跳过离开目标应用断网"),
+                reason = "当前连接 Wi‑Fi，已跳过离开目标应用断网",
+                matchedRules = listOf("AppExitDisconnect", "SkipDisconnectOnWifi"),
+                shouldLog = true,
+            )
+        }
+        return ForegroundRuleDecision(
+            targetAppActive = false,
+            action = if (context.settings.appExitDelaySeconds > 0) {
+                ForegroundAction.ScheduleDisconnect(
+                    reason = "$reason，将在 ${context.settings.appExitDelaySeconds} 秒后断网",
+                    delaySeconds = context.settings.appExitDelaySeconds,
+                )
+            } else {
+                ForegroundAction.Disconnect(reason = reason)
+            },
+            reason = reason,
+            matchedRules = listOf("AppExitDisconnect"),
+            shouldLog = true,
         )
     }
 

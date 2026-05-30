@@ -182,6 +182,60 @@ class AutomationRuleEngineTest {
     }
 
     @Test
+    fun leavingOnlineAppSkipsDisconnectWhenAlreadyDisconnected() {
+        val decision = engine.evaluateForegroundChange(
+            context(
+                settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = true),
+                packageName = "com.example.other",
+                isInOnlineList = false,
+                previousTargetAppActive = true,
+                isCurrentlyDisconnected = true,
+            ),
+        )
+
+        assertTrue(decision.action is ForegroundAction.None)
+        assertEquals("当前已断网，跳过离开目标应用后的重复断网", decision.reason)
+        assertEquals(listOf("AppExitDisconnect", "AlreadyDisconnected"), decision.matchedRules)
+        assertFalse(decision.shouldLog)
+    }
+
+    @Test
+    fun unchangedNonTargetAppDoesNotDisconnect() {
+        val decision = engine.evaluateForegroundChange(
+            context(
+                settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = true),
+                packageName = "com.example.other",
+                isInOnlineList = false,
+                previousTargetAppActive = false,
+                isCurrentlyDisconnected = true,
+            ),
+        )
+
+        assertTrue(decision.action is ForegroundAction.None)
+        assertEquals("前台应用目标状态未变化", decision.reason)
+        assertEquals(emptyList<String>(), decision.matchedRules)
+        assertFalse(decision.shouldLog)
+    }
+
+    @Test
+    fun appExitSkipsDisconnectWhenAlreadyScheduled() {
+        val decision = engine.evaluateForegroundChange(
+            context(
+                settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = true),
+                packageName = "com.example.other",
+                isInOnlineList = false,
+                previousTargetAppActive = true,
+                isAppExitDisconnectScheduled = true,
+            ),
+        )
+
+        assertTrue(decision.action is ForegroundAction.None)
+        assertEquals("离开目标应用延时断网已在计时中", decision.reason)
+        assertEquals(listOf("AppExitDisconnect", "AlreadyScheduled"), decision.matchedRules)
+        assertFalse(decision.shouldLog)
+    }
+
+    @Test
     fun leavingOnlineAppSchedulesDisconnect() {
         val decision = engine.evaluateForegroundChange(
             context(
@@ -195,6 +249,41 @@ class AutomationRuleEngineTest {
         val action = decision.action
         assertTrue(action is ForegroundAction.ScheduleDisconnect)
         assertEquals(45, (action as ForegroundAction.ScheduleDisconnect).delaySeconds)
+        assertEquals(listOf("AppExitDisconnect"), decision.matchedRules)
+    }
+
+    @Test
+    fun unchangedNonTargetAppDoesNotScheduleDisconnect() {
+        val decision = engine.evaluateForegroundChange(
+            context(
+                settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = true, appExitDelaySeconds = 45),
+                packageName = "com.example.other",
+                isInOnlineList = false,
+                previousTargetAppActive = false,
+            ),
+        )
+
+        assertTrue(decision.action is ForegroundAction.None)
+        assertEquals("前台应用目标状态未变化", decision.reason)
+        assertEquals(emptyList<String>(), decision.matchedRules)
+        assertFalse(decision.shouldLog)
+    }
+
+    @Test
+    fun leavingOnlineAppDisconnectsImmediatelyWhenDelayIsZero() {
+        val decision = engine.evaluateForegroundChange(
+            context(
+                settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = true, appExitDelaySeconds = 0),
+                packageName = "com.example.other",
+                isInOnlineList = false,
+                previousTargetAppActive = true,
+            ),
+        )
+
+        val action = decision.action
+        assertTrue(action is ForegroundAction.Disconnect)
+        assertEquals("联网应用已离开前台", decision.reason)
+        assertEquals("联网应用已离开前台", (action as ForegroundAction.Disconnect).reason)
         assertEquals(listOf("AppExitDisconnect"), decision.matchedRules)
     }
 
@@ -294,6 +383,7 @@ class AutomationRuleEngineTest {
         executorAvailable: Boolean = true,
         previousTargetAppActive: Boolean? = false,
         isCurrentlyDisconnected: Boolean? = null,
+        isAppExitDisconnectScheduled: Boolean = false,
         allowReconnectWhenTargetAppAlreadyActive: Boolean = false,
     ): ForegroundRuleContext = ForegroundRuleContext(
         settings = settings,
@@ -306,6 +396,7 @@ class AutomationRuleEngineTest {
         executorAvailable = executorAvailable,
         previousTargetAppActive = previousTargetAppActive,
         isCurrentlyDisconnected = isCurrentlyDisconnected,
+        isAppExitDisconnectScheduled = isAppExitDisconnectScheduled,
         allowReconnectWhenTargetAppAlreadyActive = allowReconnectWhenTargetAppAlreadyActive,
     )
 }
