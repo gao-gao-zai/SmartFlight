@@ -100,6 +100,7 @@ class ForegroundAutomationHandlerTest {
 
         assertEquals(AutomationDisableMode.None, updated.settings.temporaryDisableMode)
         assertEquals(listOf(false), fixture.accessRepository.disconnectedRequests)
+        assertEquals(listOf("检测到应用切换，恢复自动化"), fixture.promptNotifier.automationRestoredPrompts)
     }
 
     private fun fixture(
@@ -114,10 +115,11 @@ class ForegroundAutomationHandlerTest {
             send = {},
             reporter = reporter,
         )
+        val promptNotifier = NoOpRuntimePromptNotifier()
         val networkExecutor = RuntimeNetworkChangeExecutor(
             accessRepository = accessRepository,
             reporter = reporter,
-            promptNotifier = NoOpRuntimePromptNotifier(),
+            promptNotifier = promptNotifier,
         )
         val disconnectHandler = DisconnectAutomationHandler(
             screenOffDisconnectHandler = ScreenOffDisconnectHandler(
@@ -144,8 +146,9 @@ class ForegroundAutomationHandlerTest {
                 reporter = reporter,
                 networkChangeExecutor = networkExecutor,
                 disconnectAutomationHandler = disconnectHandler,
-                temporaryDisableHandler = TemporaryDisableHandler(settingsRepository, reporter),
+                temporaryDisableHandler = TemporaryDisableHandler(settingsRepository, reporter, promptNotifier),
             ),
+            promptNotifier = promptNotifier,
         )
     }
 
@@ -154,5 +157,6 @@ class ForegroundAutomationHandlerTest {
         val accessRepository: FakeAccessRepository,
         val scheduler: RuntimeTaskScheduler,
         val handler: ForegroundAutomationHandler,
+        val promptNotifier: NoOpRuntimePromptNotifier,
     )
 }

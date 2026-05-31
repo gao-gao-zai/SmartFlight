@@ -9,6 +9,7 @@ import javax.inject.Inject
 class TemporaryDisableHandler @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val reporter: RuntimeSnapshotReporter,
+    private val promptNotifier: RuntimePromptNotifier,
 ) {
     fun scheduleTemporaryDisableExpiry(
         scheduler: RuntimeTaskScheduler,
@@ -27,6 +28,7 @@ class TemporaryDisableHandler @Inject constructor(
         scheduler.cancelTemporaryDisableExpiry()
         settingsRepository.updateSettings { it.withTemporaryDisableCleared() }
         reporter.markTemporaryDisableCleared(reason)
+        promptNotifier.showAutomationRestoredPrompt(restoredSettings, reason)
         Log.d(LOG_TAG, "temporary disable cleared: $reason")
         return state.copy(settings = restoredSettings)
     }

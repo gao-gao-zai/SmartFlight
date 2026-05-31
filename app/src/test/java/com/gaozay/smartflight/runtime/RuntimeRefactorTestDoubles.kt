@@ -96,9 +96,15 @@ internal class FakeForegroundAppSource(
 }
 
 internal class NoOpRuntimePromptNotifier : RuntimePromptNotifier {
+    val automationRestoredPrompts = mutableListOf<String>()
+
     override suspend fun showReconnectPrompt(settings: UserSettings) = Unit
 
     override suspend fun showDisconnectPrompt(settings: UserSettings) = Unit
+
+    override suspend fun showAutomationRestoredPrompt(settings: UserSettings, reason: String) {
+        automationRestoredPrompts += reason
+    }
 }
 
 internal fun availableAccessGateState(): AccessGateState =

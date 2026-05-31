@@ -12,6 +12,8 @@ interface RuntimePromptNotifier {
     suspend fun showReconnectPrompt(settings: UserSettings)
 
     suspend fun showDisconnectPrompt(settings: UserSettings)
+
+    suspend fun showAutomationRestoredPrompt(settings: UserSettings, reason: String)
 }
 
 class ToastRuntimePromptNotifier @Inject constructor(
@@ -29,6 +31,13 @@ class ToastRuntimePromptNotifier @Inject constructor(
             return
         }
         showPrompt(settings.disconnectPromptText.ifBlank { "SmartFlight 已断网" })
+    }
+
+    override suspend fun showAutomationRestoredPrompt(settings: UserSettings, reason: String) {
+        if (!settings.showReconnectPrompt) {
+            return
+        }
+        showPrompt(reason.ifBlank { "SmartFlight 已恢复自动化" })
     }
 
     private suspend fun showPrompt(message: String) {
