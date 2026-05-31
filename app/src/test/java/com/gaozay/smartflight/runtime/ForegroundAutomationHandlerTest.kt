@@ -120,10 +120,17 @@ class ForegroundAutomationHandlerTest {
             promptNotifier = NoOpRuntimePromptNotifier(),
         )
         val disconnectHandler = DisconnectAutomationHandler(
-            accessRepository = accessRepository,
-            automationRuleEngine = AutomationRuleEngine(ForegroundRuleEvaluator()),
-            reporter = reporter,
-            networkChangeExecutor = networkExecutor,
+            screenOffDisconnectHandler = ScreenOffDisconnectHandler(
+                accessRepository = accessRepository,
+                automationRuleEngine = AutomationRuleEngine(ForegroundRuleEvaluator()),
+                reporter = reporter,
+                networkChangeExecutor = networkExecutor,
+            ),
+            appExitDisconnectHandler = AppExitDisconnectHandler(
+                accessRepository = accessRepository,
+                reporter = reporter,
+                networkChangeExecutor = networkExecutor,
+            ),
         )
         val settingsRepository = FakeSettingsRepository()
         return Fixture(

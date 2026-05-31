@@ -89,10 +89,17 @@ class DisconnectAutomationHandlerTest {
             accessRepository = accessRepository,
             scheduler = scheduler,
             handler = DisconnectAutomationHandler(
-                accessRepository = accessRepository,
-                automationRuleEngine = AutomationRuleEngine(ForegroundRuleEvaluator()),
-                reporter = reporter,
-                networkChangeExecutor = networkExecutor,
+                screenOffDisconnectHandler = ScreenOffDisconnectHandler(
+                    accessRepository = accessRepository,
+                    automationRuleEngine = AutomationRuleEngine(ForegroundRuleEvaluator()),
+                    reporter = reporter,
+                    networkChangeExecutor = networkExecutor,
+                ),
+                appExitDisconnectHandler = AppExitDisconnectHandler(
+                    accessRepository = accessRepository,
+                    reporter = reporter,
+                    networkChangeExecutor = networkExecutor,
+                ),
             ),
         )
     }
