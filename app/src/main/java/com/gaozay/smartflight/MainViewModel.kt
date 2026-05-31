@@ -15,7 +15,6 @@ import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
-import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.permission.AccessGateState
 import com.gaozay.smartflight.runtime.AutomationServiceController
 import com.gaozay.smartflight.settings.AutomationDisableMode
@@ -34,12 +33,9 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
-    private val executionLogRepository: ExecutionLogRepository,
     private val automationServiceController: AutomationServiceController,
     private val uiStateAssembler: MainUiStateAssembler,
-    private val accessActions: AccessActions,
-    private val automationSettingsActions: AutomationSettingsActions,
-    private val appsManagementController: AppsManagementController,
+    private val actionDispatcher: MainViewModelActionDispatcher,
 ) : ViewModel() {
     val uiState: StateFlow<SmartFlightUiState> = uiStateAssembler.smartFlightUiState().stateIn(
         scope = viewModelScope,
@@ -54,164 +50,74 @@ class MainViewModel @Inject constructor(
     )
 
     init {
+        actionDispatcher.attach(viewModelScope)
         refreshAccessChecks()
         observeAutomationState()
     }
 
-    fun refreshAccessChecks() {
-        viewModelScope.launch {
-            accessActions.refreshAccessChecks()
-        }
-    }
+    fun refreshAccessChecks() = actionDispatcher.refreshAccessChecks()
 
-    fun setAdbBootstrapped(bootstrapped: Boolean) {
-        viewModelScope.launch {
-            accessActions.setAdbBootstrapped(bootstrapped)
-        }
-    }
+    fun setAdbBootstrapped(bootstrapped: Boolean) = actionDispatcher.setAdbBootstrapped(bootstrapped)
 
-    fun probeRootAccess() {
-        viewModelScope.launch {
-            accessActions.probeRootAccess()
-        }
-    }
+    fun probeRootAccess() = actionDispatcher.probeRootAccess()
 
-    fun autoGrantCompanionPermissions() {
-        viewModelScope.launch {
-            accessActions.autoGrantCompanionPermissions()
-        }
-    }
+    fun autoGrantCompanionPermissions() = actionDispatcher.autoGrantCompanionPermissions()
 
-    fun syncCurrentNetworkControlState() {
-        viewModelScope.launch {
-            accessActions.syncCurrentNetworkControlState()
-        }
-    }
+    fun syncCurrentNetworkControlState() = actionDispatcher.syncCurrentNetworkControlState()
 
-    fun probeCurrentNetworkControlState() {
-        viewModelScope.launch {
-            accessActions.probeCurrentNetworkControlState()
-        }
-    }
+    fun probeCurrentNetworkControlState() = actionDispatcher.probeCurrentNetworkControlState()
 
-    fun toggleCurrentNetworkControlState() {
-        viewModelScope.launch {
-            accessActions.toggleCurrentNetworkControlState()
-        }
-    }
+    fun toggleCurrentNetworkControlState() = actionDispatcher.toggleCurrentNetworkControlState()
 
-    fun setAutomationEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            automationSettingsActions.setAutomationEnabled(enabled)
-        }
-    }
+    fun setAutomationEnabled(enabled: Boolean) = actionDispatcher.setAutomationEnabled(enabled)
 
-    fun disableAutomation(mode: AutomationDisableMode) {
-        viewModelScope.launch {
-            automationSettingsActions.disableAutomation(mode)
-        }
-    }
+    fun disableAutomation(mode: AutomationDisableMode) = actionDispatcher.disableAutomation(mode)
 
-    fun clearExecutionLogs() {
-        viewModelScope.launch {
-            executionLogRepository.clearLogs()
-        }
-    }
+    fun clearExecutionLogs() = actionDispatcher.clearExecutionLogs()
 
-    fun setMonitorForegroundWhenScreenOff(enabled: Boolean) {
-        viewModelScope.launch {
-            automationSettingsActions.setMonitorForegroundWhenScreenOff(enabled)
-        }
-    }
+    fun setMonitorForegroundWhenScreenOff(enabled: Boolean) =
+        actionDispatcher.setMonitorForegroundWhenScreenOff(enabled)
 
-    fun updateSettings(transform: (UserSettings) -> UserSettings) {
-        viewModelScope.launch {
-            automationSettingsActions.updateSettings(transform)
-        }
-    }
+    fun updateSettings(transform: (UserSettings) -> UserSettings) = actionDispatcher.updateSettings(transform)
 
-    fun setNetworkControlMode(mode: NetworkControlMode) {
-        viewModelScope.launch {
-            automationSettingsActions.setNetworkControlMode(mode)
-        }
-    }
+    fun setNetworkControlMode(mode: NetworkControlMode) = actionDispatcher.setNetworkControlMode(mode)
 
-    fun setPreferredExecutorType(type: ExecutorType) {
-        viewModelScope.launch {
-            automationSettingsActions.setPreferredExecutorType(type)
-        }
-    }
+    fun setPreferredExecutorType(type: ExecutorType) = actionDispatcher.setPreferredExecutorType(type)
 
-    fun setThemeMode(mode: ThemeMode) = updateSettings { it.copy(themeMode = mode) }
+    fun setThemeMode(mode: ThemeMode) = actionDispatcher.setThemeMode(mode)
 
-    fun setThemePalette(palette: ThemePalette) = updateSettings { it.copy(themePalette = palette) }
+    fun setThemePalette(palette: ThemePalette) = actionDispatcher.setThemePalette(palette)
 
-    fun setCustomSeedColor(seedColorArgb: Int) = updateSettings {
-        it.copy(
-            themePalette = ThemePalette.Custom,
-            customSeedColorArgb = seedColorArgb,
-        )
-    }
+    fun setCustomSeedColor(seedColorArgb: Int) = actionDispatcher.setCustomSeedColor(seedColorArgb)
 
-    fun setThemeIntensity(intensity: ThemeIntensity) = updateSettings { it.copy(themeIntensity = intensity) }
+    fun setThemeIntensity(intensity: ThemeIntensity) = actionDispatcher.setThemeIntensity(intensity)
 
-    fun setCornerStyle(cornerStyle: CornerStyle) = updateSettings { it.copy(cornerStyle = cornerStyle) }
+    fun setCornerStyle(cornerStyle: CornerStyle) = actionDispatcher.setCornerStyle(cornerStyle)
 
-    fun simulateScreenOff() {
-        automationServiceController.simulateScreenOff()
-    }
+    fun simulateScreenOff() = actionDispatcher.simulateScreenOff()
 
-    fun simulateScreenOn() {
-        automationServiceController.simulateScreenOn()
-    }
+    fun simulateScreenOn() = actionDispatcher.simulateScreenOn()
 
-    fun updateAppQuery(query: String) {
-        appsManagementController.updateAppQuery(query)
-    }
+    fun updateAppQuery(query: String) = actionDispatcher.updateAppQuery(query)
 
-    fun updateAppFilter(filter: AppFilter) {
-        appsManagementController.updateAppFilter(filter)
-    }
+    fun updateAppFilter(filter: AppFilter) = actionDispatcher.updateAppFilter(filter)
 
-    fun updateAppInternetPermissionFilter(filter: InternetPermissionFilter) {
-        appsManagementController.updateAppInternetPermissionFilter(filter)
-    }
+    fun updateAppInternetPermissionFilter(filter: InternetPermissionFilter) =
+        actionDispatcher.updateAppInternetPermissionFilter(filter)
 
-    fun updateAppTypeFilter(filter: AppTypeFilter) {
-        appsManagementController.updateAppTypeFilter(filter)
-    }
+    fun updateAppTypeFilter(filter: AppTypeFilter) = actionDispatcher.updateAppTypeFilter(filter)
 
-    fun updateAppLauncherFilter(filter: LauncherFilter) {
-        appsManagementController.updateAppLauncherFilter(filter)
-    }
+    fun updateAppLauncherFilter(filter: LauncherFilter) = actionDispatcher.updateAppLauncherFilter(filter)
 
-    fun clearAppAdvancedFilters() {
-        appsManagementController.clearAppAdvancedFilters()
-    }
+    fun clearAppAdvancedFilters() = actionDispatcher.clearAppAdvancedFilters()
 
-    fun refreshInstalledApps() {
-        viewModelScope.launch {
-            appsManagementController.refreshInstalledApps()
-        }
-    }
+    fun refreshInstalledApps() = actionDispatcher.refreshInstalledApps()
 
-    fun setAppManualOnline(packageName: String) {
-        viewModelScope.launch {
-            appsManagementController.setAppManualOnline(packageName)
-        }
-    }
+    fun setAppManualOnline(packageName: String) = actionDispatcher.setAppManualOnline(packageName)
 
-    fun setAppManualOffline(packageName: String) {
-        viewModelScope.launch {
-            appsManagementController.setAppManualOffline(packageName)
-        }
-    }
+    fun setAppManualOffline(packageName: String) = actionDispatcher.setAppManualOffline(packageName)
 
-    fun resetAppToDefault(packageName: String) {
-        viewModelScope.launch {
-            appsManagementController.resetAppToDefault(packageName)
-        }
-    }
+    fun resetAppToDefault(packageName: String) = actionDispatcher.resetAppToDefault(packageName)
 
     private fun observeAutomationState() {
         viewModelScope.launch {
