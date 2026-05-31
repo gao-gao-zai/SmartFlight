@@ -14,7 +14,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import androidx.activity.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.gaozay.smartflight.ui.AccessActions
+import com.gaozay.smartflight.ui.AppsActions
+import com.gaozay.smartflight.ui.AutomationActions
+import com.gaozay.smartflight.ui.DiagnosticsActions
+import com.gaozay.smartflight.ui.SettingsActions
+import com.gaozay.smartflight.ui.SmartFlightActions
 import com.gaozay.smartflight.ui.SmartFlightRoot
+import com.gaozay.smartflight.ui.SystemIntentActions
 import com.gaozay.smartflight.ui.theme.SmartFlightTheme
 import dagger.hilt.android.AndroidEntryPoint
 import rikka.shizuku.Shizuku
@@ -48,66 +55,7 @@ class MainActivity : ComponentActivity() {
                 SmartFlightRoot(
                     state = uiState.value,
                     appsState = appsUiState.value,
-                    onUpdateSettings = viewModel::updateSettings,
-                    onSetNetworkControlMode = viewModel::setNetworkControlMode,
-                    onSetPreferredExecutorType = viewModel::setPreferredExecutorType,
-                    onSetThemeMode = viewModel::setThemeMode,
-                    onSetThemePalette = viewModel::setThemePalette,
-                    onSetCustomSeedColor = viewModel::setCustomSeedColor,
-                    onSetThemeIntensity = viewModel::setThemeIntensity,
-                    onSetCornerStyle = viewModel::setCornerStyle,
-                    onSetAutomationEnabled = viewModel::setAutomationEnabled,
-                    onDisableAutomation = viewModel::disableAutomation,
-                    onSetMonitorForegroundWhenScreenOff = viewModel::setMonitorForegroundWhenScreenOff,
-                    onAppQueryChange = viewModel::updateAppQuery,
-                    onAppFilterChange = viewModel::updateAppFilter,
-                    onAppInternetPermissionFilterChange = viewModel::updateAppInternetPermissionFilter,
-                    onAppTypeFilterChange = viewModel::updateAppTypeFilter,
-                    onAppLauncherFilterChange = viewModel::updateAppLauncherFilter,
-                    onClearAppAdvancedFilters = viewModel::clearAppAdvancedFilters,
-                    onRefreshApps = viewModel::refreshInstalledApps,
-                    onSetAppManualOnline = viewModel::setAppManualOnline,
-                    onSetAppManualOffline = viewModel::setAppManualOffline,
-                    onResetAppToDefault = viewModel::resetAppToDefault,
-                    onRefreshAccessChecks = viewModel::refreshAccessChecks,
-                    onProbeCurrentNetworkControlState = viewModel::probeCurrentNetworkControlState,
-                    onToggleCurrentNetworkControlState = viewModel::toggleCurrentNetworkControlState,
-                    onSimulateScreenOff = viewModel::simulateScreenOff,
-                    onSimulateScreenOn = viewModel::simulateScreenOn,
-                    onClearExecutionLogs = viewModel::clearExecutionLogs,
-                    onRequestBluetoothPermission = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                            ContextCompat.checkSelfPermission(
-                                this,
-                                Manifest.permission.BLUETOOTH_CONNECT,
-                            ) != PackageManager.PERMISSION_GRANTED
-                        ) {
-                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-                        }
-                    },
-                    onRequestShizukuPermission = {
-                        runCatching {
-                            Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
-                        }.onFailure {
-                            viewModel.refreshAccessChecks()
-                        }
-                    },
-                    onProbeRootAccess = viewModel::probeRootAccess,
-                    onSetAdbBootstrapped = viewModel::setAdbBootstrapped,
-                    onAutoGrantCompanionPermissions = viewModel::autoGrantCompanionPermissions,
-                    onOpenUsageAccessSettings = {
-                        startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                    },
-                    onOpenNotificationSettings = {
-                        startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-                        })
-                    },
-                    onOpenBatteryOptimizationSettings = {
-                        startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = Uri.parse("package:$packageName")
-                        })
-                    },
+                    actions = buildSmartFlightActions(),
                 )
             }
         }
@@ -121,5 +69,85 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
         super.onDestroy()
+    }
+
+    private fun buildSmartFlightActions(): SmartFlightActions =
+        SmartFlightActions(
+            settings = SettingsActions(
+                updateSettings = viewModel::updateSettings,
+                setNetworkControlMode = viewModel::setNetworkControlMode,
+                setPreferredExecutorType = viewModel::setPreferredExecutorType,
+                setMonitorForegroundWhenScreenOff = viewModel::setMonitorForegroundWhenScreenOff,
+                setThemeMode = viewModel::setThemeMode,
+                setThemePalette = viewModel::setThemePalette,
+                setCustomSeedColor = viewModel::setCustomSeedColor,
+                setThemeIntensity = viewModel::setThemeIntensity,
+                setCornerStyle = viewModel::setCornerStyle,
+            ),
+            automation = AutomationActions(
+                setAutomationEnabled = viewModel::setAutomationEnabled,
+                disableAutomation = viewModel::disableAutomation,
+            ),
+            apps = AppsActions(
+                queryChange = viewModel::updateAppQuery,
+                filterChange = viewModel::updateAppFilter,
+                internetPermissionFilterChange = viewModel::updateAppInternetPermissionFilter,
+                typeFilterChange = viewModel::updateAppTypeFilter,
+                launcherFilterChange = viewModel::updateAppLauncherFilter,
+                clearAdvancedFilters = viewModel::clearAppAdvancedFilters,
+                refreshApps = viewModel::refreshInstalledApps,
+                setManualOnline = viewModel::setAppManualOnline,
+                setManualOffline = viewModel::setAppManualOffline,
+                resetToDefault = viewModel::resetAppToDefault,
+            ),
+            access = AccessActions(
+                refreshAccessChecks = viewModel::refreshAccessChecks,
+                requestShizukuPermission = ::requestShizukuPermission,
+                probeRootAccess = viewModel::probeRootAccess,
+                setAdbBootstrapped = viewModel::setAdbBootstrapped,
+                autoGrantCompanionPermissions = viewModel::autoGrantCompanionPermissions,
+            ),
+            diagnostics = DiagnosticsActions(
+                probeCurrentNetworkControlState = viewModel::probeCurrentNetworkControlState,
+                toggleCurrentNetworkControlState = viewModel::toggleCurrentNetworkControlState,
+                simulateScreenOff = viewModel::simulateScreenOff,
+                simulateScreenOn = viewModel::simulateScreenOn,
+                clearExecutionLogs = viewModel::clearExecutionLogs,
+                requestBluetoothPermission = ::requestBluetoothPermission,
+            ),
+            system = SystemIntentActions(
+                openUsageAccessSettings = {
+                    startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                },
+                openNotificationSettings = {
+                    startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    })
+                },
+                openBatteryOptimizationSettings = {
+                    startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    })
+                },
+            ),
+        )
+
+    private fun requestBluetoothPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.BLUETOOTH_CONNECT,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+    }
+
+    private fun requestShizukuPermission() {
+        runCatching {
+            Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
+        }.onFailure {
+            viewModel.refreshAccessChecks()
+        }
     }
 }

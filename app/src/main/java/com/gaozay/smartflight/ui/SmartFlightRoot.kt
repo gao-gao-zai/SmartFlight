@@ -27,19 +27,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.text.font.FontWeight
 import com.gaozay.smartflight.SmartFlightUiState
-import com.gaozay.smartflight.apps.AppFilter
-import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.AppsUiState
-import com.gaozay.smartflight.apps.InternetPermissionFilter
-import com.gaozay.smartflight.apps.LauncherFilter
-import com.gaozay.smartflight.domain.model.CornerStyle
-import com.gaozay.smartflight.domain.model.ExecutorType
-import com.gaozay.smartflight.domain.model.NetworkControlMode
-import com.gaozay.smartflight.domain.model.ThemeIntensity
-import com.gaozay.smartflight.domain.model.ThemeMode
-import com.gaozay.smartflight.domain.model.ThemePalette
-import com.gaozay.smartflight.settings.AutomationDisableMode
-import com.gaozay.smartflight.settings.UserSettings
 
 private enum class SmartFlightScreen(val title: String) {
     Dashboard("控制台"), Apps("应用范围"), Rules("自动化规则"), Diagnostics("诊断与日志"), Appearance("外观设置")
@@ -50,41 +38,7 @@ private enum class SmartFlightScreen(val title: String) {
 fun SmartFlightRoot(
     state: SmartFlightUiState,
     appsState: AppsUiState,
-    onUpdateSettings: ((UserSettings) -> UserSettings) -> Unit,
-    onSetNetworkControlMode: (NetworkControlMode) -> Unit,
-    onSetPreferredExecutorType: (ExecutorType) -> Unit,
-    onSetThemeMode: (ThemeMode) -> Unit,
-    onSetThemePalette: (ThemePalette) -> Unit,
-    onSetCustomSeedColor: (Int) -> Unit,
-    onSetThemeIntensity: (ThemeIntensity) -> Unit,
-    onSetCornerStyle: (CornerStyle) -> Unit,
-    onSetAutomationEnabled: (Boolean) -> Unit,
-    onDisableAutomation: (AutomationDisableMode) -> Unit,
-    onSetMonitorForegroundWhenScreenOff: (Boolean) -> Unit,
-    onAppQueryChange: (String) -> Unit,
-    onAppFilterChange: (AppFilter) -> Unit,
-    onAppInternetPermissionFilterChange: (InternetPermissionFilter) -> Unit,
-    onAppTypeFilterChange: (AppTypeFilter) -> Unit,
-    onAppLauncherFilterChange: (LauncherFilter) -> Unit,
-    onClearAppAdvancedFilters: () -> Unit,
-    onRefreshApps: () -> Unit,
-    onSetAppManualOnline: (String) -> Unit,
-    onSetAppManualOffline: (String) -> Unit,
-    onResetAppToDefault: (String) -> Unit,
-    onRefreshAccessChecks: () -> Unit,
-    onProbeCurrentNetworkControlState: () -> Unit,
-    onToggleCurrentNetworkControlState: () -> Unit,
-    onSimulateScreenOff: () -> Unit,
-    onSimulateScreenOn: () -> Unit,
-    onClearExecutionLogs: () -> Unit,
-    onRequestBluetoothPermission: () -> Unit,
-    onRequestShizukuPermission: () -> Unit,
-    onProbeRootAccess: () -> Unit,
-    onSetAdbBootstrapped: (Boolean) -> Unit,
-    onAutoGrantCompanionPermissions: () -> Unit,
-    onOpenUsageAccessSettings: () -> Unit,
-    onOpenNotificationSettings: () -> Unit,
-    onOpenBatteryOptimizationSettings: () -> Unit,
+    actions: SmartFlightActions,
 ) {
     var screen by rememberSaveable { mutableStateOf(SmartFlightScreen.Dashboard) }
     if (!state.accessGateState.canEnterApp) {
@@ -92,14 +46,14 @@ fun SmartFlightRoot(
             Surface(Modifier.fillMaxSize().padding(innerPadding)) {
                 AccessGateScreen(
                     state = state.accessGateState,
-                    onRefresh = onRefreshAccessChecks,
-                    onRequestShizukuPermission = onRequestShizukuPermission,
-                    onProbeRootAccess = onProbeRootAccess,
-                    onSetAdbBootstrapped = onSetAdbBootstrapped,
-                    onAutoGrantCompanionPermissions = onAutoGrantCompanionPermissions,
-                    onOpenUsageAccessSettings = onOpenUsageAccessSettings,
-                    onOpenNotificationSettings = onOpenNotificationSettings,
-                    onOpenBatteryOptimizationSettings = onOpenBatteryOptimizationSettings,
+                    onRefresh = actions.access.refreshAccessChecks,
+                    onRequestShizukuPermission = actions.access.requestShizukuPermission,
+                    onProbeRootAccess = actions.access.probeRootAccess,
+                    onSetAdbBootstrapped = actions.access.setAdbBootstrapped,
+                    onAutoGrantCompanionPermissions = actions.access.autoGrantCompanionPermissions,
+                    onOpenUsageAccessSettings = actions.system.openUsageAccessSettings,
+                    onOpenNotificationSettings = actions.system.openNotificationSettings,
+                    onOpenBatteryOptimizationSettings = actions.system.openBatteryOptimizationSettings,
                 )
             }
         }
@@ -119,8 +73,8 @@ fun SmartFlightRoot(
                 SmartFlightScreen.Dashboard -> DashboardScreen(
                     state = state,
                     innerPadding = innerPadding,
-                    onSetAutomationEnabled = onSetAutomationEnabled,
-                    onDisableAutomation = onDisableAutomation,
+                    onSetAutomationEnabled = actions.automation.setAutomationEnabled,
+                    onDisableAutomation = actions.automation.disableAutomation,
                     onOpenApps = { screen = SmartFlightScreen.Apps },
                     onOpenRules = { screen = SmartFlightScreen.Rules },
                     onOpenDiagnostics = { screen = SmartFlightScreen.Diagnostics },
@@ -128,50 +82,50 @@ fun SmartFlightRoot(
                 SmartFlightScreen.Apps -> AppManagementScreen(
                     state = appsState,
                     innerPadding = innerPadding,
-                    onQueryChange = onAppQueryChange,
-                    onFilterChange = onAppFilterChange,
-                    onInternetPermissionFilterChange = onAppInternetPermissionFilterChange,
-                    onAppTypeFilterChange = onAppTypeFilterChange,
-                    onLauncherFilterChange = onAppLauncherFilterChange,
-                    onClearAdvancedFilters = onClearAppAdvancedFilters,
-                    onRefreshApps = onRefreshApps,
-                    onSetManualOnline = onSetAppManualOnline,
-                    onSetManualOffline = onSetAppManualOffline,
-                    onResetToDefault = onResetAppToDefault,
+                    onQueryChange = actions.apps.queryChange,
+                    onFilterChange = actions.apps.filterChange,
+                    onInternetPermissionFilterChange = actions.apps.internetPermissionFilterChange,
+                    onAppTypeFilterChange = actions.apps.typeFilterChange,
+                    onLauncherFilterChange = actions.apps.launcherFilterChange,
+                    onClearAdvancedFilters = actions.apps.clearAdvancedFilters,
+                    onRefreshApps = actions.apps.refreshApps,
+                    onSetManualOnline = actions.apps.setManualOnline,
+                    onSetManualOffline = actions.apps.setManualOffline,
+                    onResetToDefault = actions.apps.resetToDefault,
                 )
                 SmartFlightScreen.Rules -> RulesScreen(
                     settings = state.settings,
                     innerPadding = innerPadding,
-                    onUpdateSettings = onUpdateSettings,
-                    onSetNetworkControlMode = onSetNetworkControlMode,
-                    onSetPreferredExecutorType = onSetPreferredExecutorType,
-                    onSetMonitorForegroundWhenScreenOff = onSetMonitorForegroundWhenScreenOff,
+                    onUpdateSettings = actions.settings.updateSettings,
+                    onSetNetworkControlMode = actions.settings.setNetworkControlMode,
+                    onSetPreferredExecutorType = actions.settings.setPreferredExecutorType,
+                    onSetMonitorForegroundWhenScreenOff = actions.settings.setMonitorForegroundWhenScreenOff,
                 )
                 SmartFlightScreen.Diagnostics -> DiagnosticsScreen(
                     state = state,
                     innerPadding = innerPadding,
-                    onRefreshAccessChecks = onRefreshAccessChecks,
-                    onProbeCurrentNetworkControlState = onProbeCurrentNetworkControlState,
-                    onToggleCurrentNetworkControlState = onToggleCurrentNetworkControlState,
-                    onSimulateScreenOff = onSimulateScreenOff,
-                    onSimulateScreenOn = onSimulateScreenOn,
-                    onClearExecutionLogs = onClearExecutionLogs,
-                    onRequestBluetoothPermission = onRequestBluetoothPermission,
-                    onRequestShizukuPermission = onRequestShizukuPermission,
-                    onProbeRootAccess = onProbeRootAccess,
-                    onSetAdbBootstrapped = onSetAdbBootstrapped,
-                    onOpenUsageAccessSettings = onOpenUsageAccessSettings,
-                    onOpenNotificationSettings = onOpenNotificationSettings,
-                    onOpenBatteryOptimizationSettings = onOpenBatteryOptimizationSettings,
+                    onRefreshAccessChecks = actions.access.refreshAccessChecks,
+                    onProbeCurrentNetworkControlState = actions.diagnostics.probeCurrentNetworkControlState,
+                    onToggleCurrentNetworkControlState = actions.diagnostics.toggleCurrentNetworkControlState,
+                    onSimulateScreenOff = actions.diagnostics.simulateScreenOff,
+                    onSimulateScreenOn = actions.diagnostics.simulateScreenOn,
+                    onClearExecutionLogs = actions.diagnostics.clearExecutionLogs,
+                    onRequestBluetoothPermission = actions.diagnostics.requestBluetoothPermission,
+                    onRequestShizukuPermission = actions.access.requestShizukuPermission,
+                    onProbeRootAccess = actions.access.probeRootAccess,
+                    onSetAdbBootstrapped = actions.access.setAdbBootstrapped,
+                    onOpenUsageAccessSettings = actions.system.openUsageAccessSettings,
+                    onOpenNotificationSettings = actions.system.openNotificationSettings,
+                    onOpenBatteryOptimizationSettings = actions.system.openBatteryOptimizationSettings,
                 )
                 SmartFlightScreen.Appearance -> AppearanceScreen(
                     settings = state.settings,
                     innerPadding = innerPadding,
-                    onSetThemeMode = onSetThemeMode,
-                    onSetThemePalette = onSetThemePalette,
-                    onSetCustomSeedColor = onSetCustomSeedColor,
-                    onSetThemeIntensity = onSetThemeIntensity,
-                    onSetCornerStyle = onSetCornerStyle,
+                    onSetThemeMode = actions.settings.setThemeMode,
+                    onSetThemePalette = actions.settings.setThemePalette,
+                    onSetCustomSeedColor = actions.settings.setCustomSeedColor,
+                    onSetThemeIntensity = actions.settings.setThemeIntensity,
+                    onSetCornerStyle = actions.settings.setCornerStyle,
                 )
             }
         }
