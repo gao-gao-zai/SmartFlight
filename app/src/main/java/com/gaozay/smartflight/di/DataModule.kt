@@ -14,6 +14,8 @@ import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.permission.DataStoreAdbBootstrapRepository
 import com.gaozay.smartflight.permission.DataStoreRootAccessProbeRepository
 import com.gaozay.smartflight.permission.DefaultAccessRepository
+import com.gaozay.smartflight.permission.ExecutorNetworkControlProbe
+import com.gaozay.smartflight.permission.NetworkControlProbe
 import com.gaozay.smartflight.permission.RootAccessProbeRepository
 import com.gaozay.smartflight.runtime.DataStoreRuntimeStatusRepository
 import com.gaozay.smartflight.runtime.ForegroundAppDetector
@@ -97,6 +99,12 @@ abstract class RepositoryModule {
     abstract fun bindAccessRepository(
         repository: DefaultAccessRepository,
     ): AccessRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindNetworkControlProbe(
+        probe: ExecutorNetworkControlProbe,
+    ): NetworkControlProbe
 
     @Binds
     @Singleton
