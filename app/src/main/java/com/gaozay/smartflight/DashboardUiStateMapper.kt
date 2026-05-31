@@ -103,11 +103,3 @@ fun buildMobileDataStatus(snapshot: RuntimeSnapshot): String =
         false -> "已关闭"
         null -> "未知"
     }
-
-data class UiStateBase(
-    val settings: UserSettings,
-    val runtimeSnapshot: RuntimeSnapshot,
-    val appCount: Int,
-    val logCount: Int,
-    val accessGateState: AccessGateState,
-)

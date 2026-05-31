@@ -8,8 +8,6 @@ import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.apps.InternetPermissionFilter
 import com.gaozay.smartflight.apps.LauncherFilter
-import com.gaozay.smartflight.apps.InstalledAppRepository
-import com.gaozay.smartflight.apps.buildAppsUiState
 import com.gaozay.smartflight.domain.model.CornerStyle
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ExecutorType
@@ -19,9 +17,7 @@ import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.permission.AccessGateState
-import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.runtime.AutomationServiceController
-import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
@@ -29,7 +25,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -39,62 +34,20 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
-    private val runtimeStatusRepository: RuntimeStatusRepository,
-    private val installedAppRepository: InstalledAppRepository,
     private val executionLogRepository: ExecutionLogRepository,
-    private val accessRepository: AccessRepository,
     private val automationServiceController: AutomationServiceController,
-    private val dashboardUiStateMapper: DashboardUiStateMapper,
+    private val uiStateAssembler: MainUiStateAssembler,
     private val accessActions: AccessActions,
     private val automationSettingsActions: AutomationSettingsActions,
     private val appsManagementController: AppsManagementController,
 ) : ViewModel() {
-    private val recentLogs = executionLogRepository.observeRecentLogs(limit = 6)
-
-    val uiState: StateFlow<SmartFlightUiState> = combine(
-        settingsRepository.settings,
-        runtimeStatusRepository.snapshot,
-        installedAppRepository.observeAppCount(),
-        executionLogRepository.observeLogCount(),
-        accessRepository.accessGateState,
-    ) { settings, runtimeSnapshot, appCount, logCount, accessGateState ->
-        UiStateBase(
-            settings = settings,
-            runtimeSnapshot = runtimeSnapshot,
-            appCount = appCount,
-            logCount = logCount,
-            accessGateState = accessGateState,
-        )
-    }.combine(recentLogs) { base, recentLogs ->
-        dashboardUiStateMapper.buildSmartFlightUiState(
-            settings = base.settings,
-            runtimeSnapshot = base.runtimeSnapshot,
-            appCount = base.appCount,
-            logCount = base.logCount,
-            accessGateState = base.accessGateState,
-            recentLogs = recentLogs,
-        )
-    }.stateIn(
+    val uiState: StateFlow<SmartFlightUiState> = uiStateAssembler.smartFlightUiState().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = SmartFlightUiState(),
     )
 
-    val appsUiState: StateFlow<AppsUiState> = combine(
-        installedAppRepository.observeApps(),
-        appsManagementController.appQuery,
-        appsManagementController.appFilterStateFlow(),
-        appsManagementController.appScanning,
-        appsManagementController.appLastScanSummary,
-    ) { apps, query, filterState, isScanning, lastScanSummary ->
-        buildAppsUiState(
-            apps = apps,
-            query = query,
-            filterState = filterState,
-            isScanning = isScanning,
-            lastScanSummary = lastScanSummary,
-        )
-    }.stateIn(
+    val appsUiState: StateFlow<AppsUiState> = uiStateAssembler.appsUiState().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = AppsUiState(),
