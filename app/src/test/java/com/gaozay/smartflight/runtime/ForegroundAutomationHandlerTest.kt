@@ -120,6 +120,7 @@ class ForegroundAutomationHandlerTest {
             accessRepository = accessRepository,
             reporter = reporter,
             promptNotifier = promptNotifier,
+            expectedNetworkChangeTracker = RuntimeExpectedNetworkChangeTracker(),
         )
         val disconnectHandler = DisconnectAutomationHandler(
             screenOffDisconnectHandler = ScreenOffDisconnectHandler(

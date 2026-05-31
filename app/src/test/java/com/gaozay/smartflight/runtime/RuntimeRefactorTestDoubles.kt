@@ -96,11 +96,16 @@ internal class FakeForegroundAppSource(
 }
 
 internal class NoOpRuntimePromptNotifier : RuntimePromptNotifier {
+    val automationPausedPrompts = mutableListOf<String>()
     val automationRestoredPrompts = mutableListOf<String>()
 
     override suspend fun showReconnectPrompt(settings: UserSettings) = Unit
 
     override suspend fun showDisconnectPrompt(settings: UserSettings) = Unit
+
+    override suspend fun showAutomationPausedPrompt(settings: UserSettings, reason: String) {
+        automationPausedPrompts += reason
+    }
 
     override suspend fun showAutomationRestoredPrompt(settings: UserSettings, reason: String) {
         automationRestoredPrompts += reason

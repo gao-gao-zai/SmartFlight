@@ -83,6 +83,7 @@ class DisconnectAutomationHandlerTest {
             accessRepository = accessRepository,
             reporter = reporter,
             promptNotifier = NoOpRuntimePromptNotifier(),
+            expectedNetworkChangeTracker = RuntimeExpectedNetworkChangeTracker(),
         )
         return Fixture(
             runtimeStatusRepository = runtimeStatusRepository,

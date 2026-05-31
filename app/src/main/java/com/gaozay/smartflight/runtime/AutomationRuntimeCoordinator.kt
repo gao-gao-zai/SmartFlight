@@ -32,6 +32,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
     private val foregroundAutomationHandler: ForegroundAutomationHandler,
     private val disconnectAutomationHandler: DisconnectAutomationHandler,
     private val temporaryDisableHandler: TemporaryDisableHandler,
+    private val unexpectedNetworkChangeGuard: UnexpectedNetworkChangeGuard,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val events = Channel<RuntimeEvent>(Channel.UNLIMITED)
@@ -122,7 +123,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
             is RuntimeEvent.AppsChanged -> {
                 state = state.copy(appRulesByPackageName = event.appRulesByPackageName)
             }
-            RuntimeEvent.NetworkChanged -> runtimeEnvironmentMonitor.refreshSnapshot()
+            RuntimeEvent.NetworkChanged -> handleNetworkChanged()
             RuntimeEvent.TemporaryDisableExpired -> handleTemporaryDisableExpired()
             RuntimeEvent.ScreenOffDisconnectDue -> {
                 disconnectAutomationHandler.handleScreenOffDisconnectDue(state, scheduler)
@@ -233,6 +234,18 @@ class AutomationRuntimeCoordinator @Inject constructor(
             state = state,
             automationRuleEngine = automationRuleEngine,
             immediate = false,
+        )
+    }
+
+    private suspend fun handleNetworkChanged() {
+        val previousSnapshot = reporter.snapshot.first()
+        runtimeEnvironmentMonitor.refreshSnapshot()
+        accessRepository.syncCurrentNetworkControlState()
+        val updatedSnapshot = reporter.snapshot.first()
+        state = unexpectedNetworkChangeGuard.handleNetworkStateObserved(
+            state = state,
+            previousSnapshot = previousSnapshot,
+            updatedSnapshot = updatedSnapshot,
         )
     }
 

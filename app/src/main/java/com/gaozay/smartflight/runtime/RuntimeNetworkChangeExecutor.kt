@@ -11,6 +11,7 @@ class RuntimeNetworkChangeExecutor @Inject constructor(
     private val accessRepository: AccessRepository,
     private val reporter: RuntimeSnapshotReporter,
     private val promptNotifier: RuntimePromptNotifier,
+    private val expectedNetworkChangeTracker: RuntimeExpectedNetworkChangeTracker,
 ) {
     suspend fun executeNetworkChange(
         scheduler: RuntimeTaskScheduler,
@@ -31,6 +32,7 @@ class RuntimeNetworkChangeExecutor @Inject constructor(
             LOG_TAG,
             "execute network change trigger=$triggerSource current=$currentDisconnected target=$targetDisconnected reason=$reason",
         )
+        expectedNetworkChangeTracker.record(targetDisconnected)
         accessRepository.setDisconnectedState(
             disconnected = targetDisconnected,
             triggerSource = triggerSource,
