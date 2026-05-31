@@ -24,6 +24,7 @@ class UserSettingsPreferencesMapperTest {
     fun writeUserSettingsRoundTripsCustomizedValues() {
         val customized = UserSettings(
             automationEnabled = true,
+            pauseAutomationOnExternalNetworkChange = false,
             temporaryDisableMode = AutomationDisableMode.UntilAppSwitch,
             temporaryDisableStartedAtMillis = 123L,
             temporaryDisableUntilMillis = 456L,

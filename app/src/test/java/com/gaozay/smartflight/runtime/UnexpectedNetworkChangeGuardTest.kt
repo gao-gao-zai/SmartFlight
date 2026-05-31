@@ -64,4 +64,30 @@ class UnexpectedNetworkChangeGuardTest {
         assertEquals(AutomationDisableMode.None, settingsRepository.currentSettings.temporaryDisableMode)
         assertEquals(emptyList<String>(), promptNotifier.automationPausedPrompts)
     }
+
+    @Test
+    fun disabledSettingDoesNotPauseAutomationOnExternalNetworkControlChange() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            UserSettings(
+                automationEnabled = true,
+                pauseAutomationOnExternalNetworkChange = false,
+            ),
+        )
+        val promptNotifier = NoOpRuntimePromptNotifier()
+        val guard = UnexpectedNetworkChangeGuard(
+            settingsRepository = settingsRepository,
+            reporter = RuntimeSnapshotReporter(FakeRuntimeStatusRepository()),
+            promptNotifier = promptNotifier,
+            expectedNetworkChangeTracker = RuntimeExpectedNetworkChangeTracker(),
+        )
+
+        guard.handleNetworkStateObserved(
+            state = RuntimeState(settings = settingsRepository.currentSettings),
+            previousSnapshot = RuntimeSnapshot(isAirplaneModeEnabled = false),
+            updatedSnapshot = RuntimeSnapshot(isAirplaneModeEnabled = true),
+        )
+
+        assertEquals(AutomationDisableMode.None, settingsRepository.currentSettings.temporaryDisableMode)
+        assertEquals(emptyList<String>(), promptNotifier.automationPausedPrompts)
+    }
 }

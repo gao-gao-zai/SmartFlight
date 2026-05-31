@@ -11,6 +11,7 @@ import com.gaozay.smartflight.domain.model.ThemePalette
 
 fun Preferences.toUserSettings(): UserSettings = UserSettings(
     automationEnabled = this[SettingsPreferenceKeys.AutomationEnabled] ?: false,
+    pauseAutomationOnExternalNetworkChange = this[SettingsPreferenceKeys.PauseAutomationOnExternalNetworkChange] ?: true,
     temporaryDisableMode = enumValueOrDefault(
         value = this[SettingsPreferenceKeys.TemporaryDisableMode],
         default = AutomationDisableMode.None,
@@ -63,6 +64,7 @@ fun Preferences.toUserSettings(): UserSettings = UserSettings(
 
 fun MutablePreferences.writeUserSettings(settings: UserSettings) {
     this[SettingsPreferenceKeys.AutomationEnabled] = settings.automationEnabled
+    this[SettingsPreferenceKeys.PauseAutomationOnExternalNetworkChange] = settings.pauseAutomationOnExternalNetworkChange
     this[SettingsPreferenceKeys.TemporaryDisableMode] = settings.temporaryDisableMode.name
     this[SettingsPreferenceKeys.TemporaryDisableStartedAtMillis] = settings.temporaryDisableStartedAtMillis
     settings.temporaryDisableUntilMillis?.let {

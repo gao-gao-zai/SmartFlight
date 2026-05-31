@@ -26,6 +26,7 @@ enum class AutomationDisableMode(
 
 data class UserSettings(
     val automationEnabled: Boolean = false,
+    val pauseAutomationOnExternalNetworkChange: Boolean = true,
     val temporaryDisableMode: AutomationDisableMode = AutomationDisableMode.None,
     val temporaryDisableStartedAtMillis: Long = 0L,
     val temporaryDisableUntilMillis: Long? = null,

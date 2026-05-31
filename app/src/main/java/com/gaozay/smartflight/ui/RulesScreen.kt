@@ -42,6 +42,13 @@ internal fun RulesScreen(
                     if (enabled) s.withAutomationEnabled() else s.withAutomationDisabled(AutomationDisableMode.Permanent)
                 }
             }
+            SwitchRow(
+                "外部联网变化时暂停",
+                "检测到不是 SmartFlight 触发的联网状态变化后，暂停自动化直到应用切换",
+                settings.pauseAutomationOnExternalNetworkChange,
+            ) {
+                onUpdateSettings { s -> s.copy(pauseAutomationOnExternalNetworkChange = it) }
+            }
             ChoiceRow("联网控制方式", NetworkControlMode.entries, settings.networkControlMode, onSetNetworkControlMode)
             ChoiceRow("执行器偏好", ExecutorType.entries.filterNot { it == ExecutorType.Unavailable }, settings.preferredExecutorType, onSetPreferredExecutorType)
         } }

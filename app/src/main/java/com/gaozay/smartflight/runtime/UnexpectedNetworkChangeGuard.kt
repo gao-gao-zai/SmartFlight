@@ -19,7 +19,10 @@ class UnexpectedNetworkChangeGuard @Inject constructor(
         updatedSnapshot: RuntimeSnapshot,
     ): RuntimeState {
         val settings = state.settings
-        if (!settings.automationEnabled || settings.isTemporaryDisableActive()) {
+        if (!settings.automationEnabled ||
+            !settings.pauseAutomationOnExternalNetworkChange ||
+            settings.isTemporaryDisableActive()
+        ) {
             expectedNetworkChangeTracker.clearExpired()
             return state
         }

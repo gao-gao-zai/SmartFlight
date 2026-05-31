@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 
 object SettingsPreferenceKeys {
     val AutomationEnabled = booleanPreferencesKey("automation_enabled")
+    val PauseAutomationOnExternalNetworkChange = booleanPreferencesKey("pause_automation_on_external_network_change")
     val TemporaryDisableMode = stringPreferencesKey("temporary_disable_mode")
     val TemporaryDisableStartedAtMillis = longPreferencesKey("temporary_disable_started_at_millis")
     val TemporaryDisableUntilMillis = longPreferencesKey("temporary_disable_until_millis")
