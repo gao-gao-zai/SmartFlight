@@ -90,7 +90,7 @@ class DisconnectAutomationHandlerTest {
             scheduler = scheduler,
             handler = DisconnectAutomationHandler(
                 accessRepository = accessRepository,
-                automationRuleEngine = AutomationRuleEngine(),
+                automationRuleEngine = AutomationRuleEngine(ForegroundRuleEvaluator()),
                 reporter = reporter,
                 networkChangeExecutor = networkExecutor,
             ),

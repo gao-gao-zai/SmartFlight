@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AutomationRuleEngineTest {
-    private val engine = AutomationRuleEngine()
+    private val engine = AutomationRuleEngine(ForegroundRuleEvaluator())
 
     @Test
     fun automationDisabledReturnsNoAction() {

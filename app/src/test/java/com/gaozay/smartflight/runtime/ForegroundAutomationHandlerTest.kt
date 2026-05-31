@@ -121,7 +121,7 @@ class ForegroundAutomationHandlerTest {
         )
         val disconnectHandler = DisconnectAutomationHandler(
             accessRepository = accessRepository,
-            automationRuleEngine = AutomationRuleEngine(),
+            automationRuleEngine = AutomationRuleEngine(ForegroundRuleEvaluator()),
             reporter = reporter,
             networkChangeExecutor = networkExecutor,
         )
@@ -133,7 +133,7 @@ class ForegroundAutomationHandlerTest {
             handler = ForegroundAutomationHandler(
                 accessRepository = accessRepository,
                 foregroundAppSource = FakeForegroundAppSource(foregroundApp),
-                automationRuleEngine = AutomationRuleEngine(),
+                automationRuleEngine = AutomationRuleEngine(ForegroundRuleEvaluator()),
                 reporter = reporter,
                 networkChangeExecutor = networkExecutor,
                 disconnectAutomationHandler = disconnectHandler,

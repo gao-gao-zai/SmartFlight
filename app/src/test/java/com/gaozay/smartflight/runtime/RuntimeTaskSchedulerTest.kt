@@ -28,7 +28,7 @@ class RuntimeTaskSchedulerTest {
 
         scheduler.scheduleForegroundProbe(
             state = RuntimeState(settings = com.gaozay.smartflight.settings.UserSettings(automationEnabled = true)),
-            automationRuleEngine = AutomationRuleEngine(),
+            automationRuleEngine = AutomationRuleEngine(ForegroundRuleEvaluator()),
             immediate = true,
         )
         runCurrent()
