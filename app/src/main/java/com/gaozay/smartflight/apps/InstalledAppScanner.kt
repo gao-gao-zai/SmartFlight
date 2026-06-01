@@ -28,8 +28,7 @@ class InstalledAppScanner @Inject constructor(
                 val declaresInternetPermission = packageInfo.requestedPermissions
                     ?.contains(Manifest.permission.INTERNET) == true
                 val isSystemApp = applicationInfo.isSystemApp()
-                if (isSystemApp) return@mapNotNull null
-                val isAutoDetectedOnline = declaresInternetPermission && hasLauncherEntry
+                val isAutoDetectedOnline = !isSystemApp && declaresInternetPermission && hasLauncherEntry
                 InstalledAppEntity(
                     packageName = packageName,
                     label = applicationInfo.loadLabel(packageManager).toString(),

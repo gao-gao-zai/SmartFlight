@@ -20,6 +20,8 @@ import androidx.compose.material.icons.automirrored.rounded.Rule
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Flight
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Card
@@ -67,6 +69,8 @@ internal fun DashboardScreen(
     onOpenApps: () -> Unit,
     onOpenRules: () -> Unit,
     onOpenDiagnostics: () -> Unit,
+    onOpenAppearance: () -> Unit,
+    onOpenAbout: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 20.dp),
@@ -80,6 +84,8 @@ internal fun DashboardScreen(
                 EntryCard(Icons.Rounded.Apps, "应用范围", "设置哪些应用会被视为联网", onOpenApps)
                 EntryCard(Icons.AutoMirrored.Rounded.Rule, "自动化规则", "配置息屏、离开应用和 Wi‑Fi 例外", onOpenRules)
                 EntryCard(Icons.Rounded.BugReport, "诊断与日志", "查看权限、执行器和最近动作", onOpenDiagnostics)
+                EntryCard(Icons.Rounded.Palette, "外观设置", "调整主题、配色强度和圆角风格", onOpenAppearance)
+                EntryCard(Icons.Rounded.Info, "关于", "查看版本信息并手动检查更新", onOpenAbout)
             }
         }
         item { RecentActionCard(state.recentExecutionLogs, onOpenDiagnostics) }

@@ -106,6 +106,24 @@ class AppsUiStateMapperTest {
     }
 
     @Test
+    fun systemAppsCanBeShownByTypeFilter() {
+        val state = buildAppsUiState(
+            apps = listOf(
+                app("com.example.user", "User App"),
+                app("android.system", "System App", isSystemApp = true),
+            ),
+            query = "",
+            filterState = defaultFilterState(appTypeFilter = AppTypeFilter.System),
+            isScanning = false,
+            lastScanSummary = "",
+        )
+
+        assertEquals(listOf("android.system"), state.apps.map { it.packageName })
+        assertEquals(2, state.totalCount)
+        assertEquals(1, state.filteredCount)
+    }
+
+    @Test
     fun whitelistAndBlacklistFiltersUseManualRuleFlags() {
         val apps = listOf(
             app("com.example.white", "White", isInOnlineList = true, isInWhitelist = true),

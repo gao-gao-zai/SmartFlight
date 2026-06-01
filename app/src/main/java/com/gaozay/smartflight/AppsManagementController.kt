@@ -6,11 +6,13 @@ import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.InstalledAppRepository
 import com.gaozay.smartflight.apps.InternetPermissionFilter
 import com.gaozay.smartflight.apps.LauncherFilter
+import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 
+@ViewModelScoped
 class AppsManagementController @Inject constructor(
     private val installedAppRepository: InstalledAppRepository,
 ) {

@@ -60,6 +60,7 @@ fun Preferences.toUserSettings(): UserSettings = UserSettings(
         value = this[SettingsPreferenceKeys.CornerStyle],
         default = CornerStyle.Standard,
     ),
+    skippedUpdateVersion = this[SettingsPreferenceKeys.SkippedUpdateVersion],
 )
 
 fun MutablePreferences.writeUserSettings(settings: UserSettings) {
@@ -96,6 +97,9 @@ fun MutablePreferences.writeUserSettings(settings: UserSettings) {
     this[SettingsPreferenceKeys.CustomSeedColorArgb] = settings.customSeedColorArgb
     this[SettingsPreferenceKeys.ThemeIntensity] = settings.themeIntensity.name
     this[SettingsPreferenceKeys.CornerStyle] = settings.cornerStyle.name
+    settings.skippedUpdateVersion?.let {
+        this[SettingsPreferenceKeys.SkippedUpdateVersion] = it
+    } ?: remove(SettingsPreferenceKeys.SkippedUpdateVersion)
 }
 
 inline fun <reified T : Enum<T>> enumValueOrDefault(value: String?, default: T): T =

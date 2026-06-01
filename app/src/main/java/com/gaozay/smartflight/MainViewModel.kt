@@ -20,6 +20,7 @@ import com.gaozay.smartflight.runtime.AutomationServiceController
 import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
+import com.gaozay.smartflight.update.UpdateUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
@@ -49,8 +50,11 @@ class MainViewModel @Inject constructor(
         initialValue = AppsUiState(),
     )
 
+    val updateUiState: StateFlow<UpdateUiState> = actionDispatcher.updateUiState
+
     init {
         actionDispatcher.attach(viewModelScope)
+        checkForUpdates(manual = false)
         refreshAccessChecks()
         observeAutomationState()
     }
@@ -118,6 +122,16 @@ class MainViewModel @Inject constructor(
     fun setAppManualOffline(packageName: String) = actionDispatcher.setAppManualOffline(packageName)
 
     fun resetAppToDefault(packageName: String) = actionDispatcher.resetAppToDefault(packageName)
+
+    fun checkForUpdates(manual: Boolean) = actionDispatcher.checkForUpdates(manual)
+
+    fun dismissUpdatePrompt() = actionDispatcher.dismissUpdatePrompt()
+
+    fun skipUpdateVersion(tag: String) = actionDispatcher.skipUpdateVersion(tag)
+
+    fun copyUpdateLink(url: String) = actionDispatcher.copyUpdateLink(url)
+
+    fun openUpdateLink(url: String) = actionDispatcher.openUpdateLink(url)
 
     private fun observeAutomationState() {
         viewModelScope.launch {

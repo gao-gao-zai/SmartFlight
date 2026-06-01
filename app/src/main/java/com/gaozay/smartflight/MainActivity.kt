@@ -22,6 +22,7 @@ import com.gaozay.smartflight.ui.SettingsActions
 import com.gaozay.smartflight.ui.SmartFlightActions
 import com.gaozay.smartflight.ui.SmartFlightRoot
 import com.gaozay.smartflight.ui.SystemIntentActions
+import com.gaozay.smartflight.ui.UpdateActions
 import com.gaozay.smartflight.ui.theme.SmartFlightTheme
 import dagger.hilt.android.AndroidEntryPoint
 import rikka.shizuku.Shizuku
@@ -51,10 +52,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             val uiState = viewModel.uiState.collectAsStateWithLifecycle()
             val appsUiState = viewModel.appsUiState.collectAsStateWithLifecycle()
+            val updateUiState = viewModel.updateUiState.collectAsStateWithLifecycle()
             SmartFlightTheme(settings = uiState.value.settings) {
                 SmartFlightRoot(
                     state = uiState.value,
                     appsState = appsUiState.value,
+                    updateState = updateUiState.value,
                     actions = buildSmartFlightActions(),
                 )
             }
@@ -129,6 +132,13 @@ class MainActivity : ComponentActivity() {
                         data = Uri.parse("package:$packageName")
                     })
                 },
+            ),
+            update = UpdateActions(
+                checkForUpdates = viewModel::checkForUpdates,
+                dismissUpdatePrompt = viewModel::dismissUpdatePrompt,
+                skipUpdateVersion = viewModel::skipUpdateVersion,
+                copyUpdateLink = viewModel::copyUpdateLink,
+                openUpdateLink = viewModel::openUpdateLink,
             ),
         )
 

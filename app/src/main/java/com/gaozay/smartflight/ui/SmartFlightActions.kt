@@ -20,6 +20,7 @@ data class SmartFlightActions(
     val access: AccessActions,
     val diagnostics: DiagnosticsActions,
     val system: SystemIntentActions,
+    val update: UpdateActions,
 )
 
 data class SettingsActions(
@@ -73,4 +74,12 @@ data class SystemIntentActions(
     val openUsageAccessSettings: () -> Unit,
     val openNotificationSettings: () -> Unit,
     val openBatteryOptimizationSettings: () -> Unit,
+)
+
+data class UpdateActions(
+    val checkForUpdates: (Boolean) -> Unit,
+    val dismissUpdatePrompt: () -> Unit,
+    val skipUpdateVersion: (String) -> Unit,
+    val copyUpdateLink: (String) -> Unit,
+    val openUpdateLink: (String) -> Unit,
 )

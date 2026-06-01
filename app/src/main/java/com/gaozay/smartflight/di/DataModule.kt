@@ -25,6 +25,10 @@ import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import com.gaozay.smartflight.runtime.ToastRuntimePromptNotifier
 import com.gaozay.smartflight.settings.DataStoreSettingsRepository
 import com.gaozay.smartflight.settings.SettingsRepository
+import com.gaozay.smartflight.update.DefaultUpdateRepository
+import com.gaozay.smartflight.update.HttpReleaseApiClient
+import com.gaozay.smartflight.update.ReleaseApiClient
+import com.gaozay.smartflight.update.UpdateRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -117,4 +121,16 @@ abstract class RepositoryModule {
     abstract fun bindRootAccessProbeRepository(
         repository: DataStoreRootAccessProbeRepository,
     ): RootAccessProbeRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindReleaseApiClient(
+        client: HttpReleaseApiClient,
+    ): ReleaseApiClient
+
+    @Binds
+    @Singleton
+    abstract fun bindUpdateRepository(
+        repository: DefaultUpdateRepository,
+    ): UpdateRepository
 }

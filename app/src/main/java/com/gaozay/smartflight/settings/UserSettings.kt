@@ -54,6 +54,7 @@ data class UserSettings(
     val customSeedColorArgb: Int = ThemePalette.LogoOriginal.seedColorArgb,
     val themeIntensity: ThemeIntensity = ThemeIntensity.Standard,
     val cornerStyle: CornerStyle = CornerStyle.Standard,
+    val skippedUpdateVersion: String? = null,
 )
 
 fun UserSettings.isTemporaryDisableActive(nowMillis: Long = System.currentTimeMillis()): Boolean {

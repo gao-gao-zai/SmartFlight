@@ -4,11 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -17,20 +13,21 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontWeight
 import com.gaozay.smartflight.SmartFlightUiState
 import com.gaozay.smartflight.apps.AppsUiState
+import com.gaozay.smartflight.update.GITEE_RELEASES_URL
+import com.gaozay.smartflight.update.UpdateUiState
 
 private enum class SmartFlightScreen(val title: String) {
-    Dashboard("控制台"), Apps("应用范围"), Rules("自动化规则"), Diagnostics("诊断与日志"), Appearance("外观设置")
+    Dashboard("控制台"), Apps("应用范围"), Rules("自动化规则"), Diagnostics("诊断与日志"), Appearance("外观设置"), About("关于")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,9 +35,17 @@ private enum class SmartFlightScreen(val title: String) {
 fun SmartFlightRoot(
     state: SmartFlightUiState,
     appsState: AppsUiState,
+    updateState: UpdateUiState,
     actions: SmartFlightActions,
 ) {
     var screen by rememberSaveable { mutableStateOf(SmartFlightScreen.Dashboard) }
+    UpdatePromptDialog(
+        state = updateState,
+        onDismiss = actions.update.dismissUpdatePrompt,
+        onCopyLink = actions.update.copyUpdateLink,
+        onOpenLink = actions.update.openUpdateLink,
+        onSkipVersion = actions.update.skipUpdateVersion,
+    )
     if (!state.accessGateState.canEnterApp) {
         Scaffold(topBar = { SmartFlightTopBar("SmartFlight 接入检查") }) { innerPadding ->
             Surface(Modifier.fillMaxSize().padding(innerPadding)) {
@@ -62,7 +67,7 @@ fun SmartFlightRoot(
     Scaffold(
         topBar = {
             if (screen == SmartFlightScreen.Dashboard) {
-                DashboardTopBar { screen = SmartFlightScreen.Appearance }
+                DashboardTopBar()
             } else {
                 SmartFlightTopBar(screen.title) { screen = SmartFlightScreen.Dashboard }
             }
@@ -78,6 +83,8 @@ fun SmartFlightRoot(
                     onOpenApps = { screen = SmartFlightScreen.Apps },
                     onOpenRules = { screen = SmartFlightScreen.Rules },
                     onOpenDiagnostics = { screen = SmartFlightScreen.Diagnostics },
+                    onOpenAppearance = { screen = SmartFlightScreen.Appearance },
+                    onOpenAbout = { screen = SmartFlightScreen.About },
                 )
                 SmartFlightScreen.Apps -> AppManagementScreen(
                     state = appsState,
@@ -127,6 +134,12 @@ fun SmartFlightRoot(
                     onSetThemeIntensity = actions.settings.setThemeIntensity,
                     onSetCornerStyle = actions.settings.setCornerStyle,
                 )
+                SmartFlightScreen.About -> AboutScreen(
+                    updateState = updateState,
+                    innerPadding = innerPadding,
+                    onCheckForUpdates = { actions.update.checkForUpdates(true) },
+                    onOpenReleasePage = { actions.update.openUpdateLink(GITEE_RELEASES_URL) },
+                )
             }
         }
     }
@@ -134,25 +147,12 @@ fun SmartFlightRoot(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DashboardTopBar(onOpenAppearance: () -> Unit) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
+private fun DashboardTopBar() {
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("自动飞行", fontWeight = FontWeight.Bold)
                 Text("SmartFlight", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-        actions = {
-            Box {
-                IconButton(onClick = { expanded = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "更多") }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text("外观设置") },
-                        leadingIcon = { Icon(Icons.Rounded.Palette, contentDescription = null) },
-                        onClick = { expanded = false; onOpenAppearance() },
-                    )
-                }
             }
         },
     )

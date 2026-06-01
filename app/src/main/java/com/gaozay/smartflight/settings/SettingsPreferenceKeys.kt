@@ -35,4 +35,5 @@ object SettingsPreferenceKeys {
     val CustomSeedColorArgb = intPreferencesKey("custom_seed_color_argb")
     val ThemeIntensity = stringPreferencesKey("theme_intensity")
     val CornerStyle = stringPreferencesKey("corner_style")
+    val SkippedUpdateVersion = stringPreferencesKey("skipped_update_version")
 }

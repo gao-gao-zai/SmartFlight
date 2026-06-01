@@ -52,6 +52,7 @@ class UserSettingsPreferencesMapperTest {
             customSeedColorArgb = 0xFF112233.toInt(),
             themeIntensity = ThemeIntensity.HighContrast,
             cornerStyle = CornerStyle.Soft,
+            skippedUpdateVersion = "v0.0.17",
         )
         val preferences = mutablePreferencesOf()
 
@@ -74,6 +75,16 @@ class UserSettingsPreferencesMapperTest {
 
         assertNull(preferences[SettingsPreferenceKeys.TemporaryDisableUntilMillis])
         assertNull(preferences[SettingsPreferenceKeys.TemporaryDisableForegroundPackageName])
+    }
+
+    @Test
+    fun writeUserSettingsRemovesSkippedUpdateVersionWhenUnset() {
+        val preferences = mutablePreferencesOf()
+        preferences.writeUserSettings(UserSettings(skippedUpdateVersion = "v0.0.17"))
+
+        preferences.writeUserSettings(UserSettings())
+
+        assertNull(preferences[SettingsPreferenceKeys.SkippedUpdateVersion])
     }
 
     @Test
