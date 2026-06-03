@@ -53,6 +53,7 @@ internal fun DiagnosticsScreen(
     onProbeRootAccess: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenBatteryOptimizationSettings: () -> Unit,
 ) {
@@ -72,6 +73,16 @@ internal fun DiagnosticsScreen(
                 ready = state.accessGateState.usageStatsAccess.satisfiesRequirement,
                 onBadgeClick = if (state.accessGateState.usageStatsAccess.actionType != AccessActionType.None) {
                     { selectedAccessResult = state.accessGateState.usageStatsAccess }
+                } else {
+                    null
+                },
+            )
+            AccessSummaryRow(
+                title = "无障碍监听",
+                summary = state.accessGateState.accessibilityAccess.summary,
+                ready = state.accessGateState.accessibilityAccess.satisfiesRequirement,
+                onBadgeClick = if (state.accessGateState.accessibilityAccess.actionType != AccessActionType.None) {
+                    { selectedAccessResult = state.accessGateState.accessibilityAccess }
                 } else {
                     null
                 },
@@ -186,6 +197,10 @@ internal fun DiagnosticsScreen(
             },
             onOpenUsageAccessSettings = {
                 onOpenUsageAccessSettings()
+                selectedAccessResult = null
+            },
+            onOpenAccessibilitySettings = {
+                onOpenAccessibilitySettings()
                 selectedAccessResult = null
             },
             onOpenNotificationSettings = {

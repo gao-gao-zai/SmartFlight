@@ -92,7 +92,11 @@ internal class FakeInstalledAppRepository(
 internal class FakeForegroundAppSource(
     var app: ForegroundAppInfo? = null,
 ) : ForegroundAppSource {
-    override fun detect(): ForegroundAppInfo? = app
+    var detectCalls: Int = 0
+    override fun detect(): ForegroundAppInfo? {
+        detectCalls++
+        return app
+    }
 }
 
 internal class NoOpRuntimePromptNotifier : RuntimePromptNotifier {

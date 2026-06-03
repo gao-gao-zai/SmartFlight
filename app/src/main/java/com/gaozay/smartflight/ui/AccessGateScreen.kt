@@ -27,6 +27,7 @@ fun AccessGateScreen(
     onSetAdbBootstrapped: (Boolean) -> Unit,
     onAutoGrantCompanionPermissions: () -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenBatteryOptimizationSettings: () -> Unit,
 ) {
@@ -67,11 +68,13 @@ fun AccessGateScreen(
         item {
             SystemAccessCard(
                 usageStatsAccess = state.usageStatsAccess,
+                accessibilityAccess = state.accessibilityAccess,
                 notificationAccess = state.notificationAccess,
                 batteryOptimization = state.batteryOptimization,
                 canAutoGrant = state.advancedAccess.isAvailable,
                 onAutoGrantCompanionPermissions = onAutoGrantCompanionPermissions,
                 onOpenUsageAccessSettings = onOpenUsageAccessSettings,
+                onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                 onOpenNotificationSettings = onOpenNotificationSettings,
                 onOpenBatteryOptimizationSettings = onOpenBatteryOptimizationSettings,
             )

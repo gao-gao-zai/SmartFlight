@@ -22,6 +22,7 @@ class ForegroundAutomationHandler @Inject constructor(
         scheduler: RuntimeTaskScheduler,
         triggerSource: TriggerSource = TriggerSource.AppForegroundChanged,
         allowReconnectWhenTargetAppAlreadyActive: Boolean = false,
+        foregroundAppOverride: ForegroundAppInfo? = null,
     ): RuntimeState {
         var currentState = state
         val settings = currentState.settings
@@ -34,7 +35,7 @@ class ForegroundAutomationHandler @Inject constructor(
             reporter.markServiceRunning(currentState.screenState)
             return currentState
         }
-        val foregroundApp = foregroundAppSource.detect()
+        val foregroundApp = foregroundAppOverride ?: foregroundAppSource.detect()
         currentState = currentState.copy(lastKnownForegroundApp = foregroundApp ?: currentState.lastKnownForegroundApp)
         reporter.markForegroundApp(foregroundApp, currentState.screenState)
 

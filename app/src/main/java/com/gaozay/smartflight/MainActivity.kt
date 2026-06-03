@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
                 updateSettings = viewModel::updateSettings,
                 setNetworkControlMode = viewModel::setNetworkControlMode,
                 setPreferredExecutorType = viewModel::setPreferredExecutorType,
+                setForegroundMonitorMode = viewModel::setForegroundMonitorMode,
                 setMonitorForegroundWhenScreenOff = viewModel::setMonitorForegroundWhenScreenOff,
                 setThemeMode = viewModel::setThemeMode,
                 setThemePalette = viewModel::setThemePalette,
@@ -121,6 +122,9 @@ class MainActivity : ComponentActivity() {
             system = SystemIntentActions(
                 openUsageAccessSettings = {
                     startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                },
+                openAccessibilitySettings = {
+                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 },
                 openNotificationSettings = {
                     startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {

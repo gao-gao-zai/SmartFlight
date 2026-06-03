@@ -103,6 +103,31 @@ class ForegroundAutomationHandlerTest {
         assertEquals(listOf("检测到应用切换，恢复自动化"), fixture.promptNotifier.automationRestoredPrompts)
     }
 
+    @Test
+    fun foregroundOverrideSkipsDetectorAndUsesProvidedApp() = runTest {
+        val fixture = fixture(
+            foregroundApp = ForegroundAppInfo("com.example.detector", "Detector", 1_000L),
+            snapshot = RuntimeSnapshot(isAirplaneModeEnabled = false),
+        )
+        val state = RuntimeState(
+            settings = UserSettings(automationEnabled = true),
+            appRulesByPackageName = mapOf(
+                "com.example.override" to AppRuntimeRuleInfo(true, false, AppOnlineSourceTag.Manual),
+            ),
+            lastTargetAppActive = null,
+        )
+
+        val updated = fixture.handler.automationTick(
+            state = state,
+            scheduler = fixture.scheduler,
+            foregroundAppOverride = ForegroundAppInfo("com.example.override", "Override", 2_000L),
+        )
+
+        assertEquals(true, updated.lastTargetAppActive)
+        assertEquals("com.example.override", fixture.runtimeStatusRepository.currentSnapshot.currentForegroundPackageName)
+        assertEquals(0, fixture.foregroundAppSource.detectCalls)
+    }
+
     private fun fixture(
         foregroundApp: ForegroundAppInfo,
         snapshot: RuntimeSnapshot,
@@ -136,19 +161,21 @@ class ForegroundAutomationHandlerTest {
             ),
         )
         val settingsRepository = FakeSettingsRepository()
+        val foregroundAppSource = FakeForegroundAppSource(foregroundApp)
         return Fixture(
             runtimeStatusRepository = runtimeStatusRepository,
             accessRepository = accessRepository,
             scheduler = scheduler,
             handler = ForegroundAutomationHandler(
                 accessRepository = accessRepository,
-                foregroundAppSource = FakeForegroundAppSource(foregroundApp),
+                foregroundAppSource = foregroundAppSource,
                 automationRuleEngine = AutomationRuleEngine(ForegroundRuleEvaluator()),
                 reporter = reporter,
                 networkChangeExecutor = networkExecutor,
                 disconnectAutomationHandler = disconnectHandler,
                 temporaryDisableHandler = TemporaryDisableHandler(settingsRepository, reporter, promptNotifier),
             ),
+            foregroundAppSource = foregroundAppSource,
             promptNotifier = promptNotifier,
         )
     }
@@ -158,6 +185,7 @@ class ForegroundAutomationHandlerTest {
         val accessRepository: FakeAccessRepository,
         val scheduler: RuntimeTaskScheduler,
         val handler: ForegroundAutomationHandler,
+        val foregroundAppSource: FakeForegroundAppSource,
         val promptNotifier: NoOpRuntimePromptNotifier,
     )
 }

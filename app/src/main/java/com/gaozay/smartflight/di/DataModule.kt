@@ -20,6 +20,7 @@ import com.gaozay.smartflight.permission.RootAccessProbeRepository
 import com.gaozay.smartflight.runtime.DataStoreRuntimeStatusRepository
 import com.gaozay.smartflight.runtime.ForegroundAppDetector
 import com.gaozay.smartflight.runtime.ForegroundAppSource
+import com.gaozay.smartflight.runtime.HybridForegroundAppSource
 import com.gaozay.smartflight.runtime.RuntimePromptNotifier
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import com.gaozay.smartflight.runtime.ToastRuntimePromptNotifier
@@ -89,7 +90,7 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindForegroundAppSource(
-        detector: ForegroundAppDetector,
+        source: HybridForegroundAppSource,
     ): ForegroundAppSource
 
     @Binds

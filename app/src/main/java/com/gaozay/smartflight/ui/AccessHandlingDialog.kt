@@ -26,6 +26,7 @@ internal fun AccessHandlingDialog(
     onCopyAdbCommands: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenBatteryOptimizationSettings: () -> Unit,
 ) {
@@ -51,6 +52,7 @@ internal fun AccessHandlingDialog(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (result.title) {
                     "使用情况访问权限" -> TextButton(onClick = onOpenUsageAccessSettings) { Text("去设置") }
+                    "无障碍前台监听" -> TextButton(onClick = onOpenAccessibilitySettings) { Text("去设置") }
                     "通知权限" -> TextButton(onClick = onOpenNotificationSettings) { Text("去设置") }
                     "电池优化" -> TextButton(onClick = onOpenBatteryOptimizationSettings) { Text("去设置") }
                     "Shizuku" -> when (result.actionType) {

@@ -11,6 +11,7 @@ import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
 import com.gaozay.smartflight.settings.AutomationDisableMode
+import com.gaozay.smartflight.settings.ForegroundMonitorMode
 import com.gaozay.smartflight.settings.UserSettings
 
 data class SmartFlightActions(
@@ -27,6 +28,7 @@ data class SettingsActions(
     val updateSettings: ((UserSettings) -> UserSettings) -> Unit,
     val setNetworkControlMode: (NetworkControlMode) -> Unit,
     val setPreferredExecutorType: (ExecutorType) -> Unit,
+    val setForegroundMonitorMode: (ForegroundMonitorMode) -> Unit,
     val setMonitorForegroundWhenScreenOff: (Boolean) -> Unit,
     val setThemeMode: (ThemeMode) -> Unit,
     val setThemePalette: (ThemePalette) -> Unit,
@@ -72,6 +74,7 @@ data class DiagnosticsActions(
 
 data class SystemIntentActions(
     val openUsageAccessSettings: () -> Unit,
+    val openAccessibilitySettings: () -> Unit,
     val openNotificationSettings: () -> Unit,
     val openBatteryOptimizationSettings: () -> Unit,
 )

@@ -3,11 +3,15 @@ package com.gaozay.smartflight.permission
 import android.Manifest
 import android.app.AppOpsManager
 import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
+import android.provider.Settings
+import android.text.TextUtils
 import androidx.core.content.ContextCompat
+import com.gaozay.smartflight.runtime.SmartFlightAccessibilityService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,6 +48,23 @@ class SystemPermissionChecker @Inject constructor(
             },
             isBlocking = true,
             actionType = AccessActionType.OpenSettings,
+        )
+    }
+
+    fun checkAccessibilityAccess(): AccessCheckResult {
+        val granted = isAccessibilityServiceEnabled()
+        return AccessCheckResult(
+            title = "无障碍前台监听",
+            status = if (granted) AccessCheckStatus.Granted else AccessCheckStatus.Missing,
+            summary = if (granted) "无障碍前台监听已开启" else "无障碍前台监听未开启",
+            recommendation = if (granted) {
+                "SmartFlight 会优先通过应用切换事件识别前台应用，不读取界面内容。"
+            } else {
+                "可在系统无障碍设置中开启 SmartFlight，以减少前台应用轮询。"
+            },
+            isBlocking = true,
+            actionType = AccessActionType.OpenSettings,
+            detail = "该服务只读取应用包名变化，不读取窗口文本、不执行点击或手势。",
         )
     }
 
@@ -86,5 +107,23 @@ class SystemPermissionChecker @Inject constructor(
             isBlocking = false,
             actionType = AccessActionType.OpenSettings,
         )
+    }
+
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val expected = ComponentName(context, SmartFlightAccessibilityService::class.java)
+            .flattenToString()
+        val enabledServices = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ) ?: return false
+        val splitter = TextUtils.SimpleStringSplitter(':')
+        splitter.setString(enabledServices)
+        while (splitter.hasNext()) {
+            val service = splitter.next()
+            if (service.equals(expected, ignoreCase = true)) {
+                return true
+            }
+        }
+        return false
     }
 }

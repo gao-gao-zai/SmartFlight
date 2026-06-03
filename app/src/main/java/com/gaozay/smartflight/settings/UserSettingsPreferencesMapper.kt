@@ -32,6 +32,10 @@ fun Preferences.toUserSettings(): UserSettings = UserSettings(
     appExitDisconnectEnabled = this[SettingsPreferenceKeys.AppExitDisconnectEnabled] ?: true,
     appExitDelaySeconds = this[SettingsPreferenceKeys.AppExitDelaySeconds] ?: 30,
     reconnectOnTargetAppLaunch = this[SettingsPreferenceKeys.ReconnectOnTargetAppLaunch] ?: true,
+    foregroundMonitorMode = enumValueOrDefault(
+        value = this[SettingsPreferenceKeys.ForegroundMonitorMode],
+        default = ForegroundMonitorMode.Auto,
+    ),
     monitorForegroundWhenScreenOff = this[SettingsPreferenceKeys.MonitorForegroundWhenScreenOff] ?: false,
     skipReconnectOnWifi = this[SettingsPreferenceKeys.SkipReconnectOnWifi] ?: true,
     skipDisconnectOnWifi = this[SettingsPreferenceKeys.SkipDisconnectOnWifi] ?: true,
@@ -81,6 +85,7 @@ fun MutablePreferences.writeUserSettings(settings: UserSettings) {
     this[SettingsPreferenceKeys.AppExitDisconnectEnabled] = settings.appExitDisconnectEnabled
     this[SettingsPreferenceKeys.AppExitDelaySeconds] = settings.appExitDelaySeconds
     this[SettingsPreferenceKeys.ReconnectOnTargetAppLaunch] = settings.reconnectOnTargetAppLaunch
+    this[SettingsPreferenceKeys.ForegroundMonitorMode] = settings.foregroundMonitorMode.name
     this[SettingsPreferenceKeys.MonitorForegroundWhenScreenOff] = settings.monitorForegroundWhenScreenOff
     this[SettingsPreferenceKeys.SkipReconnectOnWifi] = settings.skipReconnectOnWifi
     this[SettingsPreferenceKeys.SkipDisconnectOnWifi] = settings.skipDisconnectOnWifi

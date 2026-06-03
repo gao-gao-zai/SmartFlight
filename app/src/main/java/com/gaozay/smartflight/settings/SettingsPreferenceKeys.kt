@@ -19,6 +19,7 @@ object SettingsPreferenceKeys {
     val AppExitDisconnectEnabled = booleanPreferencesKey("app_exit_disconnect_enabled")
     val AppExitDelaySeconds = intPreferencesKey("app_exit_delay_seconds")
     val ReconnectOnTargetAppLaunch = booleanPreferencesKey("reconnect_on_target_app_launch")
+    val ForegroundMonitorMode = stringPreferencesKey("foreground_monitor_mode")
     val MonitorForegroundWhenScreenOff = booleanPreferencesKey("monitor_foreground_when_screen_off")
     val SkipReconnectOnWifi = booleanPreferencesKey("skip_reconnect_on_wifi")
     val SkipDisconnectOnWifi = booleanPreferencesKey("skip_disconnect_on_wifi")

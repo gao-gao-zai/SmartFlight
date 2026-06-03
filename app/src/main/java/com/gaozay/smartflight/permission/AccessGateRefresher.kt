@@ -13,6 +13,7 @@ class AccessGateRefresher @Inject constructor(
         val state = AccessGateState(
             advancedAccess = advancedAccess,
             usageStatsAccess = systemPermissionChecker.checkUsageStatsAccess(),
+            accessibilityAccess = systemPermissionChecker.checkAccessibilityAccess(),
             notificationAccess = systemPermissionChecker.checkNotificationPermission(),
             batteryOptimization = systemPermissionChecker.checkBatteryOptimization(),
             lastCheckedAtMillis = System.currentTimeMillis(),

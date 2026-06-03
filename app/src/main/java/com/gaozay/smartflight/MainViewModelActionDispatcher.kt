@@ -18,6 +18,7 @@ import com.gaozay.smartflight.domain.model.ThemePalette
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.runtime.AutomationServiceController
 import com.gaozay.smartflight.settings.AutomationDisableMode
+import com.gaozay.smartflight.settings.ForegroundMonitorMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
 import com.gaozay.smartflight.update.UpdateCheckResult
@@ -132,6 +133,10 @@ class MainViewModelActionDispatcher @Inject constructor(
         scope.launch {
             automationSettingsActions.setPreferredExecutorType(type)
         }
+    }
+
+    fun setForegroundMonitorMode(mode: ForegroundMonitorMode) {
+        updateSettings { it.copy(foregroundMonitorMode = mode) }
     }
 
     fun setThemeMode(mode: ThemeMode) {

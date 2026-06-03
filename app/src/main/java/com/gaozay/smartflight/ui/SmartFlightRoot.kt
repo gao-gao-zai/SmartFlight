@@ -57,6 +57,7 @@ fun SmartFlightRoot(
                     onSetAdbBootstrapped = actions.access.setAdbBootstrapped,
                     onAutoGrantCompanionPermissions = actions.access.autoGrantCompanionPermissions,
                     onOpenUsageAccessSettings = actions.system.openUsageAccessSettings,
+                    onOpenAccessibilitySettings = actions.system.openAccessibilitySettings,
                     onOpenNotificationSettings = actions.system.openNotificationSettings,
                     onOpenBatteryOptimizationSettings = actions.system.openBatteryOptimizationSettings,
                 )
@@ -106,6 +107,7 @@ fun SmartFlightRoot(
                     onUpdateSettings = actions.settings.updateSettings,
                     onSetNetworkControlMode = actions.settings.setNetworkControlMode,
                     onSetPreferredExecutorType = actions.settings.setPreferredExecutorType,
+                    onSetForegroundMonitorMode = actions.settings.setForegroundMonitorMode,
                     onSetMonitorForegroundWhenScreenOff = actions.settings.setMonitorForegroundWhenScreenOff,
                 )
                 SmartFlightScreen.Diagnostics -> DiagnosticsScreen(
@@ -122,6 +124,7 @@ fun SmartFlightRoot(
                     onProbeRootAccess = actions.access.probeRootAccess,
                     onSetAdbBootstrapped = actions.access.setAdbBootstrapped,
                     onOpenUsageAccessSettings = actions.system.openUsageAccessSettings,
+                    onOpenAccessibilitySettings = actions.system.openAccessibilitySettings,
                     onOpenNotificationSettings = actions.system.openNotificationSettings,
                     onOpenBatteryOptimizationSettings = actions.system.openBatteryOptimizationSettings,
                 )

@@ -36,6 +36,7 @@ class UserSettingsPreferencesMapperTest {
             appExitDisconnectEnabled = false,
             appExitDelaySeconds = 7,
             reconnectOnTargetAppLaunch = false,
+            foregroundMonitorMode = ForegroundMonitorMode.Accessibility,
             monitorForegroundWhenScreenOff = true,
             skipReconnectOnWifi = false,
             skipDisconnectOnWifi = false,
@@ -93,6 +94,7 @@ class UserSettingsPreferencesMapperTest {
             SettingsPreferenceKeys.TemporaryDisableMode to "invalid-disable-mode",
             SettingsPreferenceKeys.NetworkControlMode to "invalid-network-mode",
             SettingsPreferenceKeys.PreferredExecutorType to "invalid-executor",
+            SettingsPreferenceKeys.ForegroundMonitorMode to "invalid-foreground-monitor",
             SettingsPreferenceKeys.ThemeMode to "invalid-theme-mode",
             SettingsPreferenceKeys.ThemePalette to "invalid-theme-palette",
             SettingsPreferenceKeys.ThemeIntensity to "invalid-theme-intensity",
@@ -102,6 +104,7 @@ class UserSettingsPreferencesMapperTest {
         assertEquals(AutomationDisableMode.None, settings.temporaryDisableMode)
         assertEquals(NetworkControlMode.AirplaneMode, settings.networkControlMode)
         assertEquals(ExecutorType.Auto, settings.preferredExecutorType)
+        assertEquals(ForegroundMonitorMode.Auto, settings.foregroundMonitorMode)
         assertEquals(ThemeMode.System, settings.themeMode)
         assertEquals(ThemePalette.LogoOriginal, settings.themePalette)
         assertEquals(ThemeIntensity.Standard, settings.themeIntensity)

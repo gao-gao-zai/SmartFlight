@@ -18,6 +18,7 @@ import com.gaozay.smartflight.domain.model.ThemePalette
 import com.gaozay.smartflight.permission.AccessGateState
 import com.gaozay.smartflight.runtime.AutomationServiceController
 import com.gaozay.smartflight.settings.AutomationDisableMode
+import com.gaozay.smartflight.settings.ForegroundMonitorMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
 import com.gaozay.smartflight.update.UpdateUiState
@@ -87,6 +88,8 @@ class MainViewModel @Inject constructor(
     fun setNetworkControlMode(mode: NetworkControlMode) = actionDispatcher.setNetworkControlMode(mode)
 
     fun setPreferredExecutorType(type: ExecutorType) = actionDispatcher.setPreferredExecutorType(type)
+
+    fun setForegroundMonitorMode(mode: ForegroundMonitorMode) = actionDispatcher.setForegroundMonitorMode(mode)
 
     fun setThemeMode(mode: ThemeMode) = actionDispatcher.setThemeMode(mode)
 

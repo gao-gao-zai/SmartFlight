@@ -29,12 +29,16 @@ class RuntimeTaskScheduler(
         state: RuntimeState,
         automationRuleEngine: AutomationRuleEngine,
         immediate: Boolean,
+        eventDrivenForegroundAvailable: Boolean = false,
     ) {
         cancelForegroundProbe()
         if (!state.settings.automationEnabled) {
             return
         }
         if (!automationRuleEngine.shouldMonitorForeground(state.settings, state.screenState)) {
+            return
+        }
+        if (eventDrivenForegroundAvailable && !immediate) {
             return
         }
         val delayMillis = if (immediate) 0L else foregroundProbeIntervalMillis(state.screenState)

@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.settings.AutomationDisableMode
+import com.gaozay.smartflight.settings.ForegroundMonitorMode
 import com.gaozay.smartflight.settings.UserSettings
 import com.gaozay.smartflight.settings.withAutomationDisabled
 import com.gaozay.smartflight.settings.withAutomationEnabled
@@ -28,6 +29,7 @@ internal fun RulesScreen(
     onUpdateSettings: ((UserSettings) -> UserSettings) -> Unit,
     onSetNetworkControlMode: (NetworkControlMode) -> Unit,
     onSetPreferredExecutorType: (ExecutorType) -> Unit,
+    onSetForegroundMonitorMode: (ForegroundMonitorMode) -> Unit,
     onSetMonitorForegroundWhenScreenOff: (Boolean) -> Unit,
 ) {
     LazyColumn(
@@ -53,6 +55,7 @@ internal fun RulesScreen(
             ChoiceRow("执行器偏好", ExecutorType.entries.filterNot { it == ExecutorType.Unavailable }, settings.preferredExecutorType, onSetPreferredExecutorType)
         } }
         item { SettingsSection("应用触发") {
+            ChoiceRow("前台监听方式", ForegroundMonitorMode.entries, settings.foregroundMonitorMode, onSetForegroundMonitorMode)
             SwitchRow("启动目标应用时恢复联网", "联网应用进入前台时按当前模式恢复联网", settings.reconnectOnTargetAppLaunch) { onUpdateSettings { s -> s.copy(reconnectOnTargetAppLaunch = it) } }
             SwitchRow("离开目标应用后断网", "离开联网应用后等待一段时间再断网", settings.appExitDisconnectEnabled) { onUpdateSettings { s -> s.copy(appExitDisconnectEnabled = it) } }
             NumberRow("离开后延迟秒数", settings.appExitDelaySeconds) { onUpdateSettings { s -> s.copy(appExitDelaySeconds = it.coerceIn(0, 600)) } }

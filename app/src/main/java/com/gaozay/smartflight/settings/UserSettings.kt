@@ -24,6 +24,12 @@ enum class AutomationDisableMode(
     Permanent("永久禁用", "永久", "永久"),
 }
 
+enum class ForegroundMonitorMode(val label: String) {
+    Auto("自动选择"),
+    Accessibility("无障碍事件"),
+    UsageStats("使用情况轮询"),
+}
+
 data class UserSettings(
     val automationEnabled: Boolean = false,
     val pauseAutomationOnExternalNetworkChange: Boolean = true,
@@ -38,6 +44,7 @@ data class UserSettings(
     val appExitDisconnectEnabled: Boolean = true,
     val appExitDelaySeconds: Int = 30,
     val reconnectOnTargetAppLaunch: Boolean = true,
+    val foregroundMonitorMode: ForegroundMonitorMode = ForegroundMonitorMode.Auto,
     val monitorForegroundWhenScreenOff: Boolean = false,
     val skipReconnectOnWifi: Boolean = true,
     val skipDisconnectOnWifi: Boolean = true,

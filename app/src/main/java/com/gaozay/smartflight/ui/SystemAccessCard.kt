@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BatterySaver
+import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.VerifiedUser
@@ -28,11 +29,13 @@ import com.gaozay.smartflight.permission.AccessCheckResult
 @Composable
 internal fun SystemAccessCard(
     usageStatsAccess: AccessCheckResult,
+    accessibilityAccess: AccessCheckResult,
     notificationAccess: AccessCheckResult,
     batteryOptimization: AccessCheckResult,
     canAutoGrant: Boolean,
     onAutoGrantCompanionPermissions: () -> Unit,
     onOpenUsageAccessSettings: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenBatteryOptimizationSettings: () -> Unit,
 ) {
@@ -66,6 +69,12 @@ internal fun SystemAccessCard(
                 Icon(Icons.Rounded.Settings, contentDescription = "打开使用情况访问设置")
                 Spacer(modifier = Modifier.size(8.dp))
                 Text("打开使用情况访问设置")
+            }
+            AccessResultRow(result = accessibilityAccess)
+            OutlinedButton(onClick = onOpenAccessibilitySettings) {
+                Icon(Icons.Rounded.AccessibilityNew, contentDescription = "打开无障碍设置")
+                Spacer(modifier = Modifier.size(8.dp))
+                Text("打开无障碍设置")
             }
             AccessResultRow(result = notificationAccess)
             OutlinedButton(onClick = onOpenNotificationSettings) {

@@ -5,4 +5,5 @@
     <string name="automation_notification_channel_name">自动化运行</string>
     <string name="automation_notification_channel_description">用于保持自动联网控制前台服务运行</string>
     <string name="automation_tile_label">自动飞行</string>
+    <string name="accessibility_service_description">监听应用切换以识别前台应用。SmartFlight 不读取界面文字，不执行点击或手势。</string>
 </resources>

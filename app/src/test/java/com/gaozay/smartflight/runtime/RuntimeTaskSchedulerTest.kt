@@ -37,6 +37,48 @@ class RuntimeTaskSchedulerTest {
     }
 
     @Test
+    fun eventDrivenForegroundSkipsDelayedProbeButKeepsImmediateProbe() = runTest {
+        val events = mutableListOf<RuntimeEvent>()
+        val scheduler = scheduler(this, events)
+        val state = RuntimeState(settings = com.gaozay.smartflight.settings.UserSettings(automationEnabled = true))
+        val ruleEngine = AutomationRuleEngine(ForegroundRuleEvaluator())
+
+        scheduler.scheduleForegroundProbe(
+            state = state,
+            automationRuleEngine = ruleEngine,
+            immediate = false,
+            eventDrivenForegroundAvailable = true,
+        )
+        advanceTimeBy(RuntimeTaskScheduler.SCREEN_ON_POLL_INTERVAL_MILLIS)
+        runCurrent()
+        assertTrue(events.isEmpty())
+
+        scheduler.scheduleForegroundProbe(
+            state = state,
+            automationRuleEngine = ruleEngine,
+            immediate = true,
+            eventDrivenForegroundAvailable = true,
+        )
+        runCurrent()
+
+        assertEquals(listOf(RuntimeEvent.ForegroundProbeTick), events)
+    }
+
+    @Test
+    fun runtimeEventNamesIncludeAccessibilityForegroundEvents() {
+        assertEquals(
+            "ForegroundAppChanged",
+            RuntimeEvent.ForegroundAppChanged(
+                ForegroundAppInfo("com.example.app", "Example", 1_000L),
+            ).nameForLog(),
+        )
+        assertEquals(
+            "ForegroundEventSourceChanged",
+            RuntimeEvent.ForegroundEventSourceChanged.nameForLog(),
+        )
+    }
+
+    @Test
     fun delayedAppExitMarksActiveUntilCancelled() = runTest {
         val events = mutableListOf<RuntimeEvent>()
         val scheduler = scheduler(this, events)

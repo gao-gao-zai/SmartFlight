@@ -18,6 +18,8 @@ sealed interface RuntimeEvent {
     data object ScreenOn : RuntimeEvent
     data object UserUnlocked : RuntimeEvent
     data object ForegroundProbeTick : RuntimeEvent
+    data class ForegroundAppChanged(val foregroundApp: ForegroundAppInfo) : RuntimeEvent
+    data object ForegroundEventSourceChanged : RuntimeEvent
     data class SettingsChanged(val settings: UserSettings) : RuntimeEvent
     data class AppsChanged(
         val appRulesByPackageName: Map<String, AppRuntimeRuleInfo>,
@@ -35,6 +37,8 @@ fun RuntimeEvent.nameForLog(): String = when (this) {
     RuntimeEvent.ScreenOn -> "ScreenOn"
     RuntimeEvent.UserUnlocked -> "UserUnlocked"
     RuntimeEvent.ForegroundProbeTick -> "ForegroundProbeTick"
+    is RuntimeEvent.ForegroundAppChanged -> "ForegroundAppChanged"
+    RuntimeEvent.ForegroundEventSourceChanged -> "ForegroundEventSourceChanged"
     is RuntimeEvent.SettingsChanged -> "SettingsChanged"
     is RuntimeEvent.AppsChanged -> "AppsChanged"
     RuntimeEvent.NetworkChanged -> "NetworkChanged"

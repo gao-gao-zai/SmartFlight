@@ -52,6 +52,14 @@ data class AccessGateState(
         isBlocking = true,
         actionType = AccessActionType.OpenSettings,
     ),
+    val accessibilityAccess: AccessCheckResult = AccessCheckResult(
+        title = "无障碍前台监听",
+        status = AccessCheckStatus.Unknown,
+        summary = "尚未检测",
+        recommendation = "开启无障碍服务后，SmartFlight 可以通过应用切换事件实时识别前台应用。",
+        isBlocking = true,
+        actionType = AccessActionType.OpenSettings,
+    ),
     val notificationAccess: AccessCheckResult = AccessCheckResult(
         title = "通知权限",
         status = AccessCheckStatus.Unknown,
@@ -70,8 +78,12 @@ data class AccessGateState(
     ),
     val lastCheckedAtMillis: Long = 0,
 ) {
+    val foregroundDetectionAvailable: Boolean =
+        usageStatsAccess.satisfiesRequirement || accessibilityAccess.satisfiesRequirement
+
     val blockingChecks: List<AccessCheckResult> = buildList {
-        if (!usageStatsAccess.satisfiesRequirement) {
+        if (!foregroundDetectionAvailable) {
+            add(accessibilityAccess)
             add(usageStatsAccess)
         }
         addAll(advancedAccess.gatingIssues)
