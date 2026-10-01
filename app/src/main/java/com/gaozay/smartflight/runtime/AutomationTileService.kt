@@ -1,7 +1,9 @@
 package com.gaozay.smartflight.runtime
 
+import android.graphics.drawable.Icon
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.withAutomationDisabled
@@ -65,6 +67,7 @@ class AutomationTileService : TileService() {
             val settings = settingsRepository.settings.first()
             val tileMode = settings.currentTileMode()
             qsTile?.apply {
+                icon = Icon.createWithResource(this@AutomationTileService, R.drawable.ic_smartflight_tile)
                 label = "自动飞行"
                 subtitle = tileMode.tileLabel
                 state = if (tileMode == AutomationDisableMode.None) {
