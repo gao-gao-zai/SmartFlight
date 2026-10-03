@@ -16,15 +16,17 @@ class ActivityRuleResolverTest {
 
     @Test fun onlineOverrideCanOverrideAnAppBlacklist() {
         val result = resolveActivityRule(info(), offline, listOf(rule()), 1000)
-        assertTrue(result.rule!!.isInOnlineList)
-        assertFalse(result.rule.isInBlacklist)
-        assertEquals(AppOnlineSourceTag.Manual, result.rule.sourceTag)
+        val resolved = requireNotNull(result.rule)
+        assertTrue(resolved.isInOnlineList)
+        assertFalse(resolved.isInBlacklist)
+        assertEquals(AppOnlineSourceTag.Manual, resolved.sourceTag)
         assertEquals(ActivityMatchReason.ActivityOverride, result.reason)
     }
     @Test fun offlineOverrideKeepsManualOfflineSemantics() {
         val result = resolveActivityRule(info(), online, listOf(rule("Offline")), 1000)
-        assertFalse(result.rule!!.isInOnlineList)
-        assertTrue(result.rule.isInBlacklist)
+        val resolved = requireNotNull(result.rule)
+        assertFalse(resolved.isInOnlineList)
+        assertTrue(resolved.isInBlacklist)
     }
     @Test fun noOverrideDoesNotChangeAnyAppFlags() {
         for (app in listOf(online, offline, AppRuntimeRuleInfo(false, false, null))) {

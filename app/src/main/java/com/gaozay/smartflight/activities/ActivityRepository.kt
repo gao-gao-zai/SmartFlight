@@ -41,7 +41,7 @@ class ActivityRepository @Inject constructor(private val dao: ActivityDao, priva
                 if (scan == null) {
                     dao.replaceComponents(packageName, emptyList(), config.copy(needsReview = true, scanError = null))
                 } else {
-                    val currentNames = scan.components.filter { it.isEnabled }.map { it.canonicalName }.toSet()
+                    val currentNames = scan.components.filter { it.isPresent && it.isEnabled && it.isDeclared && it.targetActivity == null }.map { it.className }.toSet()
                     val invalidRules = dao.getRules(packageName).any { it.mode != ActivityRuleMode.FollowApp.name && it.activityName !in currentNames }
                     dao.replaceComponents(packageName, scan.components, config.copy(
                         lastScannedAtMillis = System.currentTimeMillis(), versionCode = scan.versionCode,
@@ -65,12 +65,12 @@ class ActivityRepository @Inject constructor(private val dao: ActivityDao, priva
     suspend fun saveRule(packageName: String, className: String, mode: ActivityRuleMode, note: String) {
         if (mode != ActivityRuleMode.FollowApp && dao.getComponent(packageName, className)?.isDeclared == false) refreshActivities(packageName)
         mutex.withLock {
-        val name = normalizeActivityName(packageName, className) ?: error("Invalid activity name")
-        val component = dao.getComponent(packageName, name)
-        if (mode != ActivityRuleMode.FollowApp && component?.isDeclared == false) throw UnverifiedActivityException()
-        val canonical = component?.canonicalName ?: name
-        // Following the app removes the override, while keeping notes and all recognition history.
-        dao.upsertRule(ActivityRuleEntity(packageName, canonical, mode.name, note.trim().take(500)))
+            val name = normalizeActivityName(packageName, className) ?: error("Invalid activity name")
+            val component = dao.getComponent(packageName, name)
+            if (mode != ActivityRuleMode.FollowApp && component?.isDeclared == false) throw UnverifiedActivityException()
+            val canonical = component?.canonicalName ?: name
+            // Following the app removes the override, while keeping notes and all recognition history.
+            dao.upsertRule(ActivityRuleEntity(packageName, canonical, mode.name, note.trim().take(500)))
         }
     }
     suspend fun recordVisit(packageName: String, activityName: String, timestamp: Long, source: String, sessionId: String?) = mutex.withLock {

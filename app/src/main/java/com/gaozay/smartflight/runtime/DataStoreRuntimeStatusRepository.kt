@@ -20,7 +20,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.runtimeDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -87,6 +86,7 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
             ),
             updatedAtMillis = preferences[Keys.UpdatedAtMillis] ?: 0,
         )
+
     override suspend fun updateSnapshot(transform: (RuntimeSnapshot) -> RuntimeSnapshot) {
         context.runtimeDataStore.edit { preferences ->
             val updated = transform(readSnapshot(preferences)).withDerivedUnifiedNetworkState()

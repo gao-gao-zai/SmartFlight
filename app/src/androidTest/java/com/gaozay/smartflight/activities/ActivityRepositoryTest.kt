@@ -43,6 +43,11 @@ class ActivityRepositoryTest {
             assertEquals("Payment", repo.observeDetails(pkg).first().rules.single().note)
             assertEquals(100L, repo.observeDetails(pkg).first().visits.single().firstEnteredAtMillis)
             assertEquals(200L, repo.observeDetails(pkg).first().visits.single().lastEnteredAtMillis)
+            // An enabled alias cannot keep its disabled target valid.
+            source.result = ActivityPackageScan(2, listOf(component("First").copy(isEnabled = false), component("Entry", "First")))
+            repo.refreshActivities(pkg)
+            assertTrue(repo.observeDetails(pkg).first().config!!.needsReview)
+            assertFalse(repo.observeRuntimeRules().first().single().isValid)
             repo.setRulesEnabled(pkg, false)
             assertFalse(repo.observeRuntimeRules().first().single().rulesEnabled)
             repo.setRulesEnabled(pkg, true)

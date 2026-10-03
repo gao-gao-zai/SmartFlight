@@ -76,7 +76,7 @@ class ActivityManagementUiTest {
             awaitActivityCondition("Second Activity was not recorded") {
                 runBlocking { repo.observeDetails(ACTIVITY_FIXTURE).first().visits.any { it.activityName == second && it.sessionId == entry.activityRecorder().state.value.sessionId } }
             }
-            activityShell("am start -W -n ${context.packageName}/.MainActivity")
+            activityShell("am start -W -f 0x34000000 -n ${context.packageName}/.MainActivity")
             awaitActivityCondition("Returning to SmartFlight did not stop recording") { !entry.activityRecorder().state.value.active }
             val session = entry.activityRecorder().state.value.sessionId
             val visits = repo.observeDetails(ACTIVITY_FIXTURE).first().visits.filter { it.sessionId == session }
@@ -160,7 +160,7 @@ class ActivityManagementUiTest {
     private fun actions(vm: ActivityManagementViewModel) = ActivityActions(vm::selectApp, vm::refresh, vm::save, vm::setEnabled,
         vm::acknowledgeReview, vm::startRecording, vm::stopRecording, vm::refreshIdentification)
     private fun scrollTo(label: String): SemanticsNodeInteraction {
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText(label))
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(label))
         return compose.onNodeWithText(label)
     }
     private fun capture(name: String) {
