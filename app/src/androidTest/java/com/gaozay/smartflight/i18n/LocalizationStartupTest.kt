@@ -29,17 +29,17 @@ class LocalizationStartupTest {
         try {
             manager.applicationLocales = LocaleList.forLanguageTags("en")
             ActivityScenario.launch(MainActivity::class.java).use {
-                awaitHeading("SmartFlight setup check")
+                awaitSetup("SmartFlight setup check")
                 assertEquals("SmartFlight", AppStrings.get(R.string.app_name))
                 capture("setup-en.png")
 
                 manager.applicationLocales = LocaleList.forLanguageTags("zh")
-                awaitHeading("SmartFlight \u63a5\u5165\u68c0\u67e5")
+                awaitSetup("SmartFlight \u63a5\u5165\u68c0\u67e5")
                 assertEquals("\u81ea\u52a8\u98de\u884c", AppStrings.get(R.string.app_name))
                 capture("setup-zh.png")
 
                 manager.applicationLocales = LocaleList.forLanguageTags("en")
-                awaitHeading("SmartFlight setup check")
+                awaitSetup("SmartFlight setup check")
                 assertEquals("SmartFlight", AppStrings.get(R.string.app_name))
                 capture("setup-en-after-switch.png")
             }
@@ -48,7 +48,14 @@ class LocalizationStartupTest {
         }
     }
 
-    private fun awaitHeading(text: String) {
+    private fun awaitSetup(heading: String) {
+        awaitText(heading)
+        // This smoke test runs on a fresh, non-rooted Google APIs emulator.
+        // The recreated heading appears before onResume's asynchronous access refresh.
+        awaitText(AppStrings.get(R.string.root_binary_not_detected))
+    }
+
+    private fun awaitText(text: String) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val deadline = SystemClock.uptimeMillis() + 15_000
         var texts = emptyList<String>()
@@ -60,7 +67,7 @@ class LocalizationStartupTest {
             SystemClock.sleep(100)
         }
         capture("startup-failure.png")
-        throw AssertionError("Localized setup heading was not displayed: $text. Visible text: $texts")
+        throw AssertionError("Localized setup text was not displayed: $text. Visible text: $texts")
     }
 
     private fun visibleTexts(node: AccessibilityNodeInfo?): List<String> {
