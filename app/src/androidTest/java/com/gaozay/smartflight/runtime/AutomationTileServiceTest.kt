@@ -89,7 +89,7 @@ class AutomationTileServiceTest {
     }
 
     private fun visibleText(node: AccessibilityNodeInfo): String = buildString {
-        append(node.text.orEmpty()).append(' ').append(node.contentDescription.orEmpty()).append('\n')
+        append(node.text?.toString().orEmpty()).append(' ').append(node.contentDescription?.toString().orEmpty()).append('\n')
         repeat(node.childCount) { index ->
             node.getChild(index)?.let { child ->
                 try {
