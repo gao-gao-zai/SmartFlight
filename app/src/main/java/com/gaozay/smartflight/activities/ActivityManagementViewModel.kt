@@ -11,6 +11,7 @@ import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.runtime.*
 import com.gaozay.smartflight.settings.ForegroundMonitorMode
 import com.gaozay.smartflight.settings.SettingsRepository
+import com.gaozay.smartflight.settings.isAutomationEffectivelyEnabled
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -27,6 +28,7 @@ data class ActivityManagementState(
     val error: String? = null,
     val foreground: ForegroundAppInfo? = null,
     val monitorMode: ForegroundMonitorMode = ForegroundMonitorMode.Auto,
+    val automationActive: Boolean = false,
     val usageGranted: Boolean = false,
     val accessibilityGranted: Boolean = false,
     val recording: ActivityRecordingState = ActivityRecordingState(),
@@ -56,7 +58,7 @@ class ActivityManagementViewModel @Inject constructor(
     init {
         viewModelScope.launch { observations.latest.collect { value -> current.update { it.copy(foreground = value) } } }
         viewModelScope.launch { recorder.state.collect { value -> current.update { it.copy(recording = value) } } }
-        viewModelScope.launch { settings.settings.collect { value -> current.update { it.copy(monitorMode = value.foregroundMonitorMode) } } }
+        viewModelScope.launch { settings.settings.collect { value -> current.update { it.copy(monitorMode = value.foregroundMonitorMode, automationActive = value.isAutomationEffectivelyEnabled()) } } }
         viewModelScope.launch { access.accessGateState.collect { value -> current.update { it.copy(
             usageGranted = value.usageStatsAccess.satisfiesRequirement, accessibilityGranted = value.accessibilityAccess.satisfiesRequirement) } } }
     }

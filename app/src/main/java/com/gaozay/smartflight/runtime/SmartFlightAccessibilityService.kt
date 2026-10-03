@@ -25,8 +25,11 @@ class SmartFlightAccessibilityService : AccessibilityService() {
         super.onCreate()
         scope.launch {
             for (event in windows) {
-                val update = foregroundAppTracker.recordPackage(event.packageName, event.timestamp, event.className) ?: continue
-                if (update.packageChanged || update.activityChanged) runtimeCoordinator.onForegroundAppChanged(update.foregroundApp)
+                try {
+                    val update = foregroundAppTracker.recordPackage(event.packageName, event.timestamp, event.className) ?: continue
+                    if (update.packageChanged || update.activityChanged) runtimeCoordinator.onForegroundAppChanged(update.foregroundApp)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) { Log.w(LOG_TAG, "Unable to validate foreground Activity", error) }
             }
         }
     }

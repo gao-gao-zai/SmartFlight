@@ -57,7 +57,10 @@ fun ActivityManagementScreen(state: ActivityManagementState, actions: ActivityAc
             contentPadding = PaddingValues(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(state.app?.label ?: pkg, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        state.app?.let { AppIcon(pkg, it.label, it) }
+                        Text(state.app?.label ?: pkg, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    }
                     ClassText(pkg)
                     state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
@@ -151,6 +154,7 @@ fun ActivityManagementScreen(state: ActivityManagementState, actions: ActivityAc
                     item { ActivityPermissionButtons(state, system) }
                     item { Text(stringResource(R.string.activity_monitor_mode, state.monitorMode.label)) }
                     item { SettingsSection(stringResource(R.string.activity_recent_confirmation)) {
+                        if (!state.automationActive) Text(stringResource(R.string.activity_global_pause))
                         val info = state.foreground
                         ClassText(info?.packageName ?: stringResource(R.string.unknown_app))
                         ClassText(info?.confirmedActivity() ?: stringResource(R.string.activity_unknown))
@@ -158,7 +162,7 @@ fun ActivityManagementScreen(state: ActivityManagementState, actions: ActivityAc
                         Text(stringResource(R.string.activity_confirmation_source, info?.source?.label ?: stringResource(R.string.activity_source_unknown)))
                         if (info?.packageName == pkg) {
                             val defaultRule = state.app?.let { AppRuntimeRuleInfo(it.isInOnlineList, it.isInBlacklist, it.sourceTag()) }
-                            val rules = state.details.rules.map { rule -> ActivityRuntimeRule(pkg, rule.activityName, rule.mode, state.details.config?.rulesEnabled != false,
+                            val rules = state.details.rules.filter { it.mode != ActivityRuleMode.FollowApp.name }.map { rule -> ActivityRuntimeRule(pkg, rule.activityName, rule.mode, state.details.config?.rulesEnabled != false,
                                 state.app != null && state.details.config?.scanError == null && state.details.components.any { it.className == rule.activityName && it.isPresent && it.isEnabled && it.isDeclared }) }
                             Text(resolveActivityRule(info, defaultRule, rules).reason.label)
                         } else Text(stringResource(R.string.activity_other_app))

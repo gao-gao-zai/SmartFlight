@@ -36,7 +36,7 @@ class ActivityRecorder @Inject constructor(
     val state = current.asStateFlow()
     private var observer: Job? = null
     private var probe: Job? = null
-    private var hostPaused = false
+    @Volatile private var hostPaused = false
 
     @Synchronized
     fun startObserving() {
@@ -84,8 +84,14 @@ class ActivityRecorder @Inject constructor(
     fun markHostPaused() { if (current.value.active) hostPaused = true }
     fun stopOnHostReturn() {
         if (!hostPaused || !current.value.active) return
+        hostPaused = false
         // Drain usage events once more; timestamp bounds also accept entries queued before return.
-        scope.launch { try { foreground.detect(settings.settings.first().foregroundMonitorMode, true) } finally { stop() } }
+        scope.launch {
+            try { foreground.detect(settings.settings.first().foregroundMonitorMode, true) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { Log.w("ActivityRecorder", "Final Activity probe failed", error) }
+            finally { stop() }
+        }
     }
     fun stop() {
         probe?.cancel()

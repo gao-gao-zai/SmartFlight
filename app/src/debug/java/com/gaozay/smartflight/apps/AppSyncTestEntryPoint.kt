@@ -9,4 +9,11 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 interface AppSyncTestEntryPoint {
     fun installedAppRepository(): InstalledAppRepository
+    fun activityRepository(): com.gaozay.smartflight.activities.ActivityRepository
+    fun foregroundDetector(): com.gaozay.smartflight.runtime.ForegroundAppDetector
+    fun foregroundTracker(): com.gaozay.smartflight.runtime.AccessibilityForegroundAppTracker
+    fun foregroundObservations(): com.gaozay.smartflight.runtime.ForegroundObservationStore
+    fun activityRecorder(): com.gaozay.smartflight.activities.ActivityRecorder
+    fun settingsRepository(): com.gaozay.smartflight.settings.SettingsRepository
+    fun accessRepository(): com.gaozay.smartflight.permission.AccessRepository
 }

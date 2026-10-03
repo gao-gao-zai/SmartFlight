@@ -83,6 +83,9 @@ class ActivityRepository @Inject constructor(private val dao: ActivityDao, priva
             dao.upsertComponent(ActivityComponentEntity(packageName, name, isEnabled = true, isExported = false,
                 isDeclared = false, versionCode = config.versionCode, scannedAtMillis = timestamp))
         }
+        if (existingComponent != null && !existingComponent.isDeclared && !existingComponent.isPresent) {
+            dao.upsertComponent(existingComponent.copy(isPresent = true, isEnabled = true))
+        }
         val old = dao.getVisit(packageName, canonical)
         if (old != null && timestamp < old.lastEnteredAtMillis) return@withLock
         val effectiveSession = sessionId ?: old?.sessionId
