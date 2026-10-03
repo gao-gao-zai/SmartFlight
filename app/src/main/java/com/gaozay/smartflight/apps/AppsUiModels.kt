@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.apps
 
+import com.gaozay.smartflight.activities.ActivityRuleSummary
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
 import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
@@ -8,10 +9,11 @@ import com.gaozay.smartflight.i18n.ResourceLabel
 
 enum class AppFilter(override val labelRes: Int) : ResourceLabel {
     All(R.string.all_apps_ui_models),
-    Online(R.string.online_apps_ui_models),
-    Offline(R.string.offline_apps_ui_models),
+    Online(R.string.activity_default_online),
+    Offline(R.string.activity_default_offline),
     Whitelist(R.string.whitelist),
     Blacklist(R.string.blacklist),
+    WithActivities(R.string.activity_filter_rules),
 }
 
 enum class InternetPermissionFilter {
@@ -44,6 +46,8 @@ data class AppsUiState(
     val offlineCount: Int = 0,
     val whitelistCount: Int = 0,
     val blacklistCount: Int = 0,
+    val activityRuleSummaries: Map<String, ActivityRuleSummary> = emptyMap(),
+    val activityRuleAppCount: Int = 0,
     val filteredCount: Int = 0,
     val isScanning: Boolean = false,
     val lastScanSummary: String = "Not scanned yet",
@@ -54,6 +58,7 @@ data class AppsUiState(
         AppFilter.Offline -> offlineCount
         AppFilter.Whitelist -> whitelistCount
         AppFilter.Blacklist -> blacklistCount
+        AppFilter.WithActivities -> activityRuleAppCount
     }
 
     val activeAdvancedFilterCount: Int

@@ -1,5 +1,7 @@
 package com.gaozay.smartflight.data.local
 
+import com.gaozay.smartflight.data.local.entity.*
+import com.gaozay.smartflight.data.local.dao.ActivityDao
 import androidx.room.Database
 import androidx.room.migration.Migration
 import androidx.room.RoomDatabase
@@ -13,16 +15,34 @@ import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
     entities = [
         InstalledAppEntity::class,
         ExecutionLogEntity::class,
+        ActivityComponentEntity::class,
+        ActivityRuleEntity::class,
+        AppActivityConfigEntity::class,
+        ActivityVisitEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class SmartFlightDatabase : RoomDatabase() {
     abstract fun installedAppDao(): InstalledAppDao
 
+    abstract fun activityDao(): ActivityDao
+
     abstract fun executionLogDao(): ExecutionLogDao
 
     companion object {
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS activity_components (packageName TEXT NOT NULL, className TEXT NOT NULL, targetActivity TEXT, label TEXT, isEnabled INTEGER NOT NULL, isExported INTEGER NOT NULL, isPresent INTEGER NOT NULL, isDeclared INTEGER NOT NULL, versionCode INTEGER NOT NULL, scannedAtMillis INTEGER NOT NULL, PRIMARY KEY(packageName, className))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS activity_rules (packageName TEXT NOT NULL, activityName TEXT NOT NULL, mode TEXT NOT NULL, note TEXT NOT NULL, PRIMARY KEY(packageName, activityName))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS app_activity_configs (packageName TEXT NOT NULL, rulesEnabled INTEGER NOT NULL, lastScannedAtMillis INTEGER NOT NULL, versionCode INTEGER NOT NULL, scanError TEXT, needsReview INTEGER NOT NULL, PRIMARY KEY(packageName))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS activity_visits (packageName TEXT NOT NULL, activityName TEXT NOT NULL, firstEnteredAtMillis INTEGER NOT NULL, lastEnteredAtMillis INTEGER NOT NULL, source TEXT NOT NULL, sessionId TEXT, PRIMARY KEY(packageName, activityName))")
+                db.execSQL("ALTER TABLE execution_logs ADD COLUMN foregroundActivityName TEXT")
+                db.execSQL("ALTER TABLE execution_logs ADD COLUMN foregroundRuleLayer TEXT")
+                db.execSQL("ALTER TABLE execution_logs ADD COLUMN foregroundRuleReason TEXT")
+            }
+        }
+
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE installed_apps ADD COLUMN isInstalled INTEGER NOT NULL DEFAULT 1")

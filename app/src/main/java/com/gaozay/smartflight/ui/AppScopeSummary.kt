@@ -72,12 +72,12 @@ internal fun AppScopeSummary(
                     modifier = Modifier.weight(1f),
                 )
                 CountPill(
-                    label = stringResource(R.string.online),
+                    label = stringResource(R.string.activity_default_online),
                     count = state.onlineCount,
                     modifier = Modifier.weight(1f),
                 )
                 CountPill(
-                    label = stringResource(R.string.offline),
+                    label = stringResource(R.string.activity_default_offline),
                     count = state.offlineCount,
                     modifier = Modifier.weight(1f),
                 )

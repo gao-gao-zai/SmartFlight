@@ -12,6 +12,7 @@ import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.gaozay.smartflight.MainActivity
 import com.gaozay.smartflight.R
+import com.gaozay.smartflight.testing.dismissLauncherAnrIfPresent
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -60,6 +61,7 @@ class LocalizationStartupTest {
         val deadline = SystemClock.uptimeMillis() + 15_000
         var texts = emptyList<String>()
         while (SystemClock.uptimeMillis() < deadline) {
+            automation.dismissLauncherAnrIfPresent()
             // Compose exposes virtual nodes; walk them instead of relying on the
             // platform provider's optional findAccessibilityNodeInfosByText implementation.
             texts = visibleTexts(automation.rootInActiveWindow)

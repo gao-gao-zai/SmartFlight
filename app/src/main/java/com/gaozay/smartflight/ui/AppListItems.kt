@@ -1,5 +1,8 @@
 package com.gaozay.smartflight.ui
 
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import com.gaozay.smartflight.activities.ActivityRuleSummary
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,16 +71,20 @@ internal fun EmptyAppsCard(onRefreshApps: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AppRow(
     app: InstalledAppEntity,
     onSetManualOnline: (String) -> Unit,
     onSetManualOffline: (String) -> Unit,
     onResetToDefault: (String) -> Unit,
+    onOpenDetails: (String) -> Unit = {},
+    activitySummary: ActivityRuleSummary? = null,
 ) {
     val sourceTag = app.sourceTag()
     var expanded by rememberSaveable(app.packageName) { mutableStateOf(false) }
     Card(
+        onClick = { onOpenDetails(app.packageName) },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
@@ -109,12 +116,16 @@ internal fun AppRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     InfoTag(
-                        text = app.statusLabel(),
+                        text = stringResource(if (app.isOnline()) R.string.activity_default_online else R.string.activity_default_offline),
                         containerColor = app.statusTagContainerColor(),
                         contentColor = app.statusTagContentColor(),
                     )
+                    activitySummary?.takeIf { it.ruleCount > 0 }?.let {
+                        InfoTag(stringResource(if (it.rulesEnabled) R.string.activity_rule_count else R.string.activity_rule_count_paused, it.ruleCount))
+                        if (it.validCount < it.ruleCount) InfoTag(stringResource(R.string.activity_invalid_count, it.ruleCount - it.validCount))
+                    }
                     sourceTag?.let {
                         InfoTag(
                             text = it.label,

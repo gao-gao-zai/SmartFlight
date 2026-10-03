@@ -91,6 +91,10 @@ class ForegroundRuleEvaluator @Inject constructor() {
                 shouldLog = false,
             )
         }
+        if (context.isAppExitDisconnectScheduled) {
+            return none(false, reason = AppStrings.get(R.string.app_exit_disconnect_countdown_is_already_running),
+                matchedRules = listOf("AppExitDisconnect", "AlreadyScheduled"), shouldLog = false)
+        }
         if (context.isWifiConnected && context.settings.skipDisconnectOnWifi) {
             return none(
                 targetAppActive = false,

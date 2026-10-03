@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.ui
 
+import com.gaozay.smartflight.activities.ActivityManagementState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,7 @@ fun SmartFlightRoot(
     appsState: AppsUiState,
     updateState: UpdateUiState,
     actions: SmartFlightActions,
+    activityState: ActivityManagementState = ActivityManagementState(),
 ) {
     var screen by rememberSaveable { mutableStateOf(SmartFlightScreen.Dashboard) }
     UpdatePromptDialog(
@@ -69,7 +71,9 @@ fun SmartFlightRoot(
     }
     Scaffold(
         topBar = {
-            if (screen == SmartFlightScreen.Dashboard) {
+            if (screen == SmartFlightScreen.Apps && activityState.packageName != null) {
+                // Detail/editor pages provide their own top bar and unsaved-change back handling.
+            } else if (screen == SmartFlightScreen.Dashboard) {
                 DashboardTopBar()
             } else {
                 SmartFlightTopBar(stringResource(screen.titleRes)) { screen = SmartFlightScreen.Dashboard }
@@ -89,7 +93,10 @@ fun SmartFlightRoot(
                     onOpenAppearance = { screen = SmartFlightScreen.Appearance },
                     onOpenAbout = { screen = SmartFlightScreen.About },
                 )
-                SmartFlightScreen.Apps -> AppManagementScreen(
+                SmartFlightScreen.Apps -> if (activityState.packageName != null) ActivityManagementScreen(
+                    state = activityState, actions = actions.activities, system = actions.system,
+                    appsActions = actions.apps,
+                ) else AppManagementScreen(
                     state = appsState,
                     innerPadding = innerPadding,
                     onQueryChange = actions.apps.queryChange,
@@ -102,6 +109,7 @@ fun SmartFlightRoot(
                     onSetManualOnline = actions.apps.setManualOnline,
                     onSetManualOffline = actions.apps.setManualOffline,
                     onResetToDefault = actions.apps.resetToDefault,
+                    onOpenDetails = actions.activities.selectApp,
                 )
                 SmartFlightScreen.Rules -> RulesScreen(
                     settings = state.settings,

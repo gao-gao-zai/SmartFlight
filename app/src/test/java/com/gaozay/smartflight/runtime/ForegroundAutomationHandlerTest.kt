@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.activities.ActivityRuntimeRule
 import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
@@ -127,6 +128,55 @@ class ForegroundAutomationHandlerTest : LocalizedStringsTest() {
         assertEquals(true, updated.lastTargetAppActive)
         assertEquals("com.example.override", fixture.runtimeStatusRepository.currentSnapshot.currentForegroundPackageName)
         assertEquals(0, fixture.foregroundAppSource.detectCalls)
+    }
+
+    @Test
+    fun samePackageActivityChangeDoesNotClearUntilAppSwitchPause() = runTest {
+        val now = System.currentTimeMillis()
+        val info = ForegroundAppInfo("example.app", "Example", now, "example.app.Payment", ForegroundInfoSource.UsageStats, true, now)
+        val fixture = fixture(info, RuntimeSnapshot(isAirplaneModeEnabled = true))
+        val state = RuntimeState(settings = UserSettings(automationEnabled = true,
+            temporaryDisableMode = AutomationDisableMode.UntilAppSwitch, temporaryDisableForegroundPackageName = "example.app"),
+            lastTargetAppActive = false, activityRules = listOf(ActivityRuntimeRule("example.app", "example.app.Payment", "Online", true, true)))
+        val updated = fixture.handler.automationTick(state, fixture.scheduler)
+        assertEquals(AutomationDisableMode.UntilAppSwitch, updated.settings.temporaryDisableMode)
+        assertTrue(fixture.accessRepository.disconnectedRequests.isEmpty())
+    }
+
+    @Test
+    fun onlineActivityReconnectsEvenWhenItsAppDefaultIsBlacklisted() = runTest {
+        val now = System.currentTimeMillis()
+        val info = ForegroundAppInfo("example.app", "Example", now, "example.app.Payment", ForegroundInfoSource.UsageStats, true, now)
+        val fixture = fixture(info, RuntimeSnapshot(isAirplaneModeEnabled = true))
+        val state = RuntimeState(settings = UserSettings(automationEnabled = true), lastTargetAppActive = false,
+            appRulesByPackageName = mapOf("example.app" to AppRuntimeRuleInfo(false, true, AppOnlineSourceTag.Manual)),
+            activityRules = listOf(ActivityRuntimeRule("example.app", "example.app.Payment", "Online", true, true)))
+        val updated = fixture.handler.automationTick(state, fixture.scheduler)
+        assertEquals(true, updated.lastTargetAppActive)
+        assertEquals(listOf(false), fixture.accessRepository.disconnectedRequests)
+        assertEquals("Activity", fixture.runtimeStatusRepository.currentSnapshot.foregroundRuleLayer)
+        assertEquals("example.app.Payment", fixture.runtimeStatusRepository.currentSnapshot.currentForegroundActivityName)
+    }
+
+    @Test
+    fun repeatedOfflineEventsKeepExitCountdownAndReturningOnlineCancelsIt() = runTest {
+        val now = System.currentTimeMillis()
+        val info = ForegroundAppInfo("example.app", "Example", now, "example.app.Offline", ForegroundInfoSource.UsageStats, true, now)
+        val fixture = fixture(info, RuntimeSnapshot(isAirplaneModeEnabled = false))
+        var state = RuntimeState(settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = true, appExitDelaySeconds = 60),
+            lastTargetAppActive = true,
+            appRulesByPackageName = mapOf("example.app" to AppRuntimeRuleInfo(true, false, AppOnlineSourceTag.Auto)),
+            activityRules = listOf(ActivityRuntimeRule("example.app", "example.app.Offline", "Offline", true, true)))
+        state = fixture.handler.automationTick(state, fixture.scheduler)
+        val deadline = fixture.runtimeStatusRepository.currentSnapshot.pendingAppExitDisconnectAtMillis
+        state = fixture.handler.automationTick(state, fixture.scheduler)
+        assertTrue(fixture.scheduler.isAppExitDisconnectActive)
+        assertEquals(deadline, fixture.runtimeStatusRepository.currentSnapshot.pendingAppExitDisconnectAtMillis)
+        assertTrue(fixture.accessRepository.disconnectedRequests.isEmpty())
+        fixture.handler.automationTick(state, fixture.scheduler, foregroundAppOverride = info.copy(activityName = "example.app.Online", eventTimestampMillis = now + 1))
+        assertTrue(!fixture.scheduler.isAppExitDisconnectActive)
+        assertTrue(fixture.accessRepository.disconnectedRequests.isEmpty())
+        fixture.scheduler.cancelForegroundProbe()
     }
 
     private fun fixture(

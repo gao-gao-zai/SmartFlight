@@ -11,6 +11,7 @@ collect_artifacts() {
     timeout 30s "$sdk_adb" wait-for-device || return 0
     "$sdk_adb" logcat -d > "$artifacts/logcat.txt" || true
     "$sdk_adb" pull /sdcard/Download/smartflight-localization "$artifacts/screenshots" || true
+    "$sdk_adb" pull /sdcard/Download/smartflight-activities "$artifacts/activity-screenshots" || true
     "$sdk_adb" pull /sdcard/Download/smartflight-tiles "$artifacts/tile-screenshots" || true
 }
 trap collect_artifacts EXIT
@@ -19,8 +20,14 @@ trap collect_artifacts EXIT
 "$sdk_adb" shell getprop ro.product.cpu.abilist > "$artifacts/device-abis.txt"
 "$sdk_adb" logcat -c
 bash scripts/build_package_sync_fixtures.sh
+bash scripts/build_activity_fixtures.sh
 "$sdk_adb" push app/build/package-sync-fixtures/fixture-v1.apk /data/local/tmp/smartflight-fixture-v1.apk
 "$sdk_adb" push app/build/package-sync-fixtures/fixture-v2.apk /data/local/tmp/smartflight-fixture-v2.apk
 # Install before SmartFlight is launched to exercise process-start reconciliation.
 "$sdk_adb" install -r app/build/package-sync-fixtures/fixture-v1.apk
+"$sdk_adb" push app/build/activity-fixtures/fixture-v1.apk /data/local/tmp/smartflight-activity-v1.apk
+"$sdk_adb" push app/build/activity-fixtures/fixture-v2.apk /data/local/tmp/smartflight-activity-v2.apk
+"$sdk_adb" install -r app/build/activity-fixtures/fixture-v1.apk
+# Clear a cold-boot Launcher ANR before opening the app; later tests only dismiss Launcher-specific dialogs.
+"$sdk_adb" shell am force-stop com.google.android.apps.nexuslauncher
 bash gradlew connectedDebugAndroidTest -PemulatorAbi=x86_64 --no-daemon

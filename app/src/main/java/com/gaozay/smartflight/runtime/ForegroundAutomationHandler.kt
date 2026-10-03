@@ -37,7 +37,8 @@ class ForegroundAutomationHandler @Inject constructor(
             reporter.markServiceRunning(currentState.screenState)
             return currentState
         }
-        val foregroundApp = foregroundAppOverride ?: foregroundAppSource.detect()
+        val candidate = foregroundAppOverride ?: foregroundAppSource.detect()
+        val foregroundApp = chooseForegroundUpdate(currentState.lastKnownForegroundApp, candidate)
         currentState = currentState.copy(lastKnownForegroundApp = foregroundApp ?: currentState.lastKnownForegroundApp)
         reporter.markForegroundApp(foregroundApp, currentState.screenState)
 
@@ -63,7 +64,9 @@ class ForegroundAutomationHandler @Inject constructor(
         }
         val effectiveSettings = currentState.settings
         val runtimeSnapshot = reporter.snapshot.first()
-        val appRuleInfo = packageName?.let { currentState.appRulesByPackageName[it] }
+        val resolved = resolveActivityRule(foregroundApp, packageName?.let { currentState.appRulesByPackageName[it] }, currentState.activityRules)
+        val appRuleInfo = resolved.rule
+        reporter.markForegroundRule(resolved)
         val executorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
         val isDisconnected = runtimeSnapshot.isDisconnected(effectiveSettings.networkControlMode)
         Log.d(
