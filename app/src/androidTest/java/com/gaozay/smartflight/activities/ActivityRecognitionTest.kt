@@ -1,6 +1,10 @@
 package com.gaozay.smartflight.activities
 
 import android.app.UiAutomation
+import android.Manifest
+import android.content.ComponentName
+import android.provider.Settings
+import java.io.File
 import android.os.ParcelFileDescriptor
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -89,15 +93,22 @@ class ActivityRecognitionTest {
         val automation = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
         fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command))
             .bufferedReader().use { it.readText().trim() }
-        val originalServices = shell("settings get secure enabled_accessibility_services")
-        val originalEnabled = shell("settings get secure accessibility_enabled")
+        val originalServices = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+        val originalEnabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED)
+        fun putSetting(key: String, value: String?) {
+            automation.adoptShellPermissionIdentity(Manifest.permission.WRITE_SECURE_SETTINGS)
+            try { assertTrue(Settings.Secure.putString(context.contentResolver, key, value)) }
+            finally { automation.dropShellPermissionIdentity() }
+        }
         val component = "${context.packageName}/${context.packageName}.runtime.SmartFlightAccessibilityService"
-        val services = originalServices.takeUnless { it == "null" || it.isBlank() }?.let { "$it:$component" } ?: component
-        fun quote(value: String) = "'" + value.replace("'", "'\"'\"'") + "'"
+        val services = originalServices?.takeIf { it.isNotBlank() }?.let { "$it:$component" } ?: component
         val tracker = EntryPointAccessors.fromApplication(context, AppSyncTestEntryPoint::class.java).foregroundTracker()
         try {
-            shell("settings put secure enabled_accessibility_services ${quote(services)}")
-            shell("settings put secure accessibility_enabled 1")
+            putSetting(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, services)
+            putSetting(Settings.Secure.ACCESSIBILITY_ENABLED, "1")
+            val configured = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+                .orEmpty().split(':').mapNotNull { ComponentName.unflattenFromString(it) }
+            assertTrue(configured.any { it.flattenToString() == component })
             awaitActivityCondition("SmartFlight accessibility service did not connect") { tracker.isServiceConnected }
             shell("am start -W -n $ACTIVITY_FIXTURE/.FirstActivity")
             awaitActivityCondition("Platform accessibility event did not confirm FirstActivity") { tracker.latest()?.activityName == first }
@@ -113,14 +124,15 @@ class ActivityRecognitionTest {
             assertEquals(ForegroundInfoSource.Accessibility, tracker.latest()!!.source)
         } catch (error: Throwable) {
             shell("mkdir -p /sdcard/Download/smartflight-activities")
-            shell("dumpsys accessibility > /sdcard/Download/smartflight-activities/accessibility-failure.txt")
-            shell("dumpsys package ${context.packageName} > /sdcard/Download/smartflight-activities/package-failure.txt")
+            for ((name, command) in listOf("accessibility-failure.txt" to "dumpsys accessibility", "package-failure.txt" to "dumpsys package ${context.packageName}")) {
+                val file = File(checkNotNull(context.getExternalFilesDir(null)), name)
+                file.writeText(shell(command))
+                shell("cp ${file.absolutePath} /sdcard/Download/smartflight-activities/$name")
+            }
             throw error
         } finally {
-            if (originalServices == "null" || originalServices.isBlank()) shell("settings delete secure enabled_accessibility_services")
-            else shell("settings put secure enabled_accessibility_services ${quote(originalServices)}")
-            if (originalEnabled == "null" || originalEnabled.isBlank()) shell("settings delete secure accessibility_enabled")
-            else shell("settings put secure accessibility_enabled ${quote(originalEnabled)}")
+            putSetting(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, originalServices)
+            putSetting(Settings.Secure.ACCESSIBILITY_ENABLED, originalEnabled)
             shell("am force-stop $ACTIVITY_FIXTURE")
         }
     }

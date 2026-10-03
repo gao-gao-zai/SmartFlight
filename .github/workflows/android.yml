@@ -65,7 +65,7 @@ jobs:
           target: google_apis
           arch: x86_64
           cores: 2
-          ram-size: 2048M
+          ram-size: 3072M
           disable-linux-hw-accel: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash scripts/run_emulator_tests.sh
