@@ -7,6 +7,7 @@ mkdir -p "$artifacts"
 collect_artifacts() {
     adb logcat -d > "$artifacts/logcat.txt" || true
     adb pull /sdcard/Download/smartflight-localization "$artifacts/screenshots" || true
+    adb pull /sdcard/Download/smartflight-tiles "$artifacts/tile-screenshots" || true
 }
 trap collect_artifacts EXIT
 

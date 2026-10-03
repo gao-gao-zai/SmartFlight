@@ -56,7 +56,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           test -r /dev/kvm && test -w /dev/kvm
-      - name: Run localization tests on Android 15
+      - name: Run instrumentation tests on Android 15
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35

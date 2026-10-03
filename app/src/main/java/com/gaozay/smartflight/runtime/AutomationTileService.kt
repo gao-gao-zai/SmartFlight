@@ -8,15 +8,12 @@ import android.service.quicksettings.TileService
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.SettingsRepository
-import com.gaozay.smartflight.settings.withAutomationDisabled
-import com.gaozay.smartflight.settings.withAutomationEnabled
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
@@ -31,36 +28,35 @@ class AutomationTileService : TileService() {
     lateinit var automationServiceController: AutomationServiceController
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val controller by lazy {
+        AutomationTileController(
+            settingsRepository = settingsRepository,
+            runtimeStatusRepository = runtimeStatusRepository,
+            scope = scope,
+            renderMode = ::renderTile,
+            ensureAutomationServiceRunning = { automationServiceController.setAutomationEnabled(true) },
+        )
+    }
 
     override fun onStartListening() {
         super.onStartListening()
-        refreshTile()
+        controller.startListening()
+    }
+
+    override fun onStopListening() {
+        controller.stopListening()
+        super.onStopListening()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        refreshTile()
+        controller.refresh()
     }
 
     override fun onClick() {
         super.onClick()
         scope.launch {
-            val settings = settingsRepository.settings.first()
-            val nextMode = settings.currentTileMode().nextTileMode()
-            if (nextMode == AutomationDisableMode.None) {
-                settingsRepository.updateSettings { it.withAutomationEnabled() }
-                automationServiceController.setAutomationEnabled(true)
-            } else {
-                automationServiceController.setAutomationEnabled(true)
-                val foregroundPackageName = runtimeStatusRepository.snapshot.first().currentForegroundPackageName
-                settingsRepository.updateSettings {
-                    it.withAutomationDisabled(
-                        mode = nextMode,
-                        foregroundPackageName = foregroundPackageName,
-                    )
-                }
-            }
-            refreshTile()
+            controller.onClick()
         }
     }
 
@@ -69,49 +65,19 @@ class AutomationTileService : TileService() {
         super.onDestroy()
     }
 
-    private fun refreshTile() {
-        scope.launch {
-            val settings = settingsRepository.settings.first()
-            val tileMode = settings.currentTileMode()
-            qsTile?.apply {
-                icon = Icon.createWithResource(this@AutomationTileService, R.drawable.ic_smartflight_tile)
-                label = getString(R.string.automation_tile_label)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    subtitle = getString(tileMode.tileLabelRes)
-                }
-                state = if (tileMode == AutomationDisableMode.None) {
-                    Tile.STATE_INACTIVE
-                } else {
-                    Tile.STATE_ACTIVE
-                }
-                updateTile()
+    private fun renderTile(tileMode: AutomationDisableMode) {
+        qsTile?.apply {
+            icon = Icon.createWithResource(this@AutomationTileService, R.drawable.ic_smartflight_tile)
+            label = getString(R.string.automation_tile_label)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                subtitle = getString(tileMode.tileLabelRes)
             }
+            state = if (tileMode == AutomationDisableMode.None) {
+                Tile.STATE_INACTIVE
+            } else {
+                Tile.STATE_ACTIVE
+            }
+            updateTile()
         }
-    }
-
-    private fun com.gaozay.smartflight.settings.UserSettings.currentTileMode(): AutomationDisableMode =
-        when {
-            !automationEnabled -> AutomationDisableMode.Permanent
-            temporaryDisableMode != AutomationDisableMode.None -> temporaryDisableMode
-            else -> AutomationDisableMode.None
-        }
-
-    private fun AutomationDisableMode.nextTileMode(): AutomationDisableMode {
-        val currentIndex = tileModeCycle.indexOf(this).takeIf { it >= 0 } ?: 0
-        return tileModeCycle[(currentIndex + 1) % tileModeCycle.size]
-    }
-
-    private companion object {
-        val tileModeCycle = listOf(
-            AutomationDisableMode.None,
-            AutomationDisableMode.UntilAppSwitch,
-            AutomationDisableMode.UntilScreenOff,
-            AutomationDisableMode.For1Minute,
-            AutomationDisableMode.For5Minutes,
-            AutomationDisableMode.For10Minutes,
-            AutomationDisableMode.For20Minutes,
-            AutomationDisableMode.For30Minutes,
-            AutomationDisableMode.Permanent,
-        )
     }
 }
