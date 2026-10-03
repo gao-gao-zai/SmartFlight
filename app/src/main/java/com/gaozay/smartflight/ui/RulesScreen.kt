@@ -12,8 +12,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.settings.AutomationDisableMode
@@ -38,46 +41,46 @@ internal fun RulesScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { RulePreviewCard(settings) }
-        item { SettingsSection("总行为") {
-            SwitchRow("自动化总开关", "关闭后永久禁用自动动作", settings.automationEnabled) { enabled ->
+        item { SettingsSection(stringResource(R.string.general_behavior)) {
+            SwitchRow(stringResource(R.string.enable_automation), stringResource(R.string.turning_this_off_permanently_disables_automatic_actions), settings.automationEnabled) { enabled ->
                 onUpdateSettings { s ->
                     if (enabled) s.withAutomationEnabled() else s.withAutomationDisabled(AutomationDisableMode.Permanent)
                 }
             }
             SwitchRow(
-                "外部联网变化时暂停",
-                "检测到不是 SmartFlight 触发的联网状态变化后，暂停自动化直到应用切换",
+                stringResource(R.string.pause_on_external_connectivity_changes),
+                stringResource(R.string.rule_pause_external_change_description),
                 settings.pauseAutomationOnExternalNetworkChange,
             ) {
                 onUpdateSettings { s -> s.copy(pauseAutomationOnExternalNetworkChange = it) }
             }
-            ChoiceRow("联网控制方式", NetworkControlMode.entries, settings.networkControlMode, onSetNetworkControlMode)
-            ChoiceRow("执行器偏好", ExecutorType.entries.filterNot { it == ExecutorType.Unavailable }, settings.preferredExecutorType, onSetPreferredExecutorType)
+            ChoiceRow(stringResource(R.string.connectivity_control_method), NetworkControlMode.entries, settings.networkControlMode, onSetNetworkControlMode)
+            ChoiceRow(stringResource(R.string.preferred_executor), ExecutorType.entries.filterNot { it == ExecutorType.Unavailable }, settings.preferredExecutorType, onSetPreferredExecutorType)
         } }
-        item { SettingsSection("应用触发") {
-            ChoiceRow("前台监听方式", ForegroundMonitorMode.entries, settings.foregroundMonitorMode, onSetForegroundMonitorMode)
-            SwitchRow("启动目标应用时恢复联网", "联网应用进入前台时按当前模式恢复联网", settings.reconnectOnTargetAppLaunch) { onUpdateSettings { s -> s.copy(reconnectOnTargetAppLaunch = it) } }
-            SwitchRow("离开目标应用后断网", "离开联网应用后等待一段时间再断网", settings.appExitDisconnectEnabled) { onUpdateSettings { s -> s.copy(appExitDisconnectEnabled = it) } }
-            NumberRow("离开后延迟秒数", settings.appExitDelaySeconds) { onUpdateSettings { s -> s.copy(appExitDelaySeconds = it.coerceIn(0, 600)) } }
+        item { SettingsSection(stringResource(R.string.app_triggers)) {
+            ChoiceRow(stringResource(R.string.foreground_monitoring_method), ForegroundMonitorMode.entries, settings.foregroundMonitorMode, onSetForegroundMonitorMode)
+            SwitchRow(stringResource(R.string.reconnect_when_launching_a_target_app), stringResource(R.string.rule_target_reconnect_description), settings.reconnectOnTargetAppLaunch) { onUpdateSettings { s -> s.copy(reconnectOnTargetAppLaunch = it) } }
+            SwitchRow(stringResource(R.string.disconnect_after_leaving_a_target_app), stringResource(R.string.wait_before_disconnecting_after_leaving_an_online_app), settings.appExitDisconnectEnabled) { onUpdateSettings { s -> s.copy(appExitDisconnectEnabled = it) } }
+            NumberRow(stringResource(R.string.app_exit_delay_in_seconds), settings.appExitDelaySeconds) { onUpdateSettings { s -> s.copy(appExitDelaySeconds = it.coerceIn(0, 600)) } }
         } }
-        item { SettingsSection("息屏触发") {
-            SwitchRow("息屏后自动断网", "屏幕关闭后按延迟执行断网", settings.screenOffDisconnectEnabled) { onUpdateSettings { s -> s.copy(screenOffDisconnectEnabled = it) } }
-            NumberRow("息屏后延迟秒数", settings.screenOffDelaySeconds) { onUpdateSettings { s -> s.copy(screenOffDelaySeconds = it.coerceIn(0, 3600)) } }
-            SwitchRow("息屏时继续监听前台应用", "更及时但更耗电", settings.monitorForegroundWhenScreenOff, onSetMonitorForegroundWhenScreenOff)
-            SwitchRow("亮屏后不自动恢复联网", "亮屏本身不触发联网恢复", settings.disableScreenOnReconnect) { onUpdateSettings { s -> s.copy(disableScreenOnReconnect = it) } }
-            SwitchRow("解锁后不自动恢复联网", "只由目标应用触发恢复联网", settings.disableUnlockReconnect) { onUpdateSettings { s -> s.copy(disableUnlockReconnect = it) } }
+        item { SettingsSection(stringResource(R.string.screen_off_triggers)) {
+            SwitchRow(stringResource(R.string.disconnect_automatically_when_the_screen_turns_off), stringResource(R.string.disconnect_after_the_configured_delay_when_the_screen_turns_off), settings.screenOffDisconnectEnabled) { onUpdateSettings { s -> s.copy(screenOffDisconnectEnabled = it) } }
+            NumberRow(stringResource(R.string.screen_off_delay_in_seconds), settings.screenOffDelaySeconds) { onUpdateSettings { s -> s.copy(screenOffDelaySeconds = it.coerceIn(0, 3600)) } }
+            SwitchRow(stringResource(R.string.keep_monitoring_foreground_apps_with_the_screen_off), stringResource(R.string.more_responsive_but_uses_more_battery), settings.monitorForegroundWhenScreenOff, onSetMonitorForegroundWhenScreenOff)
+            SwitchRow(stringResource(R.string.do_not_reconnect_automatically_when_the_screen_turns_on), stringResource(R.string.turning_on_the_screen_alone_does_not_trigger_reconnecting), settings.disableScreenOnReconnect) { onUpdateSettings { s -> s.copy(disableScreenOnReconnect = it) } }
+            SwitchRow(stringResource(R.string.do_not_reconnect_automatically_when_unlocking), stringResource(R.string.only_target_apps_trigger_reconnecting), settings.disableUnlockReconnect) { onUpdateSettings { s -> s.copy(disableUnlockReconnect = it) } }
         } }
-        item { SettingsSection("Wi‑Fi 例外与状态保留") {
-            SwitchRow("连接 Wi‑Fi 时不自动恢复联网", "避免在 Wi‑Fi 环境下额外切换飞行模式", settings.skipReconnectOnWifi) { onUpdateSettings { s -> s.copy(skipReconnectOnWifi = it) } }
-            SwitchRow("连接 Wi‑Fi 时不自动断网", "Wi‑Fi 可用时跳过自动断网动作", settings.skipDisconnectOnWifi) { onUpdateSettings { s -> s.copy(skipDisconnectOnWifi = it) } }
-            SwitchRow("切换时保留 Wi‑Fi 状态", "不同系统上可能失败", settings.preserveWifiState) { onUpdateSettings { s -> s.copy(preserveWifiState = it) } }
-            SwitchRow("切换时保留蓝牙状态", "不同系统上可能失败", settings.preserveBluetoothState) { onUpdateSettings { s -> s.copy(preserveBluetoothState = it) } }
+        item { SettingsSection(stringResource(R.string.wi_fi_exceptions_and_state_preservation)) {
+            SwitchRow(stringResource(R.string.do_not_reconnect_automatically_while_connected_to_wi_fi), stringResource(R.string.avoid_extra_airplane_mode_switches_while_using_wi_fi), settings.skipReconnectOnWifi) { onUpdateSettings { s -> s.copy(skipReconnectOnWifi = it) } }
+            SwitchRow(stringResource(R.string.do_not_disconnect_automatically_while_connected_to_wi_fi), stringResource(R.string.skip_automatic_disconnects_when_wi_fi_is_available), settings.skipDisconnectOnWifi) { onUpdateSettings { s -> s.copy(skipDisconnectOnWifi = it) } }
+            SwitchRow(stringResource(R.string.preserve_wi_fi_state_when_switching), stringResource(R.string.may_fail_on_some_systems), settings.preserveWifiState) { onUpdateSettings { s -> s.copy(preserveWifiState = it) } }
+            SwitchRow(stringResource(R.string.preserve_bluetooth_state_when_switching), stringResource(R.string.may_fail_on_some_systems), settings.preserveBluetoothState) { onUpdateSettings { s -> s.copy(preserveBluetoothState = it) } }
         } }
-        item { SettingsSection("动作提示") {
-            SwitchRow("恢复联网时提示", "自动恢复联网后显示一条短提示", settings.showReconnectPrompt) { onUpdateSettings { s -> s.copy(showReconnectPrompt = it) } }
-            TextInputRow("恢复联网提示内容", settings.reconnectPromptText) { value -> onUpdateSettings { s -> s.copy(reconnectPromptText = value) } }
-            SwitchRow("断网时提示", "自动断网后显示一条短提示", settings.showDisconnectPrompt) { onUpdateSettings { s -> s.copy(showDisconnectPrompt = it) } }
-            TextInputRow("断网提示内容", settings.disconnectPromptText) { value -> onUpdateSettings { s -> s.copy(disconnectPromptText = value) } }
+        item { SettingsSection(stringResource(R.string.action_prompts)) {
+            SwitchRow(stringResource(R.string.show_a_prompt_when_reconnecting), stringResource(R.string.show_a_brief_prompt_after_automatic_reconnection), settings.showReconnectPrompt) { onUpdateSettings { s -> s.copy(showReconnectPrompt = it) } }
+            TextInputRow(stringResource(R.string.reconnect_prompt_text), settings.reconnectPromptText, placeholder = stringResource(R.string.prompt_reconnected_default)) { value -> onUpdateSettings { s -> s.copy(reconnectPromptText = value) } }
+            SwitchRow(stringResource(R.string.show_a_prompt_when_disconnecting), stringResource(R.string.show_a_brief_prompt_after_automatic_disconnection), settings.showDisconnectPrompt) { onUpdateSettings { s -> s.copy(showDisconnectPrompt = it) } }
+            TextInputRow(stringResource(R.string.disconnect_prompt_text), settings.disconnectPromptText, placeholder = stringResource(R.string.prompt_disconnected_default)) { value -> onUpdateSettings { s -> s.copy(disconnectPromptText = value) } }
         } }
     }
 }
@@ -85,18 +88,18 @@ internal fun RulesScreen(
 @Composable
 private fun RulePreviewCard(settings: UserSettings) {
     val preview = buildString {
-        append(if (settings.reconnectOnTargetAppLaunch) "启动目标应用时恢复联网" else "启动目标应用时不自动恢复联网")
-        append("；")
-        append(if (settings.appExitDisconnectEnabled) "离开目标应用 ${settings.appExitDelaySeconds} 秒后断网" else "离开目标应用后不断网")
-        append("；")
-        append(if (settings.screenOffDisconnectEnabled) "息屏 ${settings.screenOffDelaySeconds} 秒后断网" else "息屏后不断网")
-        if (settings.skipDisconnectOnWifi) append("；连接 Wi‑Fi 时跳过断网")
+        append(if (settings.reconnectOnTargetAppLaunch) stringResource(R.string.reconnect_when_launching_a_target_app) else stringResource(R.string.do_not_reconnect_automatically_when_launching_a_target_app))
+        append(stringResource(R.string.summary_separator))
+        append(if (settings.appExitDisconnectEnabled) pluralStringResource(R.plurals.disconnect_seconds_after_leaving_a_target_app, (settings.appExitDelaySeconds).toInt(), settings.appExitDelaySeconds) else stringResource(R.string.do_not_disconnect_after_leaving_a_target_app))
+        append(stringResource(R.string.summary_separator))
+        append(if (settings.screenOffDisconnectEnabled) pluralStringResource(R.plurals.disconnect_seconds_after_screen_off, (settings.screenOffDelaySeconds).toInt(), settings.screenOffDelaySeconds) else stringResource(R.string.do_not_disconnect_after_screen_off))
+        if (settings.skipDisconnectOnWifi) append(stringResource(R.string.skip_disconnects_while_connected_to_wi_fi))
     }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("规则预览", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.rule_preview), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(preview, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Text("已自动保存", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.72f))
+            Text(stringResource(R.string.saved_automatically), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.72f))
         }
     }
 }

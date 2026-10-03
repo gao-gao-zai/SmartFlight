@@ -1,13 +1,15 @@
 package com.gaozay.smartflight.update
 
-import org.json.JSONObject
+import com.gaozay.smartflight.R
+import com.gaozay.smartflight.i18n.AppStrings
 import javax.inject.Inject
+import org.json.JSONObject
 
 class ReleaseJsonParser @Inject constructor() {
     fun parse(source: UpdateSource, json: String): Result<ReleaseInfo> = runCatching {
         val root = JSONObject(json)
         val tagName = root.optString("tag_name").takeIf { it.isNotBlank() }
-            ?: error("缺少 release tag_name")
+            ?: error(AppStrings.get(R.string.missing_release_tag_name))
         val assets = root.optJSONArray("assets")?.let { array ->
             buildList {
                 for (index in 0 until array.length()) {

@@ -1,13 +1,15 @@
 package com.gaozay.smartflight.runtime
 
 import android.util.Log
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.TriggerSource
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.settings.isAutomationEffectivelyEnabled
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
 
 class AppExitDisconnectHandler @Inject constructor(
     private val accessRepository: AccessRepository,
@@ -89,7 +91,7 @@ class AppExitDisconnectHandler @Inject constructor(
             currentDisconnected = latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode),
             targetDisconnected = true,
             triggerSource = TriggerSource.AppForegroundChanged,
-            reason = "联网应用已离开前台${latestSettings.mobileDataNoOpSuffix()}",
+            reason = AppStrings.get(R.string.an_online_app_left_the_foreground, latestSettings.mobileDataNoOpSuffix()),
             prompt = RuntimePrompt.Disconnect(latestSettings),
         )
     }

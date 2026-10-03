@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.settings
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.preferencesOf
 import com.gaozay.smartflight.domain.model.CornerStyle
@@ -12,7 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-class UserSettingsPreferencesMapperTest {
+class UserSettingsPreferencesMapperTest : LocalizedStringsTest() {
     @Test
     fun emptyPreferencesUseUserSettingsDefaults() {
         val settings = preferencesOf().toUserSettings()

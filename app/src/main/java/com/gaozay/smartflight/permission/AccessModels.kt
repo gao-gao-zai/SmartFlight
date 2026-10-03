@@ -1,13 +1,16 @@
 package com.gaozay.smartflight.permission
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.i18n.AppStrings
+import com.gaozay.smartflight.i18n.ResourceLabel
 
-enum class AccessCheckStatus(val label: String) {
-    Unknown("尚未检测"),
-    Missing("未满足"),
-    Detected("已检测"),
-    Granted("已授权"),
-    Ready("可用"),
+enum class AccessCheckStatus(override val labelRes: Int) : ResourceLabel {
+    Unknown(R.string.not_checked_yet),
+    Missing(R.string.requirement_not_met),
+    Detected(R.string.detected),
+    Granted(R.string.permission_granted),
+    Ready(R.string.ready),
 }
 
 enum class AccessActionType {
@@ -15,6 +18,10 @@ enum class AccessActionType {
     OpenSettings,
     RequestPermission,
     Refresh,
+}
+
+enum class AccessKind {
+    UsageStats, Accessibility, Notifications, BatteryOptimization, Shizuku, Root, Adb, Other,
 }
 
 data class AccessCheckResult(
@@ -29,8 +36,9 @@ data class AccessCheckResult(
     val copyLabel: String? = null,
     val satisfiesRequirement: Boolean = status == AccessCheckStatus.Granted ||
         status == AccessCheckStatus.Ready,
+    val kind: AccessKind = AccessKind.Other,
 ) {
-    val statusLabel: String = status.label
+    val statusLabel: String get() = status.label
 }
 
 data class AdvancedAccessState(
@@ -45,34 +53,38 @@ data class AdvancedAccessState(
 data class AccessGateState(
     val advancedAccess: AdvancedAccessState = AdvancedAccessState(),
     val usageStatsAccess: AccessCheckResult = AccessCheckResult(
-        title = "使用情况访问权限",
+        kind = AccessKind.UsageStats,
+        title = AppStrings.get(R.string.usage_access_permission),
         status = AccessCheckStatus.Unknown,
-        summary = "尚未检测",
-        recommendation = "授予使用情况访问权限后，SmartFlight 才能判断当前前台应用。",
+        summary = AppStrings.get(R.string.not_checked_yet),
+        recommendation = AppStrings.get(R.string.smartflight_needs_usage_access_to_identify_the_current_foreground_app),
         isBlocking = true,
         actionType = AccessActionType.OpenSettings,
     ),
     val accessibilityAccess: AccessCheckResult = AccessCheckResult(
-        title = "无障碍前台监听",
+        kind = AccessKind.Accessibility,
+        title = AppStrings.get(R.string.accessibility_foreground_monitoring),
         status = AccessCheckStatus.Unknown,
-        summary = "尚未检测",
-        recommendation = "开启无障碍服务后，SmartFlight 可以通过应用切换事件实时识别前台应用。",
+        summary = AppStrings.get(R.string.not_checked_yet),
+        recommendation = AppStrings.get(R.string.accessibility_enable_recommendation),
         isBlocking = true,
         actionType = AccessActionType.OpenSettings,
     ),
     val notificationAccess: AccessCheckResult = AccessCheckResult(
-        title = "通知权限",
+        kind = AccessKind.Notifications,
+        title = AppStrings.get(R.string.notification_permission),
         status = AccessCheckStatus.Unknown,
-        summary = "尚未检测",
-        recommendation = "授予通知权限后，前台服务才能稳定展示运行状态。",
+        summary = AppStrings.get(R.string.not_checked_yet),
+        recommendation = AppStrings.get(R.string.notification_permission_recommendation),
         isBlocking = false,
         actionType = AccessActionType.OpenSettings,
     ),
     val batteryOptimization: AccessCheckResult = AccessCheckResult(
-        title = "电池优化",
+        kind = AccessKind.BatteryOptimization,
+        title = AppStrings.get(R.string.battery_optimization),
         status = AccessCheckStatus.Unknown,
-        summary = "尚未检测",
-        recommendation = "建议允许后台不受限制运行，避免系统杀掉监听服务。",
+        summary = AppStrings.get(R.string.not_checked_yet),
+        recommendation = AppStrings.get(R.string.battery_optimization_recommendation),
         isBlocking = false,
         actionType = AccessActionType.OpenSettings,
     ),

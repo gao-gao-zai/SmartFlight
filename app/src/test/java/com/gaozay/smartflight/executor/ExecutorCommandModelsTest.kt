@@ -1,11 +1,12 @@
 package com.gaozay.smartflight.executor
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ExecutorCommandModelsTest {
+class ExecutorCommandModelsTest : LocalizedStringsTest() {
     @Test
     fun parseBinaryToggleStateSupportsOneAndZero() {
         assertEquals(true, parseBinaryToggleState("1"))

@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ScreenState
@@ -12,7 +13,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class DisconnectAutomationHandlerTest {
+class DisconnectAutomationHandlerTest : LocalizedStringsTest() {
     @Test
     fun screenOffSchedulesDisconnectWhenConditionsMatch() = runTest {
         val fixture = fixture(

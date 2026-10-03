@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.ui
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -13,21 +14,22 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.Column
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.SmartFlightUiState
 import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.update.GITEE_RELEASES_URL
 import com.gaozay.smartflight.update.UpdateUiState
 
-private enum class SmartFlightScreen(val title: String) {
-    Dashboard("控制台"), Apps("应用范围"), Rules("自动化规则"), Diagnostics("诊断与日志"), Appearance("外观设置"), About("关于")
+private enum class SmartFlightScreen(val titleRes: Int) {
+    Dashboard(R.string.dashboard), Apps(R.string.app_scope), Rules(R.string.automation_rules), Diagnostics(R.string.diagnostics_and_logs), Appearance(R.string.appearance), About(R.string.about)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,7 +49,7 @@ fun SmartFlightRoot(
         onSkipVersion = actions.update.skipUpdateVersion,
     )
     if (!state.accessGateState.canEnterApp) {
-        Scaffold(topBar = { SmartFlightTopBar("SmartFlight 接入检查") }) { innerPadding ->
+        Scaffold(topBar = { SmartFlightTopBar(stringResource(R.string.smartflight_setup_check)) }) { innerPadding ->
             Surface(Modifier.fillMaxSize().padding(innerPadding)) {
                 AccessGateScreen(
                     state = state.accessGateState,
@@ -70,7 +72,7 @@ fun SmartFlightRoot(
             if (screen == SmartFlightScreen.Dashboard) {
                 DashboardTopBar()
             } else {
-                SmartFlightTopBar(screen.title) { screen = SmartFlightScreen.Dashboard }
+                SmartFlightTopBar(stringResource(screen.titleRes)) { screen = SmartFlightScreen.Dashboard }
             }
         },
     ) { innerPadding ->
@@ -154,8 +156,10 @@ private fun DashboardTopBar() {
     CenterAlignedTopAppBar(
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("自动飞行", fontWeight = FontWeight.Bold)
-                Text("SmartFlight", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.app_name), fontWeight = FontWeight.Bold)
+                if (stringResource(R.string.app_name) != stringResource(R.string.brand_name)) {
+                    Text(stringResource(R.string.brand_name), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         },
     )
@@ -167,7 +171,7 @@ private fun SmartFlightTopBar(title: String, onBack: (() -> Unit)? = null) {
     CenterAlignedTopAppBar(
         title = { Text(title, fontWeight = FontWeight.Bold) },
         navigationIcon = {
-            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回") }
+            if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back)) }
         },
     )
 }

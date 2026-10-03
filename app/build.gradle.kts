@@ -8,6 +8,8 @@ plugins {
 }
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
+// CI emulators use x86_64; normal builds retain the release ABI list.
+val emulatorAbi = providers.gradleProperty("emulatorAbi").orNull
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
@@ -45,7 +47,7 @@ android {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a")
+            include(*(emulatorAbi?.let { arrayOf(it) } ?: arrayOf("armeabi-v7a", "arm64-v8a")))
             isUniversalApk = false
         }
     }
@@ -84,6 +86,9 @@ android {
             isReturnDefaultValues = true
         }
     }
+
+    // JVM formatter tests read the same catalog that Android packages.
+    sourceSets.getByName("test").resources.srcDir("src/main/res")
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.15"
@@ -134,4 +139,3 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
-

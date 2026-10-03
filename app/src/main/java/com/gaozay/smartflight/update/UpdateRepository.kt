@@ -1,8 +1,10 @@
 package com.gaozay.smartflight.update
 
+import com.gaozay.smartflight.R
+import com.gaozay.smartflight.i18n.AppStrings
+import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 interface UpdateRepository {
     suspend fun checkForUpdates(
@@ -31,7 +33,7 @@ class DefaultUpdateRepository @Inject constructor(
 
         if (release == null) {
             return@withContext UpdateCheckResult.Failed(
-                failures.joinToString("；").ifBlank { "无法连接更新源" },
+                failures.joinToString(AppStrings.get(R.string.summary_separator)).ifBlank { AppStrings.get(R.string.unable_to_connect_to_update_sources) },
             )
         }
         if (!versionComparator.isRemoteNewer(currentVersion, release.tagName)) {

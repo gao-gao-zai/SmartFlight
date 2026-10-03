@@ -2,11 +2,13 @@ package com.gaozay.smartflight.runtime
 
 import android.content.Context
 import android.widget.Toast
+import com.gaozay.smartflight.R
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.settings.UserSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 interface RuntimePromptNotifier {
     suspend fun showReconnectPrompt(settings: UserSettings)
@@ -25,28 +27,28 @@ class ToastRuntimePromptNotifier @Inject constructor(
         if (!settings.showReconnectPrompt) {
             return
         }
-        showPrompt(settings.reconnectPromptText.ifBlank { "SmartFlight 已恢复联网" })
+        showPrompt(settings.reconnectPromptText.ifBlank { AppStrings.get(R.string.prompt_reconnected_default) })
     }
 
     override suspend fun showDisconnectPrompt(settings: UserSettings) {
         if (!settings.showDisconnectPrompt) {
             return
         }
-        showPrompt(settings.disconnectPromptText.ifBlank { "SmartFlight 已断网" })
+        showPrompt(settings.disconnectPromptText.ifBlank { AppStrings.get(R.string.prompt_disconnected_default) })
     }
 
     override suspend fun showAutomationRestoredPrompt(settings: UserSettings, reason: String) {
         if (!settings.showReconnectPrompt) {
             return
         }
-        showPrompt(reason.ifBlank { "SmartFlight 已恢复自动化" })
+        showPrompt(reason.ifBlank { AppStrings.get(R.string.smartflight_restored_automation) })
     }
 
     override suspend fun showAutomationPausedPrompt(settings: UserSettings, reason: String) {
         if (!settings.showDisconnectPrompt) {
             return
         }
-        showPrompt(reason.ifBlank { "SmartFlight 已暂停自动化" })
+        showPrompt(reason.ifBlank { AppStrings.get(R.string.smartflight_paused_automation) })
     }
 
     private suspend fun showPrompt(message: String) {

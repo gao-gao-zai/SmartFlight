@@ -1,12 +1,14 @@
 package com.gaozay.smartflight.permission
 
 import android.util.Log
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.gaozay.smartflight.R
+import com.gaozay.smartflight.i18n.AppStrings
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Singleton
 class RootAccessChecker @Inject constructor(
@@ -17,10 +19,11 @@ class RootAccessChecker @Inject constructor(
         Log.d(LOG_TAG, "check suPath=${suPath ?: "<none>"}")
         if (suPath == null) {
             return@withContext AccessCheckResult(
+                kind = AccessKind.Root,
                 title = "Root",
                 status = AccessCheckStatus.Missing,
-                summary = "未检测到 Root 二进制文件",
-                recommendation = "如果设备没有 Root，请优先使用 Shizuku 或 ADB 初始化方案。",
+                summary = AppStrings.get(R.string.root_binary_not_detected),
+                recommendation = AppStrings.get(R.string.if_the_device_is_not_rooted_use_shizuku_or_adb_initialization_first),
                 isBlocking = true,
                 actionType = AccessActionType.Refresh,
             )
@@ -29,24 +32,25 @@ class RootAccessChecker @Inject constructor(
         val snapshot = rootAccessProbeRepository.getSnapshot()
         val confirmed = snapshot.confirmedAvailable
         AccessCheckResult(
+            kind = AccessKind.Root,
             title = "Root",
             status = if (confirmed) AccessCheckStatus.Ready else AccessCheckStatus.Detected,
-            summary = if (confirmed) "已确认 Root 授权可用" else "已检测到 Root 二进制文件",
+            summary = if (confirmed) AppStrings.get(R.string.root_authorization_confirmed_as_available) else AppStrings.get(R.string.root_binary_detected),
             recommendation = if (confirmed) {
-                "设备已完成一次 Root 授权验证，后续可继续接入 Root 执行器。"
+                AppStrings.get(R.string.root_verification_completed_description)
             } else {
-                "可主动测试一次 Root 授权；成功后会把 Root 标记为已确认可用。"
+                AppStrings.get(R.string.root_verification_recommendation)
             },
             isBlocking = true,
             actionType = if (confirmed) AccessActionType.None else AccessActionType.RequestPermission,
             detail = buildString {
-                append("检测路径：")
+                append(AppStrings.get(R.string.detected_path))
                 append(suPath)
                 if (snapshot.lastProbeAtMillis > 0) {
-                    append("。最近一次测试：")
+                    append(AppStrings.get(R.string.last_test))
                     append(snapshot.lastProbeSummary)
                 } else if (!confirmed) {
-                    append("。当前还没有执行过主动 Root 授权测试。")
+                    append(AppStrings.get(R.string.no_active_root_authorization_test_has_been_run_yet_root_access_checker))
                 }
             },
             satisfiesRequirement = confirmed,
@@ -58,10 +62,11 @@ class RootAccessChecker @Inject constructor(
         Log.d(LOG_TAG, "probeAuthorization suPath=${suPath ?: "<none>"}")
         if (suPath == null) {
             val result = AccessCheckResult(
+                kind = AccessKind.Root,
                 title = "Root",
                 status = AccessCheckStatus.Missing,
-                summary = "未检测到 Root 二进制文件",
-                recommendation = "设备当前没有可用的 Root 入口，无法继续测试授权。",
+                summary = AppStrings.get(R.string.root_binary_not_detected),
+                recommendation = AppStrings.get(R.string.root_entry_unavailable_description),
                 isBlocking = true,
                 actionType = AccessActionType.Refresh,
             )
@@ -99,10 +104,10 @@ class RootAccessChecker @Inject constructor(
             probe.exitCode == 0 &&
             probe.output.contains("uid=0")
         val summary = when {
-            confirmed -> "Root 授权测试成功"
-            probe == null -> "Root 授权测试失败：无法启动 su 进程"
-            probe.finished != true -> "Root 授权测试超时，可能仍在等待授权"
-            else -> "Root 授权测试失败，返回码 ${probe.exitCode ?: -1}"
+            confirmed -> AppStrings.get(R.string.root_authorization_test_succeeded)
+            probe == null -> AppStrings.get(R.string.root_authorization_test_failed_unable_to_start_the_su_process)
+            probe.finished != true -> AppStrings.get(R.string.root_authorization_test_timeout)
+            else -> AppStrings.get(R.string.root_authorization_test_failed_with_exit_code, probe.exitCode ?: -1)
         }
 
         rootAccessProbeRepository.updateSnapshot(
@@ -114,22 +119,23 @@ class RootAccessChecker @Inject constructor(
         )
 
         AccessCheckResult(
+            kind = AccessKind.Root,
             title = "Root",
             status = if (confirmed) AccessCheckStatus.Ready else AccessCheckStatus.Detected,
             summary = summary,
             recommendation = if (confirmed) {
-                "SmartFlight 已确认可以拿到 root shell，后续可继续接入 Root 执行器。"
+                AppStrings.get(R.string.root_shell_confirmed_description)
             } else {
-                "请检查 Root 管理器是否弹出授权框，或确认 SmartFlight 是否被拒绝。"
+                AppStrings.get(R.string.root_authorization_denied_recommendation)
             },
             isBlocking = true,
             actionType = if (confirmed) AccessActionType.None else AccessActionType.RequestPermission,
             detail = buildString {
-                append("执行命令：")
+                append(AppStrings.get(R.string.command))
                 append(suPath)
                 append(" -c id")
                 if (!probe?.output.isNullOrBlank()) {
-                    append("。输出：")
+                    append(AppStrings.get(R.string.output_root_access_checker))
                     append(probe?.output?.lineSequence()?.firstOrNull())
                 }
             },

@@ -1,6 +1,8 @@
 package com.gaozay.smartflight.runtime
 
+import android.content.res.Configuration
 import android.graphics.drawable.Icon
+import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.gaozay.smartflight.R
@@ -9,13 +11,13 @@ import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.withAutomationDisabled
 import com.gaozay.smartflight.settings.withAutomationEnabled
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class AutomationTileService : TileService() {
@@ -32,6 +34,11 @@ class AutomationTileService : TileService() {
 
     override fun onStartListening() {
         super.onStartListening()
+        refreshTile()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
         refreshTile()
     }
 
@@ -68,8 +75,10 @@ class AutomationTileService : TileService() {
             val tileMode = settings.currentTileMode()
             qsTile?.apply {
                 icon = Icon.createWithResource(this@AutomationTileService, R.drawable.ic_smartflight_tile)
-                label = "自动飞行"
-                subtitle = tileMode.tileLabel
+                label = getString(R.string.automation_tile_label)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    subtitle = getString(tileMode.tileLabelRes)
+                }
                 state = if (tileMode == AutomationDisableMode.None) {
                     Tile.STATE_INACTIVE
                 } else {

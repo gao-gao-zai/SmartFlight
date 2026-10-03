@@ -1,6 +1,8 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.settings.isAutomationEffectivelyEnabled
 import javax.inject.Inject
 
@@ -10,7 +12,7 @@ class ForegroundRuleEvaluator @Inject constructor() {
         if (context.previousTargetAppActive == null) {
             return none(
                 targetAppActive = targetAppActive,
-                reason = "首次同步前台应用状态，不执行自动动作",
+                reason = AppStrings.get(R.string.initial_foreground_app_synchronization_no_automatic_action_taken),
                 matchedRules = listOf("InitialForegroundSync"),
                 shouldLog = false,
             )
@@ -18,8 +20,8 @@ class ForegroundRuleEvaluator @Inject constructor() {
         if (!context.settings.isAutomationEffectivelyEnabled()) {
             return none(
                 targetAppActive = targetAppActive,
-                actionReason = "自动化已关闭，跳过前台应用规则",
-                reason = "自动化已关闭",
+                actionReason = AppStrings.get(R.string.automation_disabled_foreground_app_rules_skipped),
+                reason = AppStrings.get(R.string.automation_disabled),
                 matchedRules = listOf("AutomationDisabled"),
                 shouldLog = false,
             )
@@ -27,8 +29,8 @@ class ForegroundRuleEvaluator @Inject constructor() {
         if (!context.executorAvailable) {
             return ForegroundRuleDecision(
                 targetAppActive = targetAppActive,
-                action = ForegroundAction.PauseAutomation("执行器不可用，自动化已暂停"),
-                reason = "执行器不可用，自动化已暂停",
+                action = ForegroundAction.PauseAutomation(AppStrings.get(R.string.executor_unavailable_automation_paused)),
+                reason = AppStrings.get(R.string.executor_unavailable_automation_paused),
                 matchedRules = listOf("ExecutorUnavailable"),
                 shouldLog = true,
             )
@@ -39,8 +41,8 @@ class ForegroundRuleEvaluator @Inject constructor() {
         ) {
             return buildAppExitDisconnectDecision(
                 context = context,
-                reason = "联网应用已离开前台",
-                alreadyDisconnectedReason = "当前已断网，跳过离开目标应用后的重复断网",
+                reason = AppStrings.get(R.string.an_online_app_left_the_foreground_foreground_rule_evaluator),
+                alreadyDisconnectedReason = AppStrings.get(R.string.runtime_app_exit_already_offline),
             )
         }
         if (context.isInBlacklist) {
@@ -55,7 +57,7 @@ class ForegroundRuleEvaluator @Inject constructor() {
         if (context.previousTargetAppActive == targetAppActive) {
             return none(
                 targetAppActive = targetAppActive,
-                reason = "前台应用目标状态未变化",
+                reason = AppStrings.get(R.string.foreground_app_target_status_unchanged),
                 matchedRules = emptyList(),
                 shouldLog = false,
             )
@@ -64,16 +66,16 @@ class ForegroundRuleEvaluator @Inject constructor() {
             ForegroundRuleDecision(
                 targetAppActive = true,
                 action = ForegroundAction.CancelScheduledDisconnect(
-                    reason = "联网应用重新进入前台，已取消待执行的离开应用断网",
+                    reason = AppStrings.get(R.string.runtime_app_return_disconnect_canceled),
                 ),
-                reason = "联网应用重新进入前台，已取消待执行的离开应用断网",
+                reason = AppStrings.get(R.string.runtime_app_return_disconnect_canceled),
                 matchedRules = listOf("CancelAppExitDisconnect"),
                 shouldLog = true,
             )
         } else {
             none(
                 targetAppActive = false,
-                reason = "没有命中需要执行的前台应用规则",
+                reason = AppStrings.get(R.string.no_foreground_app_rule_required_an_action),
                 matchedRules = emptyList(),
                 shouldLog = false,
             )
@@ -84,7 +86,7 @@ class ForegroundRuleEvaluator @Inject constructor() {
         if (context.isCurrentlyDisconnected == true) {
             return none(
                 targetAppActive = false,
-                reason = "当前已断网，跳过黑名单应用的重复断网",
+                reason = AppStrings.get(R.string.already_offline_duplicate_disconnect_for_the_blocklisted_app_skipped),
                 matchedRules = listOf("Blacklist", "AlreadyDisconnected"),
                 shouldLog = false,
             )
@@ -92,7 +94,7 @@ class ForegroundRuleEvaluator @Inject constructor() {
         if (context.isWifiConnected && context.settings.skipDisconnectOnWifi) {
             return none(
                 targetAppActive = false,
-                reason = "当前连接 Wi‑Fi，已跳过黑名单应用断网",
+                reason = AppStrings.get(R.string.connected_to_wi_fi_disconnect_for_the_blocklisted_app_skipped),
                 matchedRules = listOf("Blacklist", "SkipDisconnectOnWifi"),
                 shouldLog = true,
             )
@@ -100,9 +102,9 @@ class ForegroundRuleEvaluator @Inject constructor() {
         return ForegroundRuleDecision(
             targetAppActive = false,
             action = ForegroundAction.Disconnect(
-                reason = "黑名单应用正在前台：${context.displayName()}",
+                reason = AppStrings.get(R.string.blocklisted_app_in_the_foreground, context.displayName()),
             ),
-            reason = "黑名单应用正在前台：${context.displayName()}",
+            reason = AppStrings.get(R.string.blocklisted_app_in_the_foreground, context.displayName()),
             matchedRules = listOf("Blacklist"),
             shouldLog = true,
         )
@@ -131,9 +133,9 @@ class ForegroundRuleEvaluator @Inject constructor() {
             return ForegroundRuleDecision(
                 targetAppActive = true,
                 action = ForegroundAction.CancelScheduledDisconnect(
-                    reason = "当前连接 Wi‑Fi，已跳过目标应用恢复联网",
+                    reason = AppStrings.get(R.string.connected_to_wi_fi_reconnect_for_the_target_app_skipped),
                 ),
-                reason = "当前连接 Wi‑Fi，已跳过目标应用恢复联网",
+                reason = AppStrings.get(R.string.connected_to_wi_fi_reconnect_for_the_target_app_skipped),
                 matchedRules = listOf(targetRule, "SkipReconnectOnWifi"),
                 shouldLog = true,
             )
@@ -141,9 +143,9 @@ class ForegroundRuleEvaluator @Inject constructor() {
         return ForegroundRuleDecision(
             targetAppActive = true,
             action = ForegroundAction.Reconnect(
-                reason = "检测到联网应用进入前台：${context.displayName()}",
+                reason = AppStrings.get(R.string.online_app_entered_the_foreground, context.displayName()),
             ),
-            reason = "检测到联网应用进入前台：${context.displayName()}",
+            reason = AppStrings.get(R.string.online_app_entered_the_foreground, context.displayName()),
             matchedRules = listOf(targetRule),
             shouldLog = true,
         )
@@ -165,7 +167,7 @@ class ForegroundRuleEvaluator @Inject constructor() {
         if (context.isAppExitDisconnectScheduled) {
             return none(
                 targetAppActive = false,
-                reason = "离开目标应用延时断网已在计时中",
+                reason = AppStrings.get(R.string.app_exit_disconnect_countdown_is_already_running),
                 matchedRules = listOf("AppExitDisconnect", "AlreadyScheduled"),
                 shouldLog = false,
             )
@@ -173,7 +175,7 @@ class ForegroundRuleEvaluator @Inject constructor() {
         if (context.isWifiConnected && context.settings.skipDisconnectOnWifi) {
             return none(
                 targetAppActive = false,
-                reason = "当前连接 Wi‑Fi，已跳过离开目标应用断网",
+                reason = AppStrings.get(R.string.connected_to_wi_fi_app_exit_disconnect_skipped),
                 matchedRules = listOf("AppExitDisconnect", "SkipDisconnectOnWifi"),
                 shouldLog = true,
             )
@@ -182,7 +184,7 @@ class ForegroundRuleEvaluator @Inject constructor() {
             targetAppActive = false,
             action = if (context.settings.appExitDelaySeconds > 0) {
                 ForegroundAction.ScheduleDisconnect(
-                    reason = "$reason，将在 ${context.settings.appExitDelaySeconds} 秒后断网",
+                    reason = AppStrings.quantity(R.plurals.disconnecting_in_seconds, (context.settings.appExitDelaySeconds).toInt(), reason, context.settings.appExitDelaySeconds),
                     delaySeconds = context.settings.appExitDelaySeconds,
                 )
             } else {

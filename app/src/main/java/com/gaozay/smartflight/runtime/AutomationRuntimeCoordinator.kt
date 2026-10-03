@@ -1,9 +1,11 @@
 package com.gaozay.smartflight.runtime
 
 import android.util.Log
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.InstalledAppRepository
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.ForegroundMonitorMode
@@ -11,6 +13,8 @@ import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
 import com.gaozay.smartflight.settings.isTemporaryDisableActive
 import com.gaozay.smartflight.settings.shouldClearExpiredTemporaryDisable
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,8 +24,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-import javax.inject.Singleton
 
 @Singleton
 class AutomationRuntimeCoordinator @Inject constructor(
@@ -253,7 +255,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
             state = temporaryDisableHandler.clearTemporaryDisable(
                 state = state,
                 scheduler = scheduler,
-                reason = "已息屏，恢复自动化",
+                reason = AppStrings.get(R.string.screen_turned_off_automation_restored),
             )
         }
         reporter.markServiceRunning(ScreenState.ScreenOff)
@@ -286,7 +288,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
             state = temporaryDisableHandler.clearTemporaryDisable(
                 state = state,
                 scheduler = scheduler,
-                reason = "临时禁用已到期，恢复自动化",
+                reason = AppStrings.get(R.string.temporary_disable_period_expired_automation_restored),
             )
         }
         if (state.settings.isTemporaryDisableActive()) {
@@ -320,7 +322,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
             state = temporaryDisableHandler.clearTemporaryDisable(
                 state = state,
                 scheduler = scheduler,
-                reason = "临时禁用已到期，恢复自动化",
+                reason = AppStrings.get(R.string.temporary_disable_period_expired_automation_restored),
             )
         }
         state = foregroundAutomationHandler.automationTick(
@@ -341,7 +343,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
             state = temporaryDisableHandler.clearTemporaryDisable(
                 state = state,
                 scheduler = scheduler,
-                reason = "临时禁用已到期，恢复自动化",
+                reason = AppStrings.get(R.string.temporary_disable_period_expired_automation_restored),
             )
         }
         state = foregroundAutomationHandler.automationTick(
@@ -388,7 +390,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
             state = temporaryDisableHandler.clearTemporaryDisable(
                 state = state,
                 scheduler = scheduler,
-                reason = "临时禁用已到期，恢复自动化",
+                reason = AppStrings.get(R.string.temporary_disable_period_expired_automation_restored),
             )
             disconnectAutomationHandler.scheduleScreenOffDisconnectIfNeeded(state, scheduler)
             scheduleForegroundObservation(immediate = true)

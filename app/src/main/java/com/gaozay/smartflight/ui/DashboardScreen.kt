@@ -42,10 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gaozay.smartflight.ExecutionLogItem
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.SmartFlightUiState
 import com.gaozay.smartflight.settings.AutomationDisableMode
 
@@ -81,11 +83,11 @@ internal fun DashboardScreen(
         item { ExplanationCard(state.triggerSummary) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                EntryCard(Icons.Rounded.Apps, "应用范围", "设置哪些应用会被视为联网", onOpenApps)
-                EntryCard(Icons.AutoMirrored.Rounded.Rule, "自动化规则", "配置息屏、离开应用和 Wi‑Fi 例外", onOpenRules)
-                EntryCard(Icons.Rounded.BugReport, "诊断与日志", "查看权限、执行器和最近动作", onOpenDiagnostics)
-                EntryCard(Icons.Rounded.Palette, "外观设置", "调整主题、配色强度和圆角风格", onOpenAppearance)
-                EntryCard(Icons.Rounded.Info, "关于", "查看版本信息并手动检查更新", onOpenAbout)
+                EntryCard(Icons.Rounded.Apps, stringResource(R.string.app_scope), stringResource(R.string.choose_which_apps_are_treated_as_online), onOpenApps)
+                EntryCard(Icons.AutoMirrored.Rounded.Rule, stringResource(R.string.automation_rules), stringResource(R.string.configure_screen_off_app_exit_and_wi_fi_exceptions), onOpenRules)
+                EntryCard(Icons.Rounded.BugReport, stringResource(R.string.diagnostics_and_logs), stringResource(R.string.view_permissions_executors_and_recent_actions), onOpenDiagnostics)
+                EntryCard(Icons.Rounded.Palette, stringResource(R.string.appearance), stringResource(R.string.adjust_theme_color_intensity_and_corner_style), onOpenAppearance)
+                EntryCard(Icons.Rounded.Info, stringResource(R.string.about), stringResource(R.string.view_version_information_and_check_for_updates_manually), onOpenAbout)
             }
         }
         item { RecentActionCard(state.recentExecutionLogs, onOpenDiagnostics) }
@@ -116,9 +118,9 @@ private fun MainStatusCard(
                 }
                 Spacer(Modifier.size(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(if (state.automationEnabled) "自动化运行中" else "自动化已暂停", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(if (state.automationEnabled) stringResource(R.string.automation_running) else stringResource(R.string.automation_paused), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(
-                        state.automationDisableSummary ?: if (state.automationEnabled) "规则正在监听" else "所有自动动作已暂停",
+                        state.automationDisableSummary ?: if (state.automationEnabled) stringResource(R.string.rules_are_monitoring) else stringResource(R.string.all_automatic_actions_are_paused),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -131,7 +133,7 @@ private fun MainStatusCard(
                 ) {
                     Icon(Icons.Rounded.Schedule, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text(if (state.automationDisabled) "调整禁用模式" else "禁用")
+                    Text(if (state.automationDisabled) stringResource(R.string.change_disable_mode) else stringResource(R.string.disable))
                 }
                 DropdownMenu(
                     expanded = disableMenuExpanded,
@@ -139,7 +141,7 @@ private fun MainStatusCard(
                 ) {
                     automationDisableOptions.forEach { mode ->
                         DropdownMenuItem(
-                            text = { Text(mode.label) },
+                            text = { Text(stringResource(mode.labelRes)) },
                             leadingIcon = { Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null) },
                             onClick = {
                                 disableMenuExpanded = false
@@ -150,9 +152,9 @@ private fun MainStatusCard(
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatusLine("控制模式", state.currentMode)
-                StatusLine("执行方式", state.runtimeExecutor)
-                StatusLine("前台应用", state.foregroundApp)
+                StatusLine(stringResource(R.string.control_mode), state.currentMode)
+                StatusLine(stringResource(R.string.execution_method), state.runtimeExecutor)
+                StatusLine(stringResource(R.string.foreground_app), state.foregroundApp)
             }
         }
     }
@@ -170,7 +172,7 @@ private fun StatusLine(label: String, value: String) {
 private fun ExplanationCard(summary: String) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.large) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("当前解释", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.current_explanation), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(summary, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -195,9 +197,9 @@ private fun EntryCard(icon: ImageVector, title: String, description: String, onC
 private fun RecentActionCard(logs: List<ExecutionLogItem>, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), shape = MaterialTheme.shapes.large) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("最近动作", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.recent_actions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             val latest = logs.firstOrNull()
-            if (latest == null) Text("尚未执行任何自动动作", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (latest == null) Text(stringResource(R.string.no_automatic_actions_taken_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
             else {
                 Text("${latest.action} · ${latest.result}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                 Text(latest.detail, color = MaterialTheme.colorScheme.onSurfaceVariant)

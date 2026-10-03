@@ -19,8 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.permission.AccessGateState
 
 @Composable
@@ -46,16 +48,16 @@ internal fun AccessSummaryCard(state: AccessGateState) {
             Spacer(modifier = Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (state.canEnterApp) "已满足核心运行门槛" else "仍需完成接入条件",
+                    text = if (state.canEnterApp) stringResource(R.string.core_requirements_met) else stringResource(R.string.setup_requirements_still_incomplete),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = if (state.canEnterApp) {
-                        "当前执行器：${state.advancedAccess.selectedExecutorType.label}"
+                        stringResource(R.string.current_executor, state.advancedAccess.selectedExecutorType.label)
                     } else {
-                        "阻塞项剩余 ${state.blockingChecks.size} 个，建议项 ${state.advisoryChecks.size} 个"
+                        stringResource(R.string.blocking_requirements_left_recommendations, state.blockingChecks.size, state.advisoryChecks.size)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

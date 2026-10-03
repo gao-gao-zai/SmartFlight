@@ -15,6 +15,7 @@ import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.permission.AccessGateState
 import com.gaozay.smartflight.runtime.AutomationServiceController
 import com.gaozay.smartflight.settings.AutomationDisableMode
@@ -23,14 +24,14 @@ import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.UserSettings
 import com.gaozay.smartflight.update.UpdateUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.launch
+import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -153,25 +154,25 @@ class MainViewModel @Inject constructor(
 data class SmartFlightUiState(
     val accessGateState: AccessGateState = AccessGateState(),
     val settings: UserSettings = UserSettings(),
-    val advancedAccess: String = "需要 Shizuku / ADB / Root",
-    val currentMode: String = "飞行模式",
+    val advancedAccess: String = AppStrings.get(R.string.requires_shizuku_adb_root),
+    val currentMode: String = AppStrings.get(R.string.airplane_mode),
     val automationEnabled: Boolean = false,
     val automationDisabled: Boolean = true,
-    val automationDisableSummary: String? = "已永久禁用",
+    val automationDisableSummary: String? = AppStrings.get(R.string.permanently_disabled),
     val monitorForegroundWhenScreenOff: Boolean = false,
-    val foregroundApp: String = "尚未连接",
-    val runtimeExecutor: String = "不可用",
-    val runtimeLastCheck: String = "尚未执行自检",
+    val foregroundApp: String = AppStrings.get(R.string.not_connected_yet),
+    val runtimeExecutor: String = AppStrings.get(R.string.unavailable),
+    val runtimeLastCheck: String = AppStrings.get(R.string.self_check_not_run_yet),
     val runtimeLastResult: String = ExecutionResult.Pending.label,
     val runtimeUpdatedAtMillis: Long = 0,
     val unifiedNetworkState: String = "Unknown",
-    val wifiStatus: String = "未知",
-    val bluetoothStatus: String = "未知",
-    val mobileDataStatus: String = "未知",
+    val wifiStatus: String = AppStrings.get(R.string.unknown),
+    val bluetoothStatus: String = AppStrings.get(R.string.unknown),
+    val mobileDataStatus: String = AppStrings.get(R.string.unknown),
     val bluetoothReadable: Boolean = false,
     val executorDiagnostics: List<ExecutorDiagnosticItem> = emptyList(),
     val recentExecutionLogs: List<ExecutionLogItem> = emptyList(),
-    val triggerSummary: String = "项目已初始化，运行时引擎待接入。",
+    val triggerSummary: String = AppStrings.get(R.string.project_initialized_runtime_engine_integration_pending),
 )
 
 @Immutable

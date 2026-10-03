@@ -6,11 +6,12 @@ import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.InstalledAppRepository
 import com.gaozay.smartflight.apps.InternetPermissionFilter
 import com.gaozay.smartflight.apps.LauncherFilter
+import com.gaozay.smartflight.i18n.AppStrings
 import dagger.hilt.android.scopes.ViewModelScoped
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import javax.inject.Inject
 
 @ViewModelScoped
 class AppsManagementController @Inject constructor(
@@ -23,7 +24,7 @@ class AppsManagementController @Inject constructor(
 
     val appQuery = MutableStateFlow("")
     val appScanning = MutableStateFlow(false)
-    val appLastScanSummary = MutableStateFlow("尚未扫描")
+    val appLastScanSummary = MutableStateFlow(AppStrings.get(R.string.not_scanned_yet))
     internal fun appFilterStateFlow() = combine(
         appFilter.asStateFlow(),
         appInternetPermissionFilter.asStateFlow(),
@@ -69,11 +70,11 @@ class AppsManagementController @Inject constructor(
         val count = runCatching {
             installedAppRepository.refreshInstalledApps()
         }.getOrElse {
-            appLastScanSummary.value = "扫描失败：${it.message ?: "未知错误"}"
+            appLastScanSummary.value = AppStrings.get(R.string.scan_failed, it.message ?: AppStrings.get(R.string.unknown_error))
             appScanning.value = false
             return
         }
-        appLastScanSummary.value = "上次扫描发现 $count 个用户应用"
+        appLastScanSummary.value = AppStrings.quantity(R.plurals.the_last_scan_found_user_apps, (count).toInt(), count)
         appScanning.value = false
     }
 

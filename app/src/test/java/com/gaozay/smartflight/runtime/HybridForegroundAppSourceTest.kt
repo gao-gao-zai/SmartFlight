@@ -1,11 +1,12 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.settings.ForegroundMonitorMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-class HybridForegroundAppSourceTest {
+class HybridForegroundAppSourceTest : LocalizedStringsTest() {
     @Test
     fun accessibilityModeDoesNotCallUsageStatsFallbackWhenCacheIsEmpty() {
         var usageStatsDetectCalls = 0

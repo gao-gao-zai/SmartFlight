@@ -1,6 +1,8 @@
 package com.gaozay.smartflight.executor
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.permission.RootAccessProbeRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,11 +17,11 @@ class RootExecutorValidator @Inject constructor(
             return ExecutorValidationResult(
                 executorType = ExecutorType.Root,
                 isReady = false,
-                summary = "Root 执行器待确认授权",
+                summary = AppStrings.get(R.string.root_executor_authorization_is_unconfirmed),
                 detail = if (snapshot.lastProbeAtMillis > 0) {
                     snapshot.lastProbeSummary
                 } else {
-                    "尚未执行 Root 主动授权测试"
+                    AppStrings.get(R.string.no_active_root_authorization_test_has_been_run_yet)
                 },
                 command = ExecutorReadonlyCommands.ReadAirplaneModeState.rawCommand,
             )
@@ -28,8 +30,8 @@ class RootExecutorValidator @Inject constructor(
         return ExecutorValidationResult(
             executorType = ExecutorType.Root,
             isReady = true,
-            summary = "Root 执行器已确认授权",
-            detail = snapshot.lastProbeSummary.ifBlank { "已完成 Root 主动授权测试" },
+            summary = AppStrings.get(R.string.root_executor_authorization_confirmed),
+            detail = snapshot.lastProbeSummary.ifBlank { AppStrings.get(R.string.active_root_authorization_test_completed) },
             command = ExecutorReadonlyCommands.ReadAirplaneModeState.rawCommand,
         )
     }

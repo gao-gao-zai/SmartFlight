@@ -15,6 +15,7 @@ import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.logs.ExecutionLogRepository
 import com.gaozay.smartflight.runtime.AutomationServiceController
 import com.gaozay.smartflight.settings.AutomationDisableMode
@@ -25,12 +26,12 @@ import com.gaozay.smartflight.update.UpdateCheckResult
 import com.gaozay.smartflight.update.UpdateRepository
 import com.gaozay.smartflight.update.UpdateUiState
 import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 class MainViewModelActionDispatcher @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -242,7 +243,7 @@ class MainViewModelActionDispatcher @Inject constructor(
                 }
                 is UpdateCheckResult.UpToDate -> {
                     mutableUpdateUiState.value = if (manual) {
-                        UpdateUiState.UpToDate("当前已是最新版本")
+                        UpdateUiState.UpToDate(AppStrings.get(R.string.you_are_on_the_latest_version))
                     } else {
                         UpdateUiState.Idle
                     }
@@ -252,7 +253,7 @@ class MainViewModelActionDispatcher @Inject constructor(
                 }
                 is UpdateCheckResult.Failed -> {
                     mutableUpdateUiState.value = if (manual) {
-                        UpdateUiState.Failed("检查更新失败：${result.message}")
+                        UpdateUiState.Failed(AppStrings.get(R.string.update_check_failed, result.message))
                     } else {
                         UpdateUiState.Idle
                     }
@@ -274,7 +275,7 @@ class MainViewModelActionDispatcher @Inject constructor(
 
     fun copyUpdateLink(url: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("SmartFlight 更新链接", url))
+        clipboard.setPrimaryClip(ClipData.newPlainText(AppStrings.get(R.string.smartflight_update_link), url))
     }
 
     fun openUpdateLink(url: String) {

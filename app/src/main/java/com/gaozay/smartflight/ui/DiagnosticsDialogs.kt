@@ -8,20 +8,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.gaozay.smartflight.R
 
 @Composable
 internal fun ConfirmActionDialog(action: String, modeLabel: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     val title = when (action) {
-        "probe" -> "探测当前控制状态"
-        "toggle" -> "手动切换当前模式"
-        "clear" -> "清空全部日志"
-        else -> "确认操作"
+        "probe" -> stringResource(R.string.probe_current_control_state)
+        "toggle" -> stringResource(R.string.manually_toggle_current_mode)
+        "clear" -> stringResource(R.string.clear_all_logs)
+        else -> stringResource(R.string.confirm_action)
     }
     val description = when (action) {
-        "probe" -> "即将读取设备当前的 $modeLabel 状态，并写入一条诊断日志。"
-        "toggle" -> "即将直接切换当前联网控制方式（$modeLabel）。该操作仅用于排障，并会写入日志。"
-        "clear" -> "即将清空当前保存的执行日志，此操作不可从应用内恢复。"
-        else -> "请确认是否继续。"
+        "probe" -> stringResource(R.string.diagnostics_probe_description, modeLabel)
+        "toggle" -> stringResource(R.string.diagnostics_toggle_description, modeLabel)
+        "clear" -> stringResource(R.string.clear_all_saved_execution_logs_this_cannot_be_undone_from_the_app)
+        else -> stringResource(R.string.confirm_whether_to_continue)
     }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -29,6 +31,6 @@ internal fun ConfirmActionDialog(action: String, modeLabel: String, onDismiss: (
         title = { Text(title) },
         text = { Text(description) },
         confirmButton = { TextButton(onClick = onConfirm) { Text(title) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

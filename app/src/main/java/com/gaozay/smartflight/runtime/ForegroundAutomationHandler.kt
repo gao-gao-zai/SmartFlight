@@ -1,12 +1,14 @@
 package com.gaozay.smartflight.runtime
 
 import android.util.Log
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.TriggerSource
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.isTemporaryDisableActive
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
 
 class ForegroundAutomationHandler @Inject constructor(
     private val accessRepository: AccessRepository,
@@ -49,7 +51,7 @@ class ForegroundAutomationHandler @Inject constructor(
                 currentState = temporaryDisableHandler.clearTemporaryDisable(
                     state = currentState,
                     scheduler = scheduler,
-                    reason = "检测到应用切换，恢复自动化",
+                    reason = AppStrings.get(R.string.app_switch_detected_automation_restored),
                 )
             } else {
                 reporter.markTemporaryDisabled(

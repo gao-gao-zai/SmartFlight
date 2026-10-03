@@ -4,6 +4,7 @@ import com.gaozay.smartflight.data.local.entity.ExecutionLogEntity
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.permission.AccessGateState
 import com.gaozay.smartflight.runtime.RuntimeSnapshot
 import com.gaozay.smartflight.runtime.buildRuntimeSummary
@@ -29,7 +30,7 @@ class DashboardUiStateMapper @Inject constructor() {
             automationEnabled = settings.isAutomationEffectivelyEnabled(),
             automationDisabled = !settings.automationEnabled || settings.temporaryDisableSummary() != null,
             automationDisableSummary = settings.temporaryDisableSummary()
-                ?: if (settings.automationEnabled) null else "已永久禁用",
+                ?: if (settings.automationEnabled) null else AppStrings.get(R.string.permanently_disabled),
             monitorForegroundWhenScreenOff = settings.monitorForegroundWhenScreenOff,
             foregroundApp = runtimeSnapshot.currentForegroundAppLabel
                 ?: runtimeSnapshot.currentForegroundPackageName
@@ -47,9 +48,9 @@ class DashboardUiStateMapper @Inject constructor() {
             recentExecutionLogs = recentLogs.map { it.toUiItem() },
             triggerSummary = buildString {
                 append(buildRuntimeSummary(settings, runtimeSnapshot))
-                append(" · Apps: ")
+                append(AppStrings.get(R.string.dashboard_app_count_suffix))
                 append(appCount)
-                append(" · Logs: ")
+                append(AppStrings.get(R.string.dashboard_log_count_suffix))
                 append(logCount)
             },
         )
@@ -57,20 +58,20 @@ class DashboardUiStateMapper @Inject constructor() {
 
 fun ExecutionLogEntity.toUiItem(): ExecutionLogItem {
     val actionLabel = when {
-        errorMessage?.startsWith("飞行模式状态探测：") == true ||
-            errorMessage?.startsWith("移动数据状态探测：") == true -> "状态探测"
-        actionType == ExecutionAction.ReconnectNow.name -> "立即恢复联网"
-        actionType == ExecutionAction.DisconnectNow.name -> "立即断网"
-        actionType == ExecutionAction.DoNothing.name -> "未执行动作"
+        AppStrings.hasTranslatedPrefix(errorMessage, R.string.probe_airplane_mode_prefix) ||
+            AppStrings.hasTranslatedPrefix(errorMessage, R.string.probe_mobile_data_prefix) -> AppStrings.get(R.string.state_probe)
+        actionType == ExecutionAction.ReconnectNow.name -> AppStrings.get(R.string.reconnect_now)
+        actionType == ExecutionAction.DisconnectNow.name -> AppStrings.get(R.string.disconnect_now)
+        actionType == ExecutionAction.DoNothing.name -> AppStrings.get(R.string.no_action_taken)
         else -> runCatching { enumValueOf<ExecutionAction>(actionType).label }.getOrDefault(actionType)
     }
     val executorLabel = runCatching { enumValueOf<ExecutorType>(executorType).label }.getOrDefault(executorType)
     val resultLabel = when (result) {
-        ExecutionResult.Success.name -> "成功"
-        ExecutionResult.Failed.name -> "失败"
-        ExecutionResult.Pending.name -> "待定"
-        ExecutionResult.PartialSuccess.name -> "部分成功"
-        ExecutionResult.Skipped.name -> "已跳过"
+        ExecutionResult.Success.name -> AppStrings.get(R.string.success)
+        ExecutionResult.Failed.name -> AppStrings.get(R.string.failed)
+        ExecutionResult.Pending.name -> AppStrings.get(R.string.pending)
+        ExecutionResult.PartialSuccess.name -> AppStrings.get(R.string.partial_success)
+        ExecutionResult.Skipped.name -> AppStrings.get(R.string.skipped)
         else -> runCatching { enumValueOf<ExecutionResult>(result).label }.getOrDefault(result)
     }
     return ExecutionLogItem(
@@ -78,28 +79,28 @@ fun ExecutionLogEntity.toUiItem(): ExecutionLogItem {
         action = actionLabel,
         executor = executorLabel,
         result = resultLabel,
-        detail = errorMessage ?: "无附加信息",
+        detail = errorMessage ?: AppStrings.get(R.string.no_additional_information),
     )
 }
 
 fun buildWifiStatus(snapshot: RuntimeSnapshot): String = when {
-    snapshot.isWifiConnected -> "已连接"
-    snapshot.isWifiEnabled -> "已开启，未连接"
-    else -> "已关闭"
+    snapshot.isWifiConnected -> AppStrings.get(R.string.connected)
+    snapshot.isWifiEnabled -> AppStrings.get(R.string.enabled_not_connected)
+    else -> AppStrings.get(R.string.disabled)
 }
 
 fun buildBluetoothStatus(snapshot: RuntimeSnapshot): String =
     if (!snapshot.isBluetoothStateReadable) {
-        "未授权，不可读"
+        AppStrings.get(R.string.permission_not_granted_state_unavailable)
     } else if (snapshot.isBluetoothEnabled) {
-        "已开启"
+        AppStrings.get(R.string.enabled)
     } else {
-        "已关闭"
+        AppStrings.get(R.string.disabled)
     }
 
 fun buildMobileDataStatus(snapshot: RuntimeSnapshot): String =
     when (snapshot.isMobileDataEnabled) {
-        true -> "已开启"
-        false -> "已关闭"
-        null -> "未知"
+        true -> AppStrings.get(R.string.enabled)
+        false -> AppStrings.get(R.string.disabled)
+        null -> AppStrings.get(R.string.unknown)
     }

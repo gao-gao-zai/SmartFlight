@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.gaozay.smartflight.BuildConfig
@@ -92,19 +93,21 @@ private fun AboutHeroCard() {
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "SmartFlight",
+                    stringResource(R.string.brand_name),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
-                Text(
-                    "自动飞行",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
-                )
+                if (stringResource(R.string.app_name) != stringResource(R.string.brand_name)) {
+                    Text(
+                        stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
+                    )
+                }
             }
             Text(
-                "按应用掌控联网状态，让自动化安静地守住规则。",
+                stringResource(R.string.about_tagline),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
@@ -125,7 +128,7 @@ private fun AboutHeroCard() {
                     )
                     Spacer(Modifier.size(8.dp))
                     Text(
-                        "当前版本 ${BuildConfig.VERSION_NAME}",
+                        stringResource(R.string.current_version, BuildConfig.VERSION_NAME),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -146,14 +149,14 @@ private fun AboutUpdateCard(
         shape = MaterialTheme.shapes.large,
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("版本更新", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.version_updates), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "启动时会静默检查新版本；手动检查会显示完整结果。",
+                stringResource(R.string.about_update_check_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "跳过的版本会在远端出现更高版本后重新提示。",
+                stringResource(R.string.about_skipped_version_description),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -168,12 +171,12 @@ private fun AboutUpdateCard(
                     Icon(Icons.Rounded.Refresh, contentDescription = null)
                 }
                 Spacer(Modifier.size(8.dp))
-                Text(if (checking) "正在检查更新" else "检查更新")
+                Text(if (checking) stringResource(R.string.checking_for_updates) else stringResource(R.string.check_for_updates))
             }
             OutlinedButton(onClick = onOpenReleasePage, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Rounded.OpenInBrowser, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text("打开发布页")
+                Text(stringResource(R.string.open_release_page))
             }
         }
     }
@@ -186,21 +189,21 @@ private fun AboutFeatureCard() {
         shape = MaterialTheme.shapes.large,
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("一点说明", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.a_few_details), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             AboutFeatureRow(
                 icon = Icons.Rounded.Route,
-                title = "按应用联网控制",
-                description = "围绕目标应用切换联网状态，规则仍由你决定。",
+                title = stringResource(R.string.connectivity_control_by_app),
+                description = stringResource(R.string.switch_connectivity_around_your_target_apps_with_rules_you_control),
             )
             AboutFeatureRow(
                 icon = Icons.Rounded.CloudDone,
-                title = "Gitee 优先 / GitHub 备用",
-                description = "更新检查会先看 Gitee，失败后再尝试 GitHub。",
+                title = stringResource(R.string.gitee_first_github_fallback),
+                description = stringResource(R.string.update_checks_try_gitee_first_then_github_if_gitee_fails),
             )
             AboutFeatureRow(
                 icon = Icons.Rounded.SystemUpdateAlt,
-                title = "只打开发布页",
-                description = "第一版不自动下载或安装 APK。",
+                title = stringResource(R.string.opens_the_release_page_only),
+                description = stringResource(R.string.the_first_version_does_not_automatically_download_or_install_apks),
             )
         }
     }

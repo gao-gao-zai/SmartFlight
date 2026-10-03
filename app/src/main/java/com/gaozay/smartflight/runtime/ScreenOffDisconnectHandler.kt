@@ -1,13 +1,15 @@
 package com.gaozay.smartflight.runtime
 
 import android.util.Log
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.TriggerSource
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.permission.AccessRepository
 import com.gaozay.smartflight.settings.isAutomationEffectivelyEnabled
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
 
 class ScreenOffDisconnectHandler @Inject constructor(
     private val accessRepository: AccessRepository,
@@ -107,7 +109,7 @@ class ScreenOffDisconnectHandler @Inject constructor(
             currentDisconnected = latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode),
             targetDisconnected = true,
             triggerSource = TriggerSource.ScreenOff,
-            reason = "息屏延迟 ${latestSettings.screenOffDelaySeconds} 秒后执行断网${latestSettings.mobileDataNoOpSuffix()}",
+            reason = AppStrings.quantity(R.plurals.disconnecting_after_a_screen_off_delay_of_seconds, (latestSettings.screenOffDelaySeconds).toInt(), latestSettings.screenOffDelaySeconds, latestSettings.mobileDataNoOpSuffix()),
             prompt = RuntimePrompt.Disconnect(latestSettings),
         )
     }

@@ -12,8 +12,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.AppFilter
 import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.AppsUiState
@@ -50,7 +52,7 @@ fun AppManagementScreen(
                 onValueChange = onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("搜索应用名称或包名") },
+                label = { Text(stringResource(R.string.search_app_name_or_package_name)) },
             )
         }
         item {
@@ -65,7 +67,7 @@ fun AppManagementScreen(
         }
         item {
             Text(
-                text = "应用列表",
+                text = stringResource(R.string.app_list),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 4.dp),

@@ -1,35 +1,37 @@
 package com.gaozay.smartflight.permission
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.executor.ExecutorCommandResult
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.runtime.RuntimeSnapshot
 import javax.inject.Inject
 
 class AccessResultFormatter @Inject constructor() {
     fun buildProbeDetailReason(result: ExecutorCommandResult): String = buildString {
         val mode = result.controlMode ?: NetworkControlMode.AirplaneMode
-        append(if (mode == NetworkControlMode.AirplaneMode) "飞行模式状态探测：" else "移动数据状态探测：")
+        append(if (mode == NetworkControlMode.AirplaneMode) AppStrings.get(R.string.probe_airplane_mode_prefix) else AppStrings.get(R.string.probe_mobile_data_prefix))
         append(
             when (result.controlledEnabled) {
-                true -> if (mode == NetworkControlMode.AirplaneMode) "已开启" else "已开启"
-                false -> if (mode == NetworkControlMode.AirplaneMode) "已关闭" else "已关闭"
+                true -> if (mode == NetworkControlMode.AirplaneMode) AppStrings.get(R.string.enabled) else AppStrings.get(R.string.enabled)
+                false -> if (mode == NetworkControlMode.AirplaneMode) AppStrings.get(R.string.disabled) else AppStrings.get(R.string.disabled)
                 null -> result.summary
             },
         )
-        append(" · 执行器：")
+        append(AppStrings.get(R.string.executor))
         append(result.executorType.label)
         appendCommandOutput(result)
     }
 
     fun buildActionDetailReason(reasonPrefix: String, result: ExecutorCommandResult): String = buildString {
         append(reasonPrefix)
-        append("：")
+        append(AppStrings.get(R.string.detail_separator))
         append(result.summary)
-        append(" · 执行器：")
+        append(AppStrings.get(R.string.executor))
         append(result.executorType.label)
         appendCommandOutput(result)
     }
@@ -41,7 +43,7 @@ class AccessResultFormatter @Inject constructor() {
     ): String = buildString {
         append(buildActionDetailReason(reasonPrefix, airplaneResult))
         if (restoreMobileDataResult != null) {
-            append(" · 移动数据恢复：")
+            append(AppStrings.get(R.string.mobile_data_restoration))
             append(restoreMobileDataResult.summary)
             appendCommandOutput(restoreMobileDataResult)
         }
@@ -49,9 +51,9 @@ class AccessResultFormatter @Inject constructor() {
 
     fun buildPassiveAccessSummary(advancedAccess: AdvancedAccessState): String {
         if (advancedAccess.selectedExecutorType != ExecutorType.Unavailable) {
-            return "当前可用通道：${advancedAccess.selectedExecutorType.label}"
+            return AppStrings.get(R.string.available_execution_channel, advancedAccess.selectedExecutorType.label)
         }
-        return advancedAccess.gatingIssues.firstOrNull()?.summary ?: "尚无可用执行器"
+        return advancedAccess.gatingIssues.firstOrNull()?.summary ?: AppStrings.get(R.string.no_executor_available_yet)
     }
 
     fun shouldRefreshRuntimeStatusSummary(snapshot: RuntimeSnapshot): Boolean {
@@ -84,7 +86,7 @@ class AccessResultFormatter @Inject constructor() {
     }
 
     fun executionResultFor(result: ExecutorCommandResult): ExecutionResult = when {
-        result.summary.contains("已处于") -> ExecutionResult.Skipped
+        result.alreadyInRequestedState -> ExecutionResult.Skipped
         result.executed && result.exitCode == 0 && result.controlledEnabled != null -> ExecutionResult.Success
         result.executed && result.exitCode == 0 -> ExecutionResult.PartialSuccess
         else -> ExecutionResult.Failed
@@ -112,11 +114,11 @@ class AccessResultFormatter @Inject constructor() {
 
     private fun StringBuilder.appendCommandOutput(result: ExecutorCommandResult) {
         if (result.stdout.isNotBlank() && result.stdout.trim() !in setOf("0", "1")) {
-            append(" · 输出：")
+            append(AppStrings.get(R.string.output))
             append(result.stdout.trim())
         }
         if (result.stderr.isNotBlank()) {
-            append(" · 错误：")
+            append(AppStrings.get(R.string.error))
             append(result.stderr.trim())
         }
     }

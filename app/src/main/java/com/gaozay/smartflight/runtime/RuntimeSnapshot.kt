@@ -1,11 +1,13 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.domain.model.UnifiedNetworkState
+import com.gaozay.smartflight.i18n.AppStrings
 
 data class RuntimeSnapshot(
     val currentForegroundPackageName: String? = null,
@@ -29,7 +31,7 @@ data class RuntimeSnapshot(
     val lastActionResult: ExecutionResult = ExecutionResult.Pending,
     val lastActionReason: String = "Runtime not started yet",
     val runtimeStatusResult: ExecutionResult = ExecutionResult.Pending,
-    val runtimeStatusSummary: String = "尚未执行自检",
+    val runtimeStatusSummary: String = AppStrings.get(R.string.self_check_not_run_yet),
     val activeExecutorType: ExecutorType = ExecutorType.Unavailable,
     val updatedAtMillis: Long = 0,
 )

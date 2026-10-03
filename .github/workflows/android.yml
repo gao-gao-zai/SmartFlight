@@ -1,0 +1,79 @@
+name: Android checks
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;34.0.0 build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Check localization catalogs
+        run: python3 scripts/check_localization.py
+      - name: Build, test and lint
+        run: bash gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --no-daemon
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-check-reports
+          path: |
+            app/build/reports
+            app/build/test-results
+          retention-days: 7
+
+  emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;34.0.0 build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build emulator APKs
+        run: bash gradlew assembleDebug assembleDebugAndroidTest -PemulatorAbi=x86_64 --no-daemon
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Run localization tests on Android 15
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          cores: 2
+          ram-size: 2048M
+          disable-linux-hw-accel: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: bash scripts/run_emulator_tests.sh
+      - name: Upload emulator reports and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-emulator-reports
+          path: |
+            app/build/reports/androidTests
+            app/build/outputs/androidTest-results
+            app/build/emulator-artifacts
+          retention-days: 7

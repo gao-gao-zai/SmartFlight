@@ -1,10 +1,11 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.UnifiedNetworkState
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class RuntimeNetworkStateTest {
+class RuntimeNetworkStateTest : LocalizedStringsTest() {
     @Test
     fun airplaneWithWifiMapsToAirplaneWithWifi() {
         assertEquals(

@@ -1,6 +1,8 @@
 package com.gaozay.smartflight.executor
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.i18n.AppStrings
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -10,7 +12,7 @@ class AdbExecutorCommandRunner @Inject constructor() : ExecutorCommandRunner {
         ExecutorCommandResult(
             executorType = ExecutorType.AdbBootstrapped,
             executed = false,
-            summary = "ADB 命令执行器尚未接入",
-            stderr = "当前只完成初始化记录，后续需要定义设备侧可执行命令链路。",
+            summary = AppStrings.get(R.string.adb_command_executor_is_not_integrated_yet),
+            stderr = AppStrings.get(R.string.adb_execution_path_pending),
         )
 }

@@ -1,10 +1,12 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.settings.UserSettings
 import com.gaozay.smartflight.settings.temporaryDisableSummary
 
@@ -19,7 +21,7 @@ internal fun buildRuntimeSummary(
         snapshot.lastAction == ExecutionAction.DoNothing &&
         snapshot.lastActionResult == ExecutionResult.Pending
     ) {
-        return "自动化已永久禁用"
+        return AppStrings.get(R.string.automation_permanently_disabled)
     }
     if (snapshot.isAppExitDisconnectScheduled) {
         val remainingSeconds = remainingSeconds(
@@ -27,7 +29,7 @@ internal fun buildRuntimeSummary(
             fallbackSeconds = settings.appExitDelaySeconds,
             nowMillis = nowMillis,
         )
-        return "联网应用已离开前台，将在 ${remainingSeconds} 秒后断网"
+        return AppStrings.quantity(R.plurals.an_online_app_left_the_foreground_disconnecting_in_seconds, (remainingSeconds).toInt(), remainingSeconds)
     }
     if (snapshot.isScreenOffDisconnectScheduled) {
         val remainingSeconds = remainingSeconds(
@@ -35,27 +37,27 @@ internal fun buildRuntimeSummary(
             fallbackSeconds = settings.screenOffDelaySeconds,
             nowMillis = nowMillis,
         )
-        return "屏幕已熄灭，将在 ${remainingSeconds} 秒后断网"
+        return AppStrings.quantity(R.plurals.screen_turned_off_disconnecting_in_seconds, (remainingSeconds).toInt(), remainingSeconds)
     }
     if (snapshot.screenState == ScreenState.ScreenOff &&
         !settings.monitorForegroundWhenScreenOff
     ) {
-        return "屏幕已熄灭，已按设置暂停前台应用监听"
+        return AppStrings.get(R.string.screen_turned_off_foreground_monitoring_paused_as_configured)
     }
     if (snapshot.lastAction == ExecutionAction.CancelScheduledDisconnect) {
         return when (snapshot.lastActionResult) {
             ExecutionResult.Success -> when (snapshot.lastTriggerSource) {
-                TriggerSource.UserUnlocked -> "用户已解锁，已取消待执行的息屏延迟断网"
-                TriggerSource.ScreenOn -> "屏幕已点亮，已取消待执行的息屏延迟断网"
-                TriggerSource.AppForegroundChanged -> "联网应用已重新进入前台，已取消待执行的离开应用延迟断网"
-                else -> "已取消待执行的息屏延迟断网"
+                TriggerSource.UserUnlocked -> AppStrings.get(R.string.device_unlocked_pending_screen_off_disconnect_canceled)
+                TriggerSource.ScreenOn -> AppStrings.get(R.string.screen_turned_on_pending_screen_off_disconnect_canceled)
+                TriggerSource.AppForegroundChanged -> AppStrings.get(R.string.runtime_app_return_delayed_disconnect_canceled)
+                else -> AppStrings.get(R.string.pending_screen_off_disconnect_canceled)
             }
 
             ExecutionResult.Skipped -> when (snapshot.lastTriggerSource) {
-                TriggerSource.UserUnlocked -> "用户已解锁，当前没有待取消的息屏延迟断网"
-                TriggerSource.ScreenOn -> "屏幕已点亮，当前没有待取消的息屏延迟断网"
-                TriggerSource.AppForegroundChanged -> "当前没有待取消的离开应用延迟断网"
-                else -> "当前没有待取消的息屏延迟断网"
+                TriggerSource.UserUnlocked -> AppStrings.get(R.string.device_unlocked_no_pending_screen_off_disconnect_to_cancel)
+                TriggerSource.ScreenOn -> AppStrings.get(R.string.screen_turned_on_no_pending_screen_off_disconnect_to_cancel)
+                TriggerSource.AppForegroundChanged -> AppStrings.get(R.string.no_pending_app_exit_disconnect_to_cancel)
+                else -> AppStrings.get(R.string.no_pending_screen_off_disconnect_to_cancel)
             }
 
             else -> snapshot.lastActionReason
@@ -67,55 +69,55 @@ internal fun buildRuntimeSummary(
             fallbackSeconds = settings.appExitDelaySeconds,
             nowMillis = nowMillis,
         )
-        return "联网应用已离开前台，将在 ${remainingSeconds} 秒后断网"
+        return AppStrings.quantity(R.plurals.an_online_app_left_the_foreground_disconnecting_in_seconds, (remainingSeconds).toInt(), remainingSeconds)
     }
     if (snapshot.lastAction == ExecutionAction.DoNothing &&
         snapshot.lastTriggerSource == TriggerSource.Manual
     ) {
         return when (snapshot.lastActionResult) {
             ExecutionResult.Success -> buildProbeSuccessSummary(mode, snapshot)
-            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { "${mode.label}状态探测失败" }
-            else -> snapshot.lastActionReason.ifBlank { "${mode.label}状态待确认" }
+            ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank { AppStrings.get(R.string.state_probe_failed, mode.label) }
+            else -> snapshot.lastActionReason.ifBlank { AppStrings.get(R.string.state_is_unconfirmed, mode.label) }
         }
     }
     if (snapshot.lastAction == ExecutionAction.DisconnectNow) {
         return when (snapshot.lastActionResult) {
             ExecutionResult.Success -> when (mode) {
-                NetworkControlMode.AirplaneMode -> "已开启飞行模式，当前处于断网状态"
-                NetworkControlMode.MobileData -> "已关闭移动数据，当前处于断网状态${settings.mobileDataNoOpSuffix()}"
+                NetworkControlMode.AirplaneMode -> AppStrings.get(R.string.airplane_mode_enabled_currently_offline)
+                NetworkControlMode.MobileData -> AppStrings.get(R.string.mobile_data_disabled_currently_offline, settings.mobileDataNoOpSuffix())
             }
             ExecutionResult.Skipped -> when (mode) {
-                NetworkControlMode.AirplaneMode -> "飞行模式原本已开启，无需重复断网"
-                NetworkControlMode.MobileData -> "移动数据原本已关闭，无需重复断网${settings.mobileDataNoOpSuffix()}"
+                NetworkControlMode.AirplaneMode -> AppStrings.get(R.string.airplane_mode_was_already_enabled_no_additional_disconnect_needed)
+                NetworkControlMode.MobileData -> AppStrings.get(R.string.mobile_data_was_already_disabled_no_additional_disconnect_needed, settings.mobileDataNoOpSuffix())
             }
-            ExecutionResult.PartialSuccess -> snapshot.lastActionReason.ifBlank { "${mode.label}写入后校验异常" }
+            ExecutionResult.PartialSuccess -> snapshot.lastActionReason.ifBlank { AppStrings.get(R.string.unexpected_verification_result_after_writing, mode.label) }
             ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank {
                 when (mode) {
-                    NetworkControlMode.AirplaneMode -> "开启飞行模式失败"
-                    NetworkControlMode.MobileData -> "关闭移动数据失败"
+                    NetworkControlMode.AirplaneMode -> AppStrings.get(R.string.failed_to_enable_airplane_mode)
+                    NetworkControlMode.MobileData -> AppStrings.get(R.string.failed_to_disable_mobile_data)
                 }
             }
-            else -> snapshot.lastActionReason.ifBlank { "正在执行断网" }
+            else -> snapshot.lastActionReason.ifBlank { AppStrings.get(R.string.disconnecting) }
         }
     }
     if (snapshot.lastAction == ExecutionAction.ReconnectNow) {
         return when (snapshot.lastActionResult) {
             ExecutionResult.Success -> when (mode) {
-                NetworkControlMode.AirplaneMode -> "已关闭飞行模式，当前已恢复联网"
-                NetworkControlMode.MobileData -> "已开启移动数据，当前已恢复联网${settings.mobileDataNoOpSuffix()}"
+                NetworkControlMode.AirplaneMode -> AppStrings.get(R.string.airplane_mode_disabled_connectivity_restored)
+                NetworkControlMode.MobileData -> AppStrings.get(R.string.mobile_data_enabled_connectivity_restored, settings.mobileDataNoOpSuffix())
             }
             ExecutionResult.Skipped -> when (mode) {
-                NetworkControlMode.AirplaneMode -> "飞行模式原本已关闭，无需重复恢复联网"
-                NetworkControlMode.MobileData -> "移动数据原本已开启，无需重复恢复联网${settings.mobileDataNoOpSuffix()}"
+                NetworkControlMode.AirplaneMode -> AppStrings.get(R.string.airplane_mode_was_already_disabled_no_additional_reconnect_needed)
+                NetworkControlMode.MobileData -> AppStrings.get(R.string.mobile_data_was_already_enabled_no_additional_reconnect_needed, settings.mobileDataNoOpSuffix())
             }
-            ExecutionResult.PartialSuccess -> snapshot.lastActionReason.ifBlank { "${mode.label}写入后校验异常" }
+            ExecutionResult.PartialSuccess -> snapshot.lastActionReason.ifBlank { AppStrings.get(R.string.unexpected_verification_result_after_writing, mode.label) }
             ExecutionResult.Failed -> snapshot.lastActionReason.ifBlank {
                 when (mode) {
-                    NetworkControlMode.AirplaneMode -> "关闭飞行模式失败"
-                    NetworkControlMode.MobileData -> "开启移动数据失败"
+                    NetworkControlMode.AirplaneMode -> AppStrings.get(R.string.failed_to_disable_airplane_mode)
+                    NetworkControlMode.MobileData -> AppStrings.get(R.string.failed_to_enable_mobile_data)
                 }
             }
-            else -> snapshot.lastActionReason.ifBlank { "正在执行恢复联网" }
+            else -> snapshot.lastActionReason.ifBlank { AppStrings.get(R.string.reconnecting) }
         }
     }
     return snapshot.lastActionReason
@@ -134,13 +136,13 @@ private fun buildProbeSuccessSummary(
     snapshot: RuntimeSnapshot,
 ): String = when (mode) {
     NetworkControlMode.AirplaneMode -> when (snapshot.isAirplaneModeEnabled) {
-        true -> "飞行模式当前已开启"
-        false -> "飞行模式当前已关闭"
-        null -> "飞行模式状态已同步"
+        true -> AppStrings.get(R.string.airplane_mode_is_currently_enabled)
+        false -> AppStrings.get(R.string.airplane_mode_is_currently_disabled)
+        null -> AppStrings.get(R.string.airplane_mode_state_synchronized)
     }
     NetworkControlMode.MobileData -> when (snapshot.isMobileDataEnabled) {
-        true -> "移动数据当前已开启"
-        false -> "移动数据当前已关闭"
-        null -> "移动数据状态已同步"
+        true -> AppStrings.get(R.string.mobile_data_is_currently_enabled)
+        false -> AppStrings.get(R.string.mobile_data_is_currently_disabled)
+        null -> AppStrings.get(R.string.mobile_data_state_synchronized)
     }
 }

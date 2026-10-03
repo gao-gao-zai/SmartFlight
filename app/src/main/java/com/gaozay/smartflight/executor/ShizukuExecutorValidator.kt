@@ -1,10 +1,12 @@
 package com.gaozay.smartflight.executor
 
 import android.content.pm.PackageManager
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
-import rikka.shizuku.Shizuku
+import com.gaozay.smartflight.i18n.AppStrings
 import javax.inject.Inject
 import javax.inject.Singleton
+import rikka.shizuku.Shizuku
 
 @Singleton
 class ShizukuExecutorValidator @Inject constructor(
@@ -16,8 +18,8 @@ class ShizukuExecutorValidator @Inject constructor(
             return ExecutorValidationResult(
                 executorType = ExecutorType.Shizuku,
                 isReady = false,
-                summary = "Shizuku 执行器未就绪",
-                detail = "Binder 尚未连接，无法调用 Shizuku 服务。",
+                summary = AppStrings.get(R.string.shizuku_executor_is_not_ready),
+                detail = AppStrings.get(R.string.binder_is_not_connected_yet_the_shizuku_service_cannot_be_called),
             )
         }
 
@@ -29,11 +31,11 @@ class ShizukuExecutorValidator @Inject constructor(
             return ExecutorValidationResult(
                 executorType = ExecutorType.Shizuku,
                 isReady = false,
-                summary = "Shizuku 执行器缺少授权",
+                summary = AppStrings.get(R.string.shizuku_executor_permission_not_granted),
                 detail = buildString {
-                    append("Binder 已连接")
+                    append(AppStrings.get(R.string.binder_connected))
                     if (remoteUid != null) {
-                        append("，后端 UID=")
+                        append(AppStrings.get(R.string.backend_uid))
                         append(remoteUid)
                     }
                 },
@@ -52,16 +54,16 @@ class ShizukuExecutorValidator @Inject constructor(
             summary = if (commandResult.executed && commandResult.exitCode == 0 &&
                 (commandResult.stdout == "0" || commandResult.stdout == "1")
             ) {
-                "Shizuku 执行器已读取飞行模式状态"
+                AppStrings.get(R.string.shizuku_executor_read_the_airplane_mode_state)
             } else {
-                "Shizuku 执行器未能读取飞行模式状态"
+                AppStrings.get(R.string.shizuku_executor_could_not_read_the_airplane_mode_state)
             },
             detail = buildString {
                 append(commandResult.stdout.ifBlank { commandResult.summary })
                 if (remoteUid != null) {
-                    append(" · 后端 UID=")
+                    append(AppStrings.get(R.string.backend_uid_shizuku_executor_validator))
                     append(remoteUid)
-                    append(if (remoteUid == 0) "（ROOT）" else if (remoteUid == 2000) "（ADB）" else "")
+                    append(if (remoteUid == 0) AppStrings.get(R.string.root_uid_suffix) else if (remoteUid == 2000) AppStrings.get(R.string.adb_uid_suffix) else "")
                 }
             },
             command = ExecutorReadonlyCommands.ReadAirplaneModeState.rawCommand,

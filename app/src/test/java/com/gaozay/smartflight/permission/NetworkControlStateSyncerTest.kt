@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.permission
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.NetworkControlMode
@@ -9,7 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class NetworkControlStateSyncerTest {
+class NetworkControlStateSyncerTest : LocalizedStringsTest() {
     @Test
     fun serviceRestoredSyncUpdatesSnapshotWithoutLog() = runTest {
         val fixture = fixture(

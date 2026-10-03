@@ -8,18 +8,20 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.domain.model.UnifiedNetworkState
+import com.gaozay.smartflight.i18n.AppStrings
 import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
-import javax.inject.Singleton
 
 private val Context.runtimeDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "smartflight_runtime",
@@ -70,7 +72,7 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
                 value = preferences[Keys.RuntimeStatusResult],
                 default = ExecutionResult.Pending,
             ),
-            runtimeStatusSummary = preferences[Keys.RuntimeStatusSummary] ?: "尚未执行自检",
+            runtimeStatusSummary = preferences[Keys.RuntimeStatusSummary] ?: AppStrings.get(R.string.self_check_not_run_yet),
             activeExecutorType = enumValueOrDefault(
                 value = preferences[Keys.ActiveExecutorType],
                 default = ExecutorType.Unavailable,

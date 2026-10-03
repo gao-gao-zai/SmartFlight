@@ -1,12 +1,13 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.UserSettings
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class UnexpectedNetworkChangeGuardTest {
+class UnexpectedNetworkChangeGuardTest : LocalizedStringsTest() {
     @Test
     fun externalNetworkControlChangePausesAutomationUntilAppSwitch() = runTest {
         val settingsRepository = FakeSettingsRepository(
