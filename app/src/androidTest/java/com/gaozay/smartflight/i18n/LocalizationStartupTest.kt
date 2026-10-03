@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.os.LocaleList
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
@@ -50,13 +51,25 @@ class LocalizationStartupTest {
     private fun awaitHeading(text: String) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val deadline = SystemClock.uptimeMillis() + 15_000
+        var texts = emptyList<String>()
         while (SystemClock.uptimeMillis() < deadline) {
-            if (automation.rootInActiveWindow?.findAccessibilityNodeInfosByText(text)?.isNotEmpty() == true) {
-                return
-            }
+            // Compose exposes virtual nodes; walk them instead of relying on the
+            // platform provider's optional findAccessibilityNodeInfosByText implementation.
+            texts = visibleTexts(automation.rootInActiveWindow)
+            if (texts.any { it.contains(text) }) return
             SystemClock.sleep(100)
         }
-        throw AssertionError("Localized setup heading was not displayed: $text")
+        capture("startup-failure.png")
+        throw AssertionError("Localized setup heading was not displayed: $text. Visible text: $texts")
+    }
+
+    private fun visibleTexts(node: AccessibilityNodeInfo?): List<String> {
+        if (node == null) return emptyList()
+        return buildList {
+            node.text?.toString()?.let(::add)
+            node.contentDescription?.toString()?.let(::add)
+            for (index in 0 until node.childCount) addAll(visibleTexts(node.getChild(index)))
+        }
     }
 
     private fun capture(name: String) {
