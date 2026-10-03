@@ -10,4 +10,3 @@ import dagger.hilt.components.SingletonComponent
 interface AppSyncTestEntryPoint {
     fun installedAppRepository(): InstalledAppRepository
 }
-
