@@ -2,7 +2,7 @@ name: Android checks
 
 on:
   push:
-    branches: [master, fix/issue-1-english-localization]
+    branches: [master]
   pull_request:
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
       - name: Check localization catalogs
         run: python3 scripts/check_localization.py
       - name: Build, test and lint
-        run: bash gradlew assembleDebug testDebugUnitTest lintDebug --no-daemon
+        run: bash gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --no-daemon
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4

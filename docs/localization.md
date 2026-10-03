@@ -34,6 +34,7 @@ The original `app/src/main` inventory contained 515 lines with Chinese text. The
 - New default reconnect/disconnect prompts use an empty stored value to mean the built-in localized prompt. The editor shows that prompt as a placeholder, and the notifier resolves it at display time. Previously saved and newly customized prompt text stays verbatim, including Chinese text that matches an older built-in default.
 - Existing execution logs and persisted explanation text remain in their original language. Probe action labels recognize both supported language prefixes after a locale change. New messages use the active locale; an old persisted runtime explanation can remain until a fresh event updates it.
 - Foreground notifications, channel names/descriptions and tile text refresh on configuration changes. Notification/channel IDs, tile state cycling, executor commands, enum persistence names, database schema, delays and automation decisions remain unchanged.
+- Tile subtitles are set on Android 10/API 29 and later, where that API is available. Android 8/9 retain the localized tile label and the same state cycle. The manifest keeps its existing usage-access and installed-app visibility permissions, with narrowly scoped lint annotations documenting their uses.
 - Installed-app names, command stdout/stderr, exception messages from external components, remote release notes and system-owned settings screens retain the text supplied by their source.
 
 ## Verification
@@ -49,7 +50,7 @@ Added checks:
 
 - JVM tests read the actual Chinese/English XML catalogs. Existing regression tests retain their Chinese expectations. New tests cover language changes, enum/command labels, permission kinds, language-independent skipped results, countdown plurals, historical probe labels, and custom-prompt persistence.
 - Instrumentation tests exercise actual Android resource loading for notification/tile strings, quoted whitespace, Chinese fallback, and English singular/plural seconds.
-- `.github/workflows/android.yml` runs catalog validation plus `assembleDebug`, `testDebugUnitTest` and `lintDebug`, and uploads reports.
+- `.github/workflows/android.yml` runs catalog validation plus `assembleDebug`, `assembleDebugAndroidTest`, `testDebugUnitTest` and `lintDebug`, and uploads reports. Building the instrumentation APK checks its compilation; device execution remains separate.
 
 The branch has been pushed and [draft PR #2](https://github.com/gao-gao-zai/SmartFlight/pull/2) is open. Gradle compilation, JVM tests and Android lint run in GitHub Actions; see the [PR checks](https://github.com/gao-gao-zai/SmartFlight/pull/2/checks) for the current result. The first CI attempt stopped during SDK setup because the action's default requested the removed `tools` package. The workflow now installs explicit platform and build-tools packages.
 
@@ -59,7 +60,7 @@ On a configured Android development machine:
 
 ```bash
 python3 scripts/check_localization.py
-bash gradlew assembleDebug testDebugUnitTest lintDebug
+bash gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug
 bash gradlew connectedDebugAndroidTest
 ```
 

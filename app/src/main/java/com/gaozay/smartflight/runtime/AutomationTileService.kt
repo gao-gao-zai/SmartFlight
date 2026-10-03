@@ -2,6 +2,7 @@ package com.gaozay.smartflight.runtime
 
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
+import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
 import com.gaozay.smartflight.R
@@ -75,7 +76,9 @@ class AutomationTileService : TileService() {
             qsTile?.apply {
                 icon = Icon.createWithResource(this@AutomationTileService, R.drawable.ic_smartflight_tile)
                 label = getString(R.string.automation_tile_label)
-                subtitle = getString(tileMode.tileLabelRes)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    subtitle = getString(tileMode.tileLabelRes)
+                }
                 state = if (tileMode == AutomationDisableMode.None) {
                     Tile.STATE_INACTIVE
                 } else {
