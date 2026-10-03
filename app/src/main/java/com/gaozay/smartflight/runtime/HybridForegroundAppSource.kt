@@ -11,7 +11,14 @@ class HybridForegroundAppSource @Inject constructor(
     private val observations: ForegroundObservationStore,
 ) : ForegroundAppSource {
     @Volatile var monitorMode: ForegroundMonitorMode = ForegroundMonitorMode.Auto
-        set(value) { if (field != value) observations.clear(); field = value }
+        set(value) {
+            if (field != value) {
+                usageStatsForegroundAppDetector.invalidateActivityConfirmation()
+                accessibilityForegroundAppTracker.invalidateActivityConfirmation()
+                observations.clear()
+            }
+            field = value
+        }
     @Volatile var confirmActivity: Boolean = false
     fun canMonitor(mode: ForegroundMonitorMode): Boolean = when (mode) {
         ForegroundMonitorMode.Auto -> accessibilityForegroundAppTracker.isServiceConnected || usageStatsForegroundAppDetector.hasPermission()

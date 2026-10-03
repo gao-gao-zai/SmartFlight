@@ -38,6 +38,10 @@ class ForegroundObservationStore @Inject constructor() {
 fun ForegroundAppInfo.confirmedActivity(nowMillis: Long = System.currentTimeMillis()): String? =
     activityName?.takeIf { activityConfirmed && verifiedAtMillis > 0 && nowMillis - verifiedAtMillis in 0..30_000L }
 
+fun ForegroundAppInfo.withoutActivityConfirmation(): ForegroundAppInfo = copy(
+    activityName = null, activityConfirmed = false, source = ForegroundInfoSource.Unknown, verifiedAtMillis = 0,
+)
+
 internal fun chooseForegroundUpdate(old: ForegroundAppInfo?, candidate: ForegroundAppInfo?): ForegroundAppInfo? {
     if (old == null || candidate == null || candidate.eventTimestampMillis >= old.eventTimestampMillis) return candidate
     if (candidate.source == ForegroundInfoSource.Unknown && candidate.packageName == old.packageName) {

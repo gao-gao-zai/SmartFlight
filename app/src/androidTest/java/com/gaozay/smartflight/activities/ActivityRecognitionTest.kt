@@ -1,5 +1,8 @@
 package com.gaozay.smartflight.activities
 
+import android.app.UiAutomation
+import android.os.ParcelFileDescriptor
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.gaozay.smartflight.apps.AppSyncTestEntryPoint
@@ -59,6 +62,8 @@ class ActivityRecognitionTest {
             awaitActivityCondition("First Activity was not confirmed by UsageEvents") {
                 firstInfo = detector.detect(); firstInfo?.activityName == first && firstInfo?.activityConfirmed == true
             }
+            detector.invalidateActivityConfirmation()
+            assertFalse(detector.detect()!!.activityConfirmed)
             activityShell("am start -W -n $ACTIVITY_FIXTURE/.SecondActivity")
             var secondInfo: ForegroundAppInfo? = null
             awaitActivityCondition("Same-package Activity switch was not detected") {
@@ -77,6 +82,45 @@ class ActivityRecognitionTest {
     }
 
     @Test
+    fun realAccessibilityServiceConfirmsSwitchAndIgnoresNativeDialog() {
+        installActivityFixture()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        // Default UiAutomation suppresses other accessibility services; explicitly allow ours.
+        val automation = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+        fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command))
+            .bufferedReader().use { it.readText().trim() }
+        val originalServices = shell("settings get secure enabled_accessibility_services")
+        val originalEnabled = shell("settings get secure accessibility_enabled")
+        val component = "${context.packageName}/.runtime.SmartFlightAccessibilityService"
+        val services = originalServices.takeUnless { it == "null" || it.isBlank() }?.let { "$it:$component" } ?: component
+        fun quote(value: String) = "'" + value.replace("'", "'\"'\"'") + "'"
+        val tracker = EntryPointAccessors.fromApplication(context, AppSyncTestEntryPoint::class.java).foregroundTracker()
+        try {
+            shell("settings put secure enabled_accessibility_services ${quote(services)}")
+            shell("settings put secure accessibility_enabled 1")
+            awaitActivityCondition("SmartFlight accessibility service did not connect") { tracker.isServiceConnected }
+            shell("am start -W -n $ACTIVITY_FIXTURE/.FirstActivity")
+            awaitActivityCondition("Platform accessibility event did not confirm FirstActivity") { tracker.latest()?.activityName == first }
+            val buttons = automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Show dialog").orEmpty()
+            assertTrue("Native fixture dialog button was missing", buttons.isNotEmpty())
+            assertTrue(buttons.first().performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            awaitActivityCondition("Fixture dialog did not open") {
+                automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Dialog is not an Activity")?.isNotEmpty() == true
+            }
+            assertEquals(first, tracker.latest()!!.activityName)
+            shell("am start -W -n $ACTIVITY_FIXTURE/.SecondActivity")
+            awaitActivityCondition("Platform accessibility did not confirm same-package SecondActivity") { tracker.latest()?.activityName == second }
+            assertEquals(ForegroundInfoSource.Accessibility, tracker.latest()!!.source)
+        } finally {
+            if (originalServices == "null" || originalServices.isBlank()) shell("settings delete secure enabled_accessibility_services")
+            else shell("settings put secure enabled_accessibility_services ${quote(originalServices)}")
+            if (originalEnabled == "null" || originalEnabled.isBlank()) shell("settings delete secure accessibility_enabled")
+            else shell("settings put secure accessibility_enabled ${quote(originalEnabled)}")
+            shell("am force-stop $ACTIVITY_FIXTURE")
+        }
+    }
+
+    @Test
     fun accessibilityRejectsDialogWidgetAndOldEventsButAcceptsDeclaredSamePackageActivity() {
         installActivityFixture()
         val tracker = AccessibilityForegroundAppTracker(context, DeclaredActivityResolver(context), ForegroundObservationStore())
@@ -86,6 +130,8 @@ class ActivityRecognitionTest {
         assertNull(tracker.recordPackage(ACTIVITY_FIXTURE, 200, "android.widget.LinearLayout"))
         assertNull(tracker.recordPackage("com.android.systemui", 200, "android.widget.FrameLayout"))
         assertEquals(first, tracker.latest()!!.activityName)
+        tracker.invalidateActivityConfirmation()
+        assertNull(tracker.latest()!!.activityName)
         val change = tracker.recordPackage(ACTIVITY_FIXTURE, 300, second)!!
         assertFalse(change.packageChanged)
         assertTrue(change.activityChanged)

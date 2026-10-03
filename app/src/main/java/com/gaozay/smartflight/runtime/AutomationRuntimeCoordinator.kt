@@ -237,6 +237,9 @@ class AutomationRuntimeCoordinator @Inject constructor(
     private suspend fun handleSettingsChanged(settings: UserSettings) {
         val previous = state.settings
         state = state.copy(settings = settings)
+        if (previous.foregroundMonitorMode != settings.foregroundMonitorMode) {
+            state = state.copy(lastKnownForegroundApp = state.lastKnownForegroundApp?.withoutActivityConfirmation())
+        }
         hybridForegroundAppSource.monitorMode = settings.foregroundMonitorMode
         if (!settings.automationEnabled) {
             scheduler.cancelForegroundProbe()
@@ -374,6 +377,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
     }
 
     private fun handleForegroundEventSourceChanged() {
+        state = state.copy(lastKnownForegroundApp = state.lastKnownForegroundApp?.withoutActivityConfirmation())
         if (shouldSuppressPeriodicForegroundProbe()) {
             scheduler.cancelForegroundProbe()
         }

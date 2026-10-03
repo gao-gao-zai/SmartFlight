@@ -22,6 +22,7 @@ class AccessibilityForegroundAppTracker @Inject constructor(
         observations.clear()
     }
     @Synchronized fun latest(): ForegroundAppInfo? = latestForegroundApp
+    @Synchronized fun invalidateActivityConfirmation() { latestForegroundApp = latestForegroundApp?.withoutActivityConfirmation() }
 
     @Synchronized
     fun recordPackage(packageName: String, eventTimestampMillis: Long, className: String? = null): AccessibilityForegroundAppUpdate? {

@@ -59,6 +59,14 @@ class ActivityRuleResolverTest {
         assertEquals(latest, chooseForegroundUpdate(latest, info()))
         assertEquals(latest, chooseForegroundUpdate(latest, info().copy(packageName = "other.app", source = ForegroundInfoSource.Unknown)))
     }
+    @Test fun changingSourceRetainsPackageButRequiresNewActivityEvidence() {
+        val original = info()
+        val cleared = original.withoutActivityConfirmation()
+        assertEquals(original.packageName, cleared.packageName)
+        assertEquals(original.eventTimestampMillis, cleared.eventTimestampMillis)
+        assertNull(cleared.confirmedActivity(1000))
+        assertEquals(offline, resolveActivityRule(cleared, offline, listOf(rule()), 1000).rule)
+    }
     @Test fun permissionLossClearsConfidenceWithoutRestoringAnOlderActivity() {
         val latest = info().copy(eventTimestampMillis = 2000)
         val lost = chooseForegroundUpdate(latest, info().copy(source = ForegroundInfoSource.Unknown, activityConfirmed = false))!!

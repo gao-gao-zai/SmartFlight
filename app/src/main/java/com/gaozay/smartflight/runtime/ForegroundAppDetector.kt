@@ -45,6 +45,9 @@ class ForegroundAppDetector @Inject constructor(
     }
 
     @Synchronized
+    fun invalidateActivityConfirmation() { lastKnown = lastKnown?.withoutActivityConfirmation() }
+
+    @Synchronized
     override fun detect(): ForegroundAppInfo? {
         val now = System.currentTimeMillis()
         if (!hasPermission()) return lastKnown?.copy(activityName = null, activityConfirmed = false,
