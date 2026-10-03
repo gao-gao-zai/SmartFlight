@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ActivityIdentityTest {
+    @Test fun acceptsLegalUnicodeActivityNamesAndNestedClassNames() {
+        assertEquals("example.app.支付Activity", normalizeActivityName("example.app", ".支付Activity"))
+        assertEquals("example.app.页面\$Inner", normalizeActivityName("example.app", "页面\$Inner"))
+        assertNull(normalizeActivityName("example.app", "Page\u0000Name"))
+    }
+
     @Test fun relativeAndShortNamesBecomeExactCanonicalClassNames() {
         assertEquals("example.app.Payment", normalizeActivityName("example.app", ".Payment"))
         assertEquals("example.app.Payment", normalizeActivityName("example.app", "Payment"))

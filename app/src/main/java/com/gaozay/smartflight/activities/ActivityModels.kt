@@ -12,7 +12,18 @@ fun normalizeActivityName(packageName: String, name: String?): String? {
         '.' !in value -> "$packageName.$value"
         else -> value
     }
-    return full.takeIf { it.split('.').all { part -> part.matches(Regex("[A-Za-z_$][A-Za-z0-9_$]*")) } }
+    return full.takeIf { it.split('.').all(::isClassNameSegment) }
+}
+
+private fun isClassNameSegment(value: String): Boolean {
+    if (value.isEmpty()) return false
+    var offset = 0
+    while (offset < value.length) {
+        val point = value.codePointAt(offset)
+        if (Character.isISOControl(point) || !(if (offset == 0) Character.isJavaIdentifierStart(point) else Character.isJavaIdentifierPart(point))) return false
+        offset += Character.charCount(point)
+    }
+    return true
 }
 
 enum class ActivityRuleMode(override val labelRes: Int) : ResourceLabel {
