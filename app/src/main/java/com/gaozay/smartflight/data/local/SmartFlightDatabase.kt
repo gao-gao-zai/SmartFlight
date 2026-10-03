@@ -14,7 +14,7 @@ import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
         InstalledAppEntity::class,
         ExecutionLogEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class SmartFlightDatabase : RoomDatabase() {
@@ -23,6 +23,12 @@ abstract class SmartFlightDatabase : RoomDatabase() {
     abstract fun executionLogDao(): ExecutionLogDao
 
     companion object {
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE installed_apps ADD COLUMN isInstalled INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

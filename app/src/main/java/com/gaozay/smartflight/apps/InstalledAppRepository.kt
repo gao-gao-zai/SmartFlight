@@ -12,6 +12,9 @@ interface InstalledAppRepository {
 
     suspend fun refreshInstalledApps(): Int
 
+    /** Refresh only this package; archive a missing package only for a confirmed removal. */
+    suspend fun refreshPackage(packageName: String, removeIfMissing: Boolean = false)
+
     suspend fun upsertApps(apps: List<InstalledAppEntity>)
 
     suspend fun setManualOnline(packageName: String)

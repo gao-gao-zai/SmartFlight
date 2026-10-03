@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface InstalledAppDao {
-    @Query("SELECT * FROM installed_apps ORDER BY label COLLATE NOCASE ASC")
+    @Query("SELECT * FROM installed_apps WHERE isInstalled = 1 ORDER BY label COLLATE NOCASE ASC")
     fun observeAll(): Flow<List<InstalledAppEntity>>
 
     @Query("SELECT * FROM installed_apps")
@@ -28,13 +28,22 @@ interface InstalledAppDao {
     suspend fun replaceScannedApps(apps: List<InstalledAppEntity>) {
         upsertAll(apps)
         if (apps.isNotEmpty()) {
-            deleteMissing(apps.map { it.packageName })
+            markMissingUninstalled(apps.map { it.packageName })
+        } else {
+            markAllUninstalled()
         }
     }
 
-    @Query("DELETE FROM installed_apps WHERE packageName NOT IN (:packageNames)")
-    suspend fun deleteMissing(packageNames: List<String>)
+    // Keep saved manual choices for a later reinstall, but exclude archived rows from runtime/UI.
+    @Query("UPDATE installed_apps SET isInstalled = 0 WHERE packageName NOT IN (:packageNames)")
+    suspend fun markMissingUninstalled(packageNames: List<String>)
 
-    @Query("SELECT COUNT(*) FROM installed_apps")
+    @Query("UPDATE installed_apps SET isInstalled = 0")
+    suspend fun markAllUninstalled()
+
+    @Query("UPDATE installed_apps SET isInstalled = 0 WHERE packageName = :packageName")
+    suspend fun markUninstalled(packageName: String)
+
+    @Query("SELECT COUNT(*) FROM installed_apps WHERE isInstalled = 1")
     fun observeCount(): Flow<Int>
 }
