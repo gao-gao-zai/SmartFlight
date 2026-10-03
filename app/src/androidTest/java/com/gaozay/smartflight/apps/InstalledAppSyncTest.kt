@@ -23,10 +23,13 @@ class InstalledAppSyncTest {
     private val fixture = "com.gaozay.smartflight.syncfixture"
 
     @Test
-    fun realInstallUpdateUninstallAndReinstallSynchronizeWithoutManualScan() = runBlocking {
+    fun startupAndRealInstallUpdateUninstallReinstallSynchronizeWithoutManualScan() = runBlocking {
         val repository = EntryPointAccessors.fromApplication(context, AppSyncTestEntryPoint::class.java)
             .installedAppRepository()
+        // CI installs the fixture before starting this process; no broadcast could reach our listener.
+        awaitApp(repository) { it?.isAutoDetectedOnline == true }
         shell("pm uninstall $fixture")
+        awaitApp(repository) { it == null }
         try {
             install(1)
             awaitApp(repository) { it?.isAutoDetectedOnline == true }

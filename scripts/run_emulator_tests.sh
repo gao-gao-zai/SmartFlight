@@ -21,4 +21,6 @@ trap collect_artifacts EXIT
 bash scripts/build_package_sync_fixtures.sh
 "$sdk_adb" push app/build/package-sync-fixtures/fixture-v1.apk /data/local/tmp/smartflight-fixture-v1.apk
 "$sdk_adb" push app/build/package-sync-fixtures/fixture-v2.apk /data/local/tmp/smartflight-fixture-v2.apk
+# Install before SmartFlight is launched to exercise process-start reconciliation.
+"$sdk_adb" install -r app/build/package-sync-fixtures/fixture-v1.apk
 bash gradlew connectedDebugAndroidTest -PemulatorAbi=x86_64 --no-daemon
