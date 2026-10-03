@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,9 +30,10 @@ class DataStoreSettingsRepository @Inject constructor(
     }
 
     override suspend fun updateSettings(transform: (UserSettings) -> UserSettings) {
-        val updated = transform(settings.first())
         context.settingsDataStore.edit { preferences ->
-            preferences.writeUserSettings(updated)
+            // Read and transform inside the same transaction so concurrent writers
+            // cannot overwrite each other's changes with a stale settings snapshot.
+            preferences.writeUserSettings(transform(preferences.toUserSettings()))
         }
     }
 }
