@@ -81,6 +81,8 @@ internal class FakeInstalledAppRepository(
         mutableApps.value.firstOrNull { it.packageName == packageName }
 
     override suspend fun refreshInstalledApps(): Int = mutableApps.value.size
+    override suspend fun refreshPackage(packageName: String, removeIfMissing: Boolean) = Unit
+
     override suspend fun upsertApps(apps: List<InstalledAppEntity>) {
         mutableApps.value = apps
     }

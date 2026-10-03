@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -16,4 +17,5 @@ data class InstalledAppEntity(
     val isInWhitelist: Boolean,
     val isInBlacklist: Boolean,
     val lastScannedAtMillis: Long,
+    @ColumnInfo(defaultValue = "1") val isInstalled: Boolean = true,
 )

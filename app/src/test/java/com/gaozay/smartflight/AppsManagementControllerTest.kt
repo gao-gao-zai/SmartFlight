@@ -56,6 +56,8 @@ class AppsManagementControllerTest : LocalizedStringsTest() {
             refreshFailure?.let { throw it }
             return refreshCount
         }
+        override suspend fun refreshPackage(packageName: String, removeIfMissing: Boolean) = Unit
+
         override suspend fun upsertApps(apps: List<InstalledAppEntity>) = Unit
         override suspend fun setManualOnline(packageName: String) = Unit
         override suspend fun setManualOffline(packageName: String) = Unit

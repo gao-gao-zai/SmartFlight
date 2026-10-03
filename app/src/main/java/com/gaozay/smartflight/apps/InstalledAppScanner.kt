@@ -15,35 +15,59 @@ import javax.inject.Singleton
 @Singleton
 class InstalledAppScanner @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
-    fun scanInstalledApps(): List<InstalledAppEntity> {
+) : InstalledAppSource {
+    override fun scanInstalledApps(): List<InstalledAppEntity> {
         val packageManager = context.packageManager
         val launcherPackages = queryLauncherPackages(packageManager)
         val now = System.currentTimeMillis()
         return queryInstalledPackages(packageManager)
-            .mapNotNull { packageInfo ->
-                val applicationInfo = packageInfo.applicationInfo ?: return@mapNotNull null
-                val packageName = packageInfo.packageName
-                val hasLauncherEntry = launcherPackages.contains(packageName)
-                val declaresInternetPermission = packageInfo.requestedPermissions
-                    ?.contains(Manifest.permission.INTERNET) == true
-                val isSystemApp = applicationInfo.isSystemApp()
-                val isAutoDetectedOnline = !isSystemApp && declaresInternetPermission && hasLauncherEntry
-                InstalledAppEntity(
-                    packageName = packageName,
-                    label = applicationInfo.loadLabel(packageManager).toString(),
-                    iconCacheKey = packageName,
-                    isSystemApp = isSystemApp,
-                    hasLauncherEntry = hasLauncherEntry,
-                    declaresInternetPermission = declaresInternetPermission,
-                    isAutoDetectedOnline = isAutoDetectedOnline,
-                    isInOnlineList = isAutoDetectedOnline,
-                    isInWhitelist = false,
-                    isInBlacklist = false,
-                    lastScannedAtMillis = now,
-                )
-            }
+            .mapNotNull { toEntity(it, launcherPackages, packageManager, now) }
             .sortedBy { it.label.lowercase() }
+    }
+
+    override fun scanPackage(packageName: String): InstalledAppEntity? {
+        val packageManager = context.packageManager
+        val info = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(
+                    packageName,
+                    PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+            }
+        } catch (_: PackageManager.NameNotFoundException) {
+            return null
+        }
+        return toEntity(info, queryLauncherPackages(packageManager, packageName), packageManager, System.currentTimeMillis())
+    }
+
+    private fun toEntity(
+        packageInfo: PackageInfo,
+        launcherPackages: Set<String>,
+        packageManager: PackageManager,
+        now: Long,
+    ): InstalledAppEntity? {
+        val applicationInfo = packageInfo.applicationInfo ?: return null
+        val packageName = packageInfo.packageName
+        val hasLauncherEntry = packageName in launcherPackages
+        val declaresInternetPermission = packageInfo.requestedPermissions?.contains(Manifest.permission.INTERNET) == true
+        val isSystemApp = applicationInfo.isSystemApp()
+        val isAutoDetectedOnline = !isSystemApp && declaresInternetPermission && hasLauncherEntry
+        return InstalledAppEntity(
+            packageName = packageName,
+            label = applicationInfo.loadLabel(packageManager).toString(),
+            iconCacheKey = packageName,
+            isSystemApp = isSystemApp,
+            hasLauncherEntry = hasLauncherEntry,
+            declaresInternetPermission = declaresInternetPermission,
+            isAutoDetectedOnline = isAutoDetectedOnline,
+            isInOnlineList = isAutoDetectedOnline,
+            isInWhitelist = false,
+            isInBlacklist = false,
+            lastScannedAtMillis = now,
+        )
     }
 
     private fun ApplicationInfo.isSystemApp(): Boolean =
@@ -60,9 +84,10 @@ class InstalledAppScanner @Inject constructor(
             packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS)
         }
 
-    private fun queryLauncherPackages(packageManager: PackageManager): Set<String> {
+    private fun queryLauncherPackages(packageManager: PackageManager, packageName: String? = null): Set<String> {
         val intent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
+            packageName?.let { setPackage(it) }
         }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             packageManager.queryIntentActivities(
