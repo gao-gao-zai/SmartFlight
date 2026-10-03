@@ -30,6 +30,7 @@ class MobileDataSupportChecker @Inject constructor() {
     }
 
     companion object {
-        const val MOBILE_DATA_UNSUPPORTED_SUMMARY = AppStrings.get(R.string.mobile_data_unsupported_recommendation)
+        val MOBILE_DATA_UNSUPPORTED_SUMMARY: String
+            get() = AppStrings.get(R.string.mobile_data_unsupported_recommendation)
     }
 }

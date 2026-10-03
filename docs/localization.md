@@ -51,7 +51,9 @@ Added checks:
 - Instrumentation tests exercise actual Android resource loading for notification/tile strings, quoted whitespace, Chinese fallback, and English singular/plural seconds.
 - `.github/workflows/android.yml` runs catalog validation plus `assembleDebug`, `testDebugUnitTest` and `lintDebug`, and uploads reports.
 
-Not executed in this environment: Gradle compilation, JVM tests, Android lint and instrumentation tests. The environment has no Android SDK, and Gradle wrapper bootstrap failed with `java.net.SocketException: Network is unreachable` while downloading Gradle 8.7. The branch has not been pushed, so the new workflow has not run.
+The branch has been pushed and [draft PR #2](https://github.com/gao-gao-zai/SmartFlight/pull/2) is open. Gradle compilation, JVM tests and Android lint run in GitHub Actions; see the [PR checks](https://github.com/gao-gao-zai/SmartFlight/pull/2/checks) for the current result. The first CI attempt stopped during SDK setup because the action's default requested the removed `tools` package. The workflow now installs explicit platform and build-tools packages.
+
+Local Gradle validation remains unavailable: this environment has no Android SDK, and wrapper bootstrap failed with `java.net.SocketException: Network is unreachable` while downloading Gradle 8.7. Instrumentation tests and the real-device review below have not been executed.
 
 On a configured Android development machine:
 
