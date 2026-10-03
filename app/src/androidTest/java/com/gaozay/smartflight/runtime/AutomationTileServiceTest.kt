@@ -1,6 +1,7 @@
 package com.gaozay.smartflight.runtime
 
 import android.graphics.Bitmap
+import android.content.Intent
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
@@ -63,7 +64,7 @@ class AutomationTileServiceTest {
                 shell("settings put secure sysui_qs_tiles '$originalTiles'")
             }
             repository.updateSettings { original }
-            shell("am stopservice -n ${context.packageName}/.runtime.AutomationForegroundService")
+            context.stopService(Intent(context, AutomationForegroundService::class.java))
         }
     }
 
@@ -83,6 +84,7 @@ class AutomationTileServiceTest {
             if (visible.contains(label) && visible.contains(subtitle)) return
             SystemClock.sleep(100)
         }
+        screenshot("tile-failure")
         assertTrue("Expected tile '$label / $subtitle', visible System UI: $visible", false)
     }
 
@@ -105,12 +107,15 @@ class AutomationTileServiceTest {
         }
 
     private fun screenshot(name: String) {
-        val directory = File("/sdcard/Download/smartflight-tiles").apply { mkdirs() }
+        instrumentation.waitForIdleSync()
+        val file = File(checkNotNull(context.getExternalFilesDir(null)), "$name.png")
         val bitmap = checkNotNull(automation.takeScreenshot())
         try {
-            File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         } finally {
             bitmap.recycle()
         }
+        shell("mkdir -p /sdcard/Download/smartflight-tiles")
+        shell("cp ${file.absolutePath} /sdcard/Download/smartflight-tiles/$name.png")
     }
 }
