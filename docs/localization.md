@@ -50,11 +50,12 @@ Added checks:
 
 - JVM tests read the actual Chinese/English XML catalogs. Existing regression tests retain their Chinese expectations. New tests cover language changes, enum/command labels, permission kinds, language-independent skipped results, countdown plurals, historical probe labels, and custom-prompt persistence.
 - Instrumentation tests exercise actual Android resource loading for notification/tile strings, quoted whitespace, Chinese fallback, and English singular/plural seconds.
+- An Android 15/API 35 x86_64 emulator job runs `connectedDebugAndroidTest`. A startup smoke test launches the real `MainActivity`, changes per-app language from English to Chinese and back, checks the visible setup heading and runtime resource resolver, and captures each state. Reports, screenshots and logcat are retained for seven days.
 - `.github/workflows/android.yml` runs catalog validation plus `assembleDebug`, `assembleDebugAndroidTest`, `testDebugUnitTest` and `lintDebug`, and uploads reports. Building the instrumentation APK checks its compilation; device execution remains separate.
 
 The branch has been pushed and [draft PR #2](https://github.com/gao-gao-zai/SmartFlight/pull/2) is open. Gradle compilation, JVM tests and Android lint run in GitHub Actions; see the [PR checks](https://github.com/gao-gao-zai/SmartFlight/pull/2/checks) for the current result. The first CI attempt stopped during SDK setup because the action's default requested the removed `tools` package. The workflow now installs explicit platform and build-tools packages.
 
-Local Gradle validation remains unavailable: this environment has no Android SDK, and wrapper bootstrap failed with `java.net.SocketException: Network is unreachable` while downloading Gradle 8.7. Instrumentation tests and the real-device review below have not been executed.
+Local Gradle validation remains unavailable: this environment has no Android SDK, and wrapper bootstrap failed with `java.net.SocketException: Network is unreachable` while downloading Gradle 8.7. Emulator execution results are tracked in the PR checks. The real-device review below remains separate.
 
 On a configured Android development machine:
 
@@ -62,6 +63,8 @@ On a configured Android development machine:
 python3 scripts/check_localization.py
 bash gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug
 bash gradlew connectedDebugAndroidTest
+# For an x86_64 emulator (normal builds keep the original ARM ABI list):
+bash gradlew connectedDebugAndroidTest -PemulatorAbi=x86_64
 ```
 
 ## Real-device review
