@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.gaozay.smartflight.apps.AppSyncTestEntryPoint
 import com.gaozay.smartflight.runtime.*
+import com.gaozay.smartflight.testing.dismissLauncherAnrIfPresent
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -112,9 +113,13 @@ class ActivityRecognitionTest {
             awaitActivityCondition("SmartFlight accessibility service did not connect") { tracker.isServiceConnected }
             shell("am start -W -n $ACTIVITY_FIXTURE/.FirstActivity")
             awaitActivityCondition("Platform accessibility event did not confirm FirstActivity") { tracker.latest()?.activityName == first }
-            val buttons = automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Show dialog").orEmpty()
-            assertTrue("Native fixture dialog button was missing", buttons.isNotEmpty())
-            assertTrue(buttons.first().performAction(AccessibilityNodeInfo.ACTION_CLICK))
+            var dialogButton: AccessibilityNodeInfo? = null
+            awaitActivityCondition("Native fixture dialog button was missing") {
+                automation.dismissLauncherAnrIfPresent()
+                dialogButton = automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Show dialog")?.firstOrNull()
+                dialogButton != null
+            }
+            assertTrue(dialogButton!!.performAction(AccessibilityNodeInfo.ACTION_CLICK))
             awaitActivityCondition("Fixture dialog did not open") {
                 automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Dialog is not an Activity")?.isNotEmpty() == true
             }
