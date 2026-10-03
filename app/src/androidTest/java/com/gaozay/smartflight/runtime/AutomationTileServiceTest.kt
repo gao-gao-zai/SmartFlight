@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.settings.AutomationDisableMode
@@ -21,6 +22,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
+@SdkSuppress(minSdkVersion = 29)
 class AutomationTileServiceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
@@ -36,7 +38,7 @@ class AutomationTileServiceTest {
             repository.updateSettings { it.withAutomationDisabled(AutomationDisableMode.For1Minute) }
             shell("cmd statusbar add-tile $component")
             // Keep the tested tile on the first page regardless of the emulator's defaults.
-            shell("settings put secure sysui_qs_tiles 'custom($component)'")
+            shell("settings put secure sysui_qs_tiles custom($component)")
             shell("cmd statusbar expand-settings")
             waitForSubtitle(AutomationDisableMode.For1Minute)
 
@@ -51,6 +53,7 @@ class AutomationTileServiceTest {
             screenshot("background-restore")
 
             shell("cmd statusbar collapse")
+            automation.waitForIdle(500, 5_000)
             repository.updateSettings { it.withAutomationDisabled(AutomationDisableMode.For10Minutes) }
             shell("cmd statusbar expand-settings")
             waitForSubtitle(AutomationDisableMode.For10Minutes)
@@ -61,7 +64,7 @@ class AutomationTileServiceTest {
             if (originalTiles == "null") {
                 shell("settings delete secure sysui_qs_tiles")
             } else {
-                shell("settings put secure sysui_qs_tiles '$originalTiles'")
+                shell("settings put secure sysui_qs_tiles $originalTiles")
             }
             repository.updateSettings { original }
             context.stopService(Intent(context, AutomationForegroundService::class.java))
