@@ -1,5 +1,8 @@
 package com.gaozay.smartflight.di
 
+import com.gaozay.smartflight.activities.ActivitySource
+import com.gaozay.smartflight.activities.ActivityScanner
+import com.gaozay.smartflight.data.local.dao.ActivityDao
 import android.content.Context
 import androidx.room.Room
 import com.gaozay.smartflight.apps.InstalledAppSource
@@ -51,7 +54,10 @@ object DatabaseModule {
         context,
         SmartFlightDatabase::class.java,
         "smartflight.db",
-    ).addMigrations(SmartFlightDatabase.MIGRATION_1_2, SmartFlightDatabase.MIGRATION_2_3).build()
+    ).addMigrations(SmartFlightDatabase.MIGRATION_1_2, SmartFlightDatabase.MIGRATION_2_3, SmartFlightDatabase.MIGRATION_3_4).build()
+
+    @Provides
+    fun provideActivityDao(database: SmartFlightDatabase): ActivityDao = database.activityDao()
 
     @Provides
     fun provideInstalledAppDao(database: SmartFlightDatabase): InstalledAppDao =
@@ -65,6 +71,9 @@ object DatabaseModule {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
+    @Binds
+    abstract fun bindActivitySource(scanner: ActivityScanner): ActivitySource
+
     @Binds
     @Singleton
     abstract fun bindInstalledAppSource(scanner: InstalledAppScanner): InstalledAppSource

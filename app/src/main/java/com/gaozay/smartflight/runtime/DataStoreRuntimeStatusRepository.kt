@@ -31,10 +31,18 @@ private val Context.runtimeDataStore: DataStore<Preferences> by preferencesDataS
 class DataStoreRuntimeStatusRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : RuntimeStatusRepository {
-    override val snapshot: Flow<RuntimeSnapshot> = context.runtimeDataStore.data.map { preferences ->
+    override val snapshot: Flow<RuntimeSnapshot> = context.runtimeDataStore.data.map { readSnapshot(it) }
+
+    private fun readSnapshot(preferences: Preferences): RuntimeSnapshot =
         RuntimeSnapshot(
             currentForegroundPackageName = preferences[Keys.CurrentForegroundPackageName],
             currentForegroundAppLabel = preferences[Keys.CurrentForegroundAppLabel],
+            currentForegroundActivityName = preferences[Keys.CurrentForegroundActivityName],
+            foregroundEventTimestampMillis = preferences[Keys.ForegroundEventTimestampMillis] ?: 0,
+            foregroundInfoSource = preferences[Keys.ForegroundInfoSource] ?: "Unknown",
+            foregroundActivityConfirmed = preferences[Keys.ForegroundActivityConfirmed] ?: false,
+            foregroundRuleLayer = preferences[Keys.ForegroundRuleLayer] ?: "App",
+            foregroundRuleReason = preferences[Keys.ForegroundRuleReason] ?: "AppDefault",
             screenState = enumValueOrDefault(
                 value = preferences[Keys.ScreenState],
                 default = ScreenState.Unknown,
@@ -79,17 +87,22 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
             ),
             updatedAtMillis = preferences[Keys.UpdatedAtMillis] ?: 0,
         )
-    }
-
     override suspend fun updateSnapshot(transform: (RuntimeSnapshot) -> RuntimeSnapshot) {
-        val updated = transform(snapshot.first()).withDerivedUnifiedNetworkState()
         context.runtimeDataStore.edit { preferences ->
+            val updated = transform(readSnapshot(preferences)).withDerivedUnifiedNetworkState()
             updated.currentForegroundPackageName?.let {
                 preferences[Keys.CurrentForegroundPackageName] = it
             } ?: preferences.remove(Keys.CurrentForegroundPackageName)
             updated.currentForegroundAppLabel?.let {
                 preferences[Keys.CurrentForegroundAppLabel] = it
             } ?: preferences.remove(Keys.CurrentForegroundAppLabel)
+            updated.currentForegroundActivityName?.let { preferences[Keys.CurrentForegroundActivityName] = it }
+                ?: preferences.remove(Keys.CurrentForegroundActivityName)
+            preferences[Keys.ForegroundEventTimestampMillis] = updated.foregroundEventTimestampMillis
+            preferences[Keys.ForegroundInfoSource] = updated.foregroundInfoSource
+            preferences[Keys.ForegroundActivityConfirmed] = updated.foregroundActivityConfirmed
+            preferences[Keys.ForegroundRuleLayer] = updated.foregroundRuleLayer
+            preferences[Keys.ForegroundRuleReason] = updated.foregroundRuleReason
             preferences[Keys.ScreenState] = updated.screenState.name
             preferences[Keys.UnifiedNetworkState] = updated.unifiedNetworkState.name
             updated.isAirplaneModeEnabled?.let {
@@ -131,6 +144,12 @@ class DataStoreRuntimeStatusRepository @Inject constructor(
     private object Keys {
         val CurrentForegroundPackageName = stringPreferencesKey("current_foreground_package_name")
         val CurrentForegroundAppLabel = stringPreferencesKey("current_foreground_app_label")
+        val CurrentForegroundActivityName = stringPreferencesKey("current_foreground_activity_name")
+        val ForegroundEventTimestampMillis = longPreferencesKey("foreground_event_timestamp")
+        val ForegroundInfoSource = stringPreferencesKey("foreground_info_source")
+        val ForegroundActivityConfirmed = booleanPreferencesKey("foreground_activity_confirmed")
+        val ForegroundRuleLayer = stringPreferencesKey("foreground_rule_layer")
+        val ForegroundRuleReason = stringPreferencesKey("foreground_rule_reason")
         val ScreenState = stringPreferencesKey("screen_state")
         val UnifiedNetworkState = stringPreferencesKey("unified_network_state")
         val IsAirplaneModeEnabled = booleanPreferencesKey("is_airplane_mode_enabled")

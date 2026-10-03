@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.apps
 
+import com.gaozay.smartflight.activities.ActivityRepository
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -21,6 +22,7 @@ import kotlinx.coroutines.launch
 class InstalledAppChangeMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: InstalledAppRepository,
+    private val activities: ActivityRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val changes = Channel<PackageChange>(Channel.UNLIMITED)
@@ -56,8 +58,14 @@ class InstalledAppChangeMonitor @Inject constructor(
             for (change in changes) {
                 try {
                     when (change) {
-                        PackageChange.Reconcile -> repository.refreshInstalledApps()
-                        is PackageChange.Refresh -> repository.refreshPackage(change.packageName, change.removed)
+                        PackageChange.Reconcile -> {
+                            repository.refreshInstalledApps()
+                            activities.refreshTrackedPackages()
+                        }
+                        is PackageChange.Refresh -> {
+                            repository.refreshPackage(change.packageName, change.removed)
+                            if (activities.isTracked(change.packageName)) activities.refreshActivities(change.packageName)
+                        }
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled

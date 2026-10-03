@@ -28,12 +28,14 @@ class InstalledAppMigrationTest {
                 try { db.installedAppDao().upsert(original) } finally { db.close() }
             }
             SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                for (table in listOf("activity_components", "activity_rules", "app_activity_configs", "activity_visits")) db.execSQL("DROP TABLE $table")
+                for (column in listOf("foregroundActivityName", "foregroundRuleLayer", "foregroundRuleReason")) db.execSQL("ALTER TABLE execution_logs DROP COLUMN $column")
                 db.execSQL("ALTER TABLE installed_apps DROP COLUMN isInstalled")
                 db.version = 2
                 db.execSQL("UPDATE room_master_table SET identity_hash = 'version-two-test'")
             }
             Room.databaseBuilder(context, SmartFlightDatabase::class.java, name)
-                .addMigrations(SmartFlightDatabase.MIGRATION_1_2, SmartFlightDatabase.MIGRATION_2_3)
+                .addMigrations(SmartFlightDatabase.MIGRATION_1_2, SmartFlightDatabase.MIGRATION_2_3, SmartFlightDatabase.MIGRATION_3_4)
                 .build().let { db ->
                     try {
                         assertEquals(original, db.installedAppDao().getByPackageName("fixture"))

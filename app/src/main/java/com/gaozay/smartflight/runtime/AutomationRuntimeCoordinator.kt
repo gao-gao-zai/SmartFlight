@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.activities.ActivityRepository
 import android.util.Log
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.InstalledAppRepository
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 class AutomationRuntimeCoordinator @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val installedAppRepository: InstalledAppRepository,
+    private val activityRepository: ActivityRepository,
     private val accessRepository: AccessRepository,
     private val automationRuleEngine: AutomationRuleEngine,
     private val runtimeEnvironmentMonitor: RuntimeEnvironmentMonitor,
@@ -51,6 +53,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
     private var eventLoopJob: Job? = null
     private var settingsJob: Job? = null
     private var appsJob: Job? = null
+    private var activityRulesJob: Job? = null
     private var state = RuntimeState()
     @Volatile
     private var runtimeActive = false
@@ -153,7 +156,15 @@ class AutomationRuntimeCoordinator @Inject constructor(
             RuntimeEvent.ForegroundEventSourceChanged -> handleForegroundEventSourceChanged()
             is RuntimeEvent.SettingsChanged -> handleSettingsChanged(event.settings)
             is RuntimeEvent.AppsChanged -> {
+                val changed = state.appRulesByPackageName != event.appRulesByPackageName
                 state = state.copy(appRulesByPackageName = event.appRulesByPackageName)
+                if (changed && state.lastTargetAppActive != null) scheduleForegroundObservation(immediate = true)
+            }
+            is RuntimeEvent.ActivityRulesChanged -> {
+                val changed = state.activityRules != event.rules
+                state = state.copy(activityRules = event.rules)
+                hybridForegroundAppSource.confirmActivity = event.rules.any { it.rulesEnabled && it.isValid }
+                if (changed && state.lastTargetAppActive != null) scheduleForegroundObservation(immediate = true)
             }
             RuntimeEvent.NetworkChanged -> handleNetworkChanged()
             RuntimeEvent.TemporaryDisableExpired -> handleTemporaryDisableExpired()
@@ -161,6 +172,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
                 disconnectAutomationHandler.handleScreenOffDisconnectDue(state, scheduler)
             }
             RuntimeEvent.AppExitDisconnectDue -> {
+                if (state.activityRules.isNotEmpty()) state = foregroundAutomationHandler.automationTick(state, scheduler)
                 disconnectAutomationHandler.handleAppExitDisconnectDue(state, scheduler)
             }
         }
@@ -172,8 +184,10 @@ class AutomationRuntimeCoordinator @Inject constructor(
             settings = settingsRepository.settings.first(),
             screenState = initialScreenState,
             appRulesByPackageName = installedAppRepository.observeApps().first().toRuntimeRuleMap(),
+            activityRules = activityRepository.observeRuntimeRules().first(),
         )
         hybridForegroundAppSource.monitorMode = state.settings.foregroundMonitorMode
+        hybridForegroundAppSource.confirmActivity = state.activityRules.any { it.rulesEnabled && it.isValid }
         startCollectors()
         runtimeEnvironmentMonitor.register(scope)
         accessRepository.refresh()
@@ -184,6 +198,9 @@ class AutomationRuntimeCoordinator @Inject constructor(
     }
 
     private fun startCollectors() {
+        if (activityRulesJob?.isActive != true) {
+            activityRulesJob = scope.launch { activityRepository.observeRuntimeRules().collect { send(RuntimeEvent.ActivityRulesChanged(it)) } }
+        }
         if (settingsJob?.isActive != true) {
             settingsJob = scope.launch {
                 settingsRepository.settings.collect { settings ->
@@ -208,8 +225,10 @@ class AutomationRuntimeCoordinator @Inject constructor(
         scheduler.cancelAll()
         settingsJob?.cancel()
         appsJob?.cancel()
+        activityRulesJob?.cancel()
         settingsJob = null
         appsJob = null
+        activityRulesJob = null
         runtimeEnvironmentMonitor.unregister()
         reporter.markServiceStopped(finalScreenState)
         ack?.complete(Unit)
@@ -349,7 +368,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
         state = foregroundAutomationHandler.automationTick(
             state = state,
             scheduler = scheduler,
-            foregroundAppOverride = foregroundApp,
+            foregroundAppOverride = if (hybridForegroundAppSource.confirmActivity) hybridForegroundAppSource.detect() ?: foregroundApp else foregroundApp,
         )
         scheduleForegroundObservation(immediate = false)
     }
@@ -379,7 +398,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
 
     private fun shouldSuppressPeriodicForegroundProbe(): Boolean =
         when (state.settings.foregroundMonitorMode) {
-            ForegroundMonitorMode.Auto -> accessibilityForegroundAppTracker.isServiceConnected
+            ForegroundMonitorMode.Auto -> accessibilityForegroundAppTracker.isServiceConnected && !hybridForegroundAppSource.confirmActivity
             ForegroundMonitorMode.Accessibility -> true
             ForegroundMonitorMode.UsageStats -> false
         }
