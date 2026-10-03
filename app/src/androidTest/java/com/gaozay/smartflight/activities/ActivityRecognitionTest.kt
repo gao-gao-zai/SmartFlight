@@ -91,7 +91,7 @@ class ActivityRecognitionTest {
             .bufferedReader().use { it.readText().trim() }
         val originalServices = shell("settings get secure enabled_accessibility_services")
         val originalEnabled = shell("settings get secure accessibility_enabled")
-        val component = "${context.packageName}/.runtime.SmartFlightAccessibilityService"
+        val component = "${context.packageName}/${context.packageName}.runtime.SmartFlightAccessibilityService"
         val services = originalServices.takeUnless { it == "null" || it.isBlank() }?.let { "$it:$component" } ?: component
         fun quote(value: String) = "'" + value.replace("'", "'\"'\"'") + "'"
         val tracker = EntryPointAccessors.fromApplication(context, AppSyncTestEntryPoint::class.java).foregroundTracker()
@@ -111,6 +111,11 @@ class ActivityRecognitionTest {
             shell("am start -W -n $ACTIVITY_FIXTURE/.SecondActivity")
             awaitActivityCondition("Platform accessibility did not confirm same-package SecondActivity") { tracker.latest()?.activityName == second }
             assertEquals(ForegroundInfoSource.Accessibility, tracker.latest()!!.source)
+        } catch (error: Throwable) {
+            shell("mkdir -p /sdcard/Download/smartflight-activities")
+            shell("dumpsys accessibility > /sdcard/Download/smartflight-activities/accessibility-failure.txt")
+            shell("dumpsys package ${context.packageName} > /sdcard/Download/smartflight-activities/package-failure.txt")
+            throw error
         } finally {
             if (originalServices == "null" || originalServices.isBlank()) shell("settings delete secure enabled_accessibility_services")
             else shell("settings put secure enabled_accessibility_services ${quote(originalServices)}")
