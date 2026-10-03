@@ -15,13 +15,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,12 +31,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.SmartFlightUiState
 import com.gaozay.smartflight.permission.AccessActionType
 import com.gaozay.smartflight.permission.AccessCheckResult
+import com.gaozay.smartflight.permission.AccessKind
 
 @Composable
 internal fun DiagnosticsScreen(
@@ -66,9 +69,9 @@ internal fun DiagnosticsScreen(
         contentPadding = PaddingValues(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { SettingsSection("运行条件") {
+        item { SettingsSection(stringResource(R.string.operating_requirements)) {
             AccessSummaryRow(
-                title = "使用情况访问",
+                title = stringResource(R.string.usage_access),
                 summary = state.accessGateState.usageStatsAccess.summary,
                 ready = state.accessGateState.usageStatsAccess.satisfiesRequirement,
                 onBadgeClick = if (state.accessGateState.usageStatsAccess.actionType != AccessActionType.None) {
@@ -78,7 +81,7 @@ internal fun DiagnosticsScreen(
                 },
             )
             AccessSummaryRow(
-                title = "无障碍监听",
+                title = stringResource(R.string.accessibility_monitoring),
                 summary = state.accessGateState.accessibilityAccess.summary,
                 ready = state.accessGateState.accessibilityAccess.satisfiesRequirement,
                 onBadgeClick = if (state.accessGateState.accessibilityAccess.actionType != AccessActionType.None) {
@@ -88,7 +91,7 @@ internal fun DiagnosticsScreen(
                 },
             )
             AccessSummaryRow(
-                title = "通知权限",
+                title = stringResource(R.string.notification_permission),
                 summary = state.accessGateState.notificationAccess.summary,
                 ready = state.accessGateState.notificationAccess.satisfiesRequirement,
                 onBadgeClick = if (state.accessGateState.notificationAccess.actionType != AccessActionType.None) {
@@ -98,7 +101,7 @@ internal fun DiagnosticsScreen(
                 },
             )
             AccessSummaryRow(
-                title = "电池优化",
+                title = stringResource(R.string.battery_optimization),
                 summary = state.accessGateState.batteryOptimization.summary,
                 ready = state.accessGateState.batteryOptimization.satisfiesRequirement,
                 onBadgeClick = if (state.accessGateState.batteryOptimization.actionType != AccessActionType.None) {
@@ -112,7 +115,7 @@ internal fun DiagnosticsScreen(
                     title = it.title,
                     summary = it.summary,
                     ready = it.satisfiesRequirement,
-                    onBadgeClick = if (it.actionType != AccessActionType.None || it.copyText != null || it.title == "ADB 初始化") {
+                    onBadgeClick = if (it.actionType != AccessActionType.None || it.copyText != null || it.kind == AccessKind.Adb) {
                         { selectedAccessResult = it }
                     } else {
                         null
@@ -120,22 +123,22 @@ internal fun DiagnosticsScreen(
                 )
             }
         } }
-        item { SettingsSection("执行器检测") {
+        item { SettingsSection(stringResource(R.string.executor_checks)) {
             Button(onClick = onRefreshAccessChecks, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Rounded.Refresh, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text("重新检测执行器")
+                Text(stringResource(R.string.check_executors_again))
             }
-            InfoRow("当前实际执行器", state.runtimeExecutor)
-            InfoRow("最近结果", state.runtimeLastResult)
-            InfoRow("最近摘要", state.runtimeLastCheck)
-            InfoRow("当前统一网络状态", state.unifiedNetworkState)
-            InfoRow("Wi‑Fi 状态", state.wifiStatus)
-            InfoRow("蓝牙状态", state.bluetoothStatus)
-            InfoRow("移动数据状态", state.mobileDataStatus)
+            InfoRow(stringResource(R.string.current_active_executor), state.runtimeExecutor)
+            InfoRow(stringResource(R.string.latest_result), state.runtimeLastResult)
+            InfoRow(stringResource(R.string.latest_summary), state.runtimeLastCheck)
+            InfoRow(stringResource(R.string.unified_network_state), state.unifiedNetworkState)
+            InfoRow(stringResource(R.string.wi_fi_state), state.wifiStatus)
+            InfoRow(stringResource(R.string.bluetooth_state), state.bluetoothStatus)
+            InfoRow(stringResource(R.string.mobile_data_state), state.mobileDataStatus)
             if (!state.bluetoothReadable) {
                 OutlinedButton(onClick = onRequestBluetoothPermission, modifier = Modifier.fillMaxWidth()) {
-                    Text("请求蓝牙状态权限")
+                    Text(stringResource(R.string.request_bluetooth_state_permission))
                 }
             }
         } }
@@ -143,22 +146,22 @@ internal fun DiagnosticsScreen(
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.fillMaxWidth().clickable { advancedExpanded = !advancedExpanded }, verticalAlignment = Alignment.CenterVertically) {
-                        Text("高级操作", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.advanced_actions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         Icon(if (advancedExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null)
                     }
                     if (advancedExpanded) {
-                        Text("这里的操作会直接改变设备联网状态，仅用于排障。", color = MaterialTheme.colorScheme.error)
-                        OutlinedButton(onClick = { pendingAction = "probe" }, modifier = Modifier.fillMaxWidth()) { Text("探测当前控制状态") }
-                        OutlinedButton(onClick = { pendingAction = "toggle" }, modifier = Modifier.fillMaxWidth()) { Text("手动切换当前模式") }
-                        OutlinedButton(onClick = onSimulateScreenOff, modifier = Modifier.fillMaxWidth()) { Text("模拟息屏") }
-                        OutlinedButton(onClick = onSimulateScreenOn, modifier = Modifier.fillMaxWidth()) { Text("模拟亮屏 / 取消延迟断网") }
-                        OutlinedButton(onClick = { pendingAction = "clear" }, modifier = Modifier.fillMaxWidth()) { Text("清空日志") }
+                        Text(stringResource(R.string.diagnostics_actions_description), color = MaterialTheme.colorScheme.error)
+                        OutlinedButton(onClick = { pendingAction = "probe" }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.probe_current_control_state)) }
+                        OutlinedButton(onClick = { pendingAction = "toggle" }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.manually_toggle_current_mode)) }
+                        OutlinedButton(onClick = onSimulateScreenOff, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.simulate_screen_off)) }
+                        OutlinedButton(onClick = onSimulateScreenOn, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.simulate_screen_on_cancel_delayed_disconnect)) }
+                        OutlinedButton(onClick = { pendingAction = "clear" }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.clear_logs)) }
                     }
                 }
             }
         }
-        item { SettingsSection("最近日志") {
-            if (state.recentExecutionLogs.isEmpty()) Text("尚未记录任何手动探测或切换动作。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        item { SettingsSection(stringResource(R.string.recent_logs)) {
+            if (state.recentExecutionLogs.isEmpty()) Text(stringResource(R.string.no_manual_probes_or_toggle_actions_recorded_yet), color = MaterialTheme.colorScheme.onSurfaceVariant)
             else state.recentExecutionLogs.forEach { ExecutionLogCard(it) }
         } }
     }

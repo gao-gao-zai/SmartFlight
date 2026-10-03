@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.permission
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.TriggerSource
@@ -9,7 +10,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class NetworkControlActionExecutorTest {
+class NetworkControlActionExecutorTest : LocalizedStringsTest() {
     @Test
     fun mobileDataDisconnectUsesSetDisconnectedStateAndWritesLog() = runTest {
         val fixture = fixture(

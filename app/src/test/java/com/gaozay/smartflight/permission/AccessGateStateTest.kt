@@ -1,10 +1,11 @@
 package com.gaozay.smartflight.permission
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class AccessGateStateTest {
+class AccessGateStateTest : LocalizedStringsTest() {
     @Test
     fun canEnterWithAdvancedAccessAndUsageStatsOnly() {
         val state = AccessGateState(

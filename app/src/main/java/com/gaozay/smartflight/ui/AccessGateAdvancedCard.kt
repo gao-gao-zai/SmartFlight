@@ -16,10 +16,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.permission.AccessActionType
 import com.gaozay.smartflight.permission.AccessCheckResult
+import com.gaozay.smartflight.permission.AccessKind
 
 @Composable
 internal fun AccessSectionCard(
@@ -68,17 +71,17 @@ private fun AccessGateAdvancedAction(
     onProbeRootAccess: () -> Unit,
     onSetAdbBootstrapped: (Boolean) -> Unit,
 ) {
-    if (result.title == "Shizuku" && result.actionType == AccessActionType.RequestPermission) {
+    if (result.kind == AccessKind.Shizuku && result.actionType == AccessActionType.RequestPermission) {
         OutlinedButton(onClick = onRequestShizukuPermission) {
-            Text("请求 Shizuku 授权")
+            Text(stringResource(R.string.request_shizuku_permission))
         }
     }
-    if (result.title == "Root" && result.actionType == AccessActionType.RequestPermission) {
+    if (result.kind == AccessKind.Root && result.actionType == AccessActionType.RequestPermission) {
         OutlinedButton(onClick = onProbeRootAccess) {
-            Text("测试 Root 授权")
+            Text(stringResource(R.string.test_root_authorization))
         }
     }
-    if (result.title == "ADB 初始化") {
+    if (result.kind == AccessKind.Adb) {
         AdbBootstrapActions(
             result = result,
             onSetAdbBootstrapped = onSetAdbBootstrapped,

@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ScreenState
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -13,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class RuntimeTaskSchedulerTest {
+class RuntimeTaskSchedulerTest : LocalizedStringsTest() {
     @Test
     fun foregroundProbeIntervalKeepsOriginalCadence() {
         assertEquals(1_500L, RuntimeTaskScheduler.foregroundProbeIntervalMillis(ScreenState.ScreenOn))

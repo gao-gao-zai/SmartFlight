@@ -1,6 +1,8 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.settings.UserSettings
 
 data class ForegroundRuleContext(
@@ -17,7 +19,7 @@ data class ForegroundRuleContext(
     val isAppExitDisconnectScheduled: Boolean = false,
     val allowReconnectWhenTargetAppAlreadyActive: Boolean = false,
 ) {
-    fun displayName(): String = appLabel ?: packageName ?: "未知应用"
+    fun displayName(): String = appLabel ?: packageName ?: AppStrings.get(R.string.unknown_app)
 
     fun isTargetAppActive(): Boolean =
         packageName != null && !isInBlacklist && isInOnlineList

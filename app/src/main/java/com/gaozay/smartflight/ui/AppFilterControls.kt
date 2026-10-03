@@ -20,9 +20,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.AppFilter
 import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.AppsUiState
@@ -54,12 +57,12 @@ internal fun FilterSummaryRow(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "当前显示",
+                        text = stringResource(R.string.currently_showing),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = "${state.filteredCount} / ${state.totalCount} · ${state.filter.zhLabel()}",
+                        text = "${state.filteredCount} / ${state.totalCount} · ${state.filter.localizedLabel()}",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium,
                     )
@@ -68,14 +71,14 @@ internal fun FilterSummaryRow(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AdvancedFilterMenu(
-                    label = "联网",
-                    value = state.internetPermissionFilter.zhLabel(),
+                    label = stringResource(R.string.online),
+                    value = state.internetPermissionFilter.localizedLabel(),
                     active = state.internetPermissionFilter != InternetPermissionFilter.All,
                     modifier = Modifier.weight(1f),
                 ) { dismiss ->
                     InternetPermissionFilter.entries.forEach { filter ->
                         DropdownMenuItem(
-                            text = { Text(filter.zhLabel()) },
+                            text = { Text(filter.localizedLabel()) },
                             onClick = {
                                 dismiss()
                                 onInternetPermissionFilterChange(filter)
@@ -84,14 +87,14 @@ internal fun FilterSummaryRow(
                     }
                 }
                 AdvancedFilterMenu(
-                    label = "类型",
-                    value = state.appTypeFilter.zhLabel(),
+                    label = stringResource(R.string.type),
+                    value = state.appTypeFilter.localizedLabel(),
                     active = state.appTypeFilter != AppTypeFilter.User,
                     modifier = Modifier.weight(1f),
                 ) { dismiss ->
                     AppTypeFilter.entries.forEach { filter ->
                         DropdownMenuItem(
-                            text = { Text(filter.zhLabel()) },
+                            text = { Text(filter.localizedLabel()) },
                             onClick = {
                                 dismiss()
                                 onAppTypeFilterChange(filter)
@@ -100,14 +103,14 @@ internal fun FilterSummaryRow(
                     }
                 }
                 AdvancedFilterMenu(
-                    label = "入口",
-                    value = state.launcherFilter.zhLabel(),
+                    label = stringResource(R.string.launcher),
+                    value = state.launcherFilter.localizedLabel(),
                     active = state.launcherFilter != LauncherFilter.All,
                     modifier = Modifier.weight(1f),
                 ) { dismiss ->
                     LauncherFilter.entries.forEach { filter ->
                         DropdownMenuItem(
-                            text = { Text(filter.zhLabel()) },
+                            text = { Text(filter.localizedLabel()) },
                             onClick = {
                                 dismiss()
                                 onLauncherFilterChange(filter)
@@ -122,13 +125,13 @@ internal fun FilterSummaryRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "已启用 ${state.activeAdvancedFilterCount} 个高级条件",
+                        text = pluralStringResource(R.plurals.advanced_filters_active, (state.activeAdvancedFilterCount).toInt(), state.activeAdvancedFilterCount),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedButton(onClick = onClearAdvancedFilters) {
-                        Text("清除")
+                        Text(stringResource(R.string.clear))
                     }
                 }
             }
@@ -144,7 +147,7 @@ private fun StatusFilterMenu(
     var expanded by rememberSaveable { mutableStateOf(false) }
     Box {
         OutlinedButton(onClick = { expanded = true }) {
-            Text("范围")
+            Text(stringResource(R.string.scope))
         }
         DropdownMenu(
             expanded = expanded,
@@ -152,7 +155,7 @@ private fun StatusFilterMenu(
         ) {
             AppFilter.entries.forEach { filter ->
                 DropdownMenuItem(
-                    text = { Text("${filter.zhLabel()} ${state.countFor(filter)}") },
+                    text = { Text("${filter.localizedLabel()} ${state.countFor(filter)}") },
                     onClick = {
                         expanded = false
                         onFilterChange(filter)
@@ -201,28 +204,32 @@ private fun AdvancedFilterMenu(
     }
 }
 
-private fun AppFilter.zhLabel(): String = when (this) {
-    AppFilter.All -> "全部应用"
-    AppFilter.Online -> "联网"
-    AppFilter.Offline -> "非联网"
-    AppFilter.Whitelist -> "白名单"
-    AppFilter.Blacklist -> "黑名单"
+@Composable
+private fun AppFilter.localizedLabel(): String = when (this) {
+    AppFilter.All -> stringResource(R.string.all_apps)
+    AppFilter.Online -> stringResource(R.string.online)
+    AppFilter.Offline -> stringResource(R.string.offline)
+    AppFilter.Whitelist -> stringResource(R.string.allowlist)
+    AppFilter.Blacklist -> stringResource(R.string.blocklist)
 }
 
-private fun InternetPermissionFilter.zhLabel(): String = when (this) {
-    InternetPermissionFilter.All -> "全部"
-    InternetPermissionFilter.Declared -> "声明联网"
-    InternetPermissionFilter.NotDeclared -> "未声明联网"
+@Composable
+private fun InternetPermissionFilter.localizedLabel(): String = when (this) {
+    InternetPermissionFilter.All -> stringResource(R.string.all)
+    InternetPermissionFilter.Declared -> stringResource(R.string.declares_internet_permission)
+    InternetPermissionFilter.NotDeclared -> stringResource(R.string.no_internet_permission_declared)
 }
 
-private fun AppTypeFilter.zhLabel(): String = when (this) {
-    AppTypeFilter.All -> "全部"
-    AppTypeFilter.User -> "用户应用"
-    AppTypeFilter.System -> "系统应用"
+@Composable
+private fun AppTypeFilter.localizedLabel(): String = when (this) {
+    AppTypeFilter.All -> stringResource(R.string.all)
+    AppTypeFilter.User -> stringResource(R.string.user_apps)
+    AppTypeFilter.System -> stringResource(R.string.system_apps)
 }
 
-private fun LauncherFilter.zhLabel(): String = when (this) {
-    LauncherFilter.All -> "全部"
-    LauncherFilter.HasLauncher -> "有启动入口"
-    LauncherFilter.NoLauncher -> "无启动入口"
+@Composable
+private fun LauncherFilter.localizedLabel(): String = when (this) {
+    LauncherFilter.All -> stringResource(R.string.all)
+    LauncherFilter.HasLauncher -> stringResource(R.string.has_launcher_entry)
+    LauncherFilter.NoLauncher -> stringResource(R.string.no_launcher_entry)
 }

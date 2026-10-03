@@ -1,11 +1,13 @@
 package com.gaozay.smartflight.executor
 
 import android.content.pm.PackageManager
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.shizuku.ShizukuServiceManager
-import rikka.shizuku.Shizuku
 import javax.inject.Inject
 import javax.inject.Singleton
+import rikka.shizuku.Shizuku
 
 @Singleton
 class ShizukuExecutorCommandRunner @Inject constructor(
@@ -17,7 +19,7 @@ class ShizukuExecutorCommandRunner @Inject constructor(
             return ExecutorCommandResult(
                 executorType = ExecutorType.Shizuku,
                 executed = false,
-                summary = "Shizuku 命令未执行：Binder 未连接",
+                summary = AppStrings.get(R.string.shizuku_command_not_executed_binder_not_connected),
             )
         }
 
@@ -28,7 +30,7 @@ class ShizukuExecutorCommandRunner @Inject constructor(
             return ExecutorCommandResult(
                 executorType = ExecutorType.Shizuku,
                 executed = false,
-                summary = "Shizuku 命令未执行：缺少授权",
+                summary = AppStrings.get(R.string.shizuku_command_not_executed_permission_not_granted),
             )
         }
 
@@ -36,7 +38,7 @@ class ShizukuExecutorCommandRunner @Inject constructor(
             ?: return ExecutorCommandResult(
                 executorType = ExecutorType.Shizuku,
                 executed = false,
-                summary = "Shizuku 命令未执行：无法绑定 UserService",
+                summary = AppStrings.get(R.string.shizuku_command_not_executed_unable_to_bind_userservice),
             )
 
         val rawResult = runCatching {
@@ -45,7 +47,7 @@ class ShizukuExecutorCommandRunner @Inject constructor(
             return ExecutorCommandResult(
                 executorType = ExecutorType.Shizuku,
                 executed = false,
-                summary = "Shizuku 命令执行异常",
+                summary = AppStrings.get(R.string.shizuku_command_execution_error),
                 stderr = throwable.message.orEmpty(),
             )
         }
@@ -62,9 +64,9 @@ class ShizukuExecutorCommandRunner @Inject constructor(
             exitCode = exitCode,
             stdout = stdout,
             summary = if (exitCode == 0) {
-                "Shizuku 命令执行成功"
+                AppStrings.get(R.string.shizuku_command_executed_successfully)
             } else {
-                "Shizuku 命令执行失败"
+                AppStrings.get(R.string.shizuku_command_execution_failed)
             },
         )
     }

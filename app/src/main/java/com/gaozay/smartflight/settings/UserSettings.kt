@@ -1,33 +1,39 @@
 package com.gaozay.smartflight.settings
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.CornerStyle
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
 import com.gaozay.smartflight.domain.model.ThemePalette
+import com.gaozay.smartflight.i18n.AppStrings
+import com.gaozay.smartflight.i18n.ResourceLabel
 
 enum class AutomationDisableMode(
-    val label: String,
-    val shortLabel: String,
-    val tileLabel: String,
+    override val labelRes: Int,
+    val shortLabelRes: Int,
+    val tileLabelRes: Int,
     val durationMillis: Long? = null,
-) {
-    None("未禁用", "运行中", "启用"),
-    UntilAppSwitch("禁用直到应用切换", "直到应用切换", "应用切换"),
-    UntilScreenOff("禁用直到息屏", "直到息屏", "息屏"),
-    For1Minute("禁用 1 分钟", "1 分钟", "1m", 60_000L),
-    For5Minutes("禁用 5 分钟", "5 分钟", "5m", 5 * 60_000L),
-    For10Minutes("禁用 10 分钟", "10 分钟", "10m", 10 * 60_000L),
-    For20Minutes("禁用 20 分钟", "20 分钟", "20m", 20 * 60_000L),
-    For30Minutes("禁用 30 分钟", "30 分钟", "30m", 30 * 60_000L),
-    Permanent("永久禁用", "永久", "永久"),
+) : ResourceLabel {
+    None(R.string.not_disabled, R.string.running, R.string.enable),
+    UntilAppSwitch(R.string.disable_until_app_switch, R.string.until_app_switch, R.string.app_switch),
+    UntilScreenOff(R.string.disable_until_screen_off, R.string.until_screen_off, R.string.screen_off),
+    For1Minute(R.string.disable_for_1_minute, R.string.duration_1_minute, R.string.tile_1m, 60_000L),
+    For5Minutes(R.string.disable_for_5_minutes, R.string.duration_5_minutes, R.string.tile_5m, 5 * 60_000L),
+    For10Minutes(R.string.disable_for_10_minutes, R.string.duration_10_minutes, R.string.tile_10m, 10 * 60_000L),
+    For20Minutes(R.string.disable_for_20_minutes, R.string.duration_20_minutes, R.string.tile_20m, 20 * 60_000L),
+    For30Minutes(R.string.disable_for_30_minutes, R.string.duration_30_minutes, R.string.tile_30m, 30 * 60_000L),
+    Permanent(R.string.disable_permanently, R.string.permanent, R.string.permanent);
+
+    val shortLabel: String get() = AppStrings.get(shortLabelRes)
+    val tileLabel: String get() = AppStrings.get(tileLabelRes)
 }
 
-enum class ForegroundMonitorMode(val label: String) {
-    Auto("自动选择"),
-    Accessibility("无障碍事件"),
-    UsageStats("使用情况轮询"),
+enum class ForegroundMonitorMode(override val labelRes: Int) : ResourceLabel {
+    Auto(R.string.automatic_selection),
+    Accessibility(R.string.accessibility_events),
+    UsageStats(R.string.usage_stats_polling),
 }
 
 data class UserSettings(
@@ -53,9 +59,10 @@ data class UserSettings(
     val disableScreenOnReconnect: Boolean = true,
     val disableUnlockReconnect: Boolean = true,
     val showReconnectPrompt: Boolean = true,
-    val reconnectPromptText: String = "SmartFlight 已恢复联网",
+    // An empty value means the localized built-in prompt. User text stays verbatim.
+    val reconnectPromptText: String = "",
     val showDisconnectPrompt: Boolean = true,
-    val disconnectPromptText: String = "SmartFlight 已断网",
+    val disconnectPromptText: String = "",
     val themeMode: ThemeMode = ThemeMode.System,
     val themePalette: ThemePalette = ThemePalette.LogoOriginal,
     val customSeedColorArgb: Int = ThemePalette.LogoOriginal.seedColorArgb,
@@ -91,8 +98,8 @@ fun UserSettings.temporaryDisableSummary(nowMillis: Long = System.currentTimeMil
         return null
     }
     return when (temporaryDisableMode) {
-        AutomationDisableMode.UntilAppSwitch -> "已临时禁用，切换应用后恢复自动化"
-        AutomationDisableMode.UntilScreenOff -> "已临时禁用，息屏后恢复自动化"
+        AutomationDisableMode.UntilAppSwitch -> AppStrings.get(R.string.temporarily_disabled_automation_resumes_on_the_next_app_switch)
+        AutomationDisableMode.UntilScreenOff -> AppStrings.get(R.string.temporarily_disabled_automation_resumes_when_the_screen_turns_off)
         AutomationDisableMode.For1Minute,
         AutomationDisableMode.For5Minutes,
         AutomationDisableMode.For10Minutes,
@@ -102,9 +109,9 @@ fun UserSettings.temporaryDisableSummary(nowMillis: Long = System.currentTimeMil
                 ((it - nowMillis).coerceAtLeast(0L) + 999L) / 1000L
             }
             if (remainingSeconds != null) {
-                "已临时禁用，剩余 ${remainingSeconds} 秒"
+                AppStrings.quantity(R.plurals.temporarily_disabled_seconds_remaining, (remainingSeconds).toInt(), remainingSeconds)
             } else {
-                "已临时禁用，稍后恢复自动化"
+                AppStrings.get(R.string.temporarily_disabled_automation_will_resume_later)
             }
         }
         AutomationDisableMode.None,

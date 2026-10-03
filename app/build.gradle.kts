@@ -85,6 +85,9 @@ android {
         }
     }
 
+    // JVM formatter tests read the same catalog that Android packages.
+    sourceSets.getByName("test").resources.srcDir("src/main/res")
+
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.15"
     }
@@ -134,4 +137,3 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
-

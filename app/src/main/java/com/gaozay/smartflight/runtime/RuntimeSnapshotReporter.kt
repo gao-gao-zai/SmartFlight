@@ -1,9 +1,11 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
+import com.gaozay.smartflight.i18n.AppStrings
 import javax.inject.Inject
 
 class RuntimeSnapshotReporter @Inject constructor(
@@ -20,7 +22,7 @@ class RuntimeSnapshotReporter @Inject constructor(
             snapshot.copy(
                 lastTriggerSource = TriggerSource.ServiceRestored,
                 lastActionResult = ExecutionResult.Failed,
-                lastActionReason = "自动化事件处理失败：${throwable.message ?: "未知错误"}",
+                lastActionReason = AppStrings.get(R.string.automation_event_handling_failed, throwable.message ?: AppStrings.get(R.string.unknown_error)),
                 updatedAtMillis = System.currentTimeMillis(),
             )
         }

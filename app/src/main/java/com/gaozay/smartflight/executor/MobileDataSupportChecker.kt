@@ -1,7 +1,9 @@
 package com.gaozay.smartflight.executor
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
+import com.gaozay.smartflight.i18n.AppStrings
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,6 +30,6 @@ class MobileDataSupportChecker @Inject constructor() {
     }
 
     companion object {
-        const val MOBILE_DATA_UNSUPPORTED_SUMMARY = "当前设备不支持移动数据切换，请改用飞行模式"
+        const val MOBILE_DATA_UNSUPPORTED_SUMMARY = AppStrings.get(R.string.mobile_data_unsupported_recommendation)
     }
 }

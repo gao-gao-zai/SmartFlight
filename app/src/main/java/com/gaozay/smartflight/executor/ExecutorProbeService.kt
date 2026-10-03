@@ -1,11 +1,13 @@
 package com.gaozay.smartflight.executor
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.settings.SettingsRepository
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
 
 @Singleton
 class ExecutorProbeService @Inject constructor(
@@ -23,7 +25,7 @@ class ExecutorProbeService @Inject constructor(
         return runner?.run(command) ?: ExecutorCommandResult(
             executorType = executorType,
             executed = false,
-            summary = "没有可用于${command.purpose}的执行器",
+            summary = AppStrings.get(R.string.no_executor_available_for, command.purpose),
         )
     }
 
@@ -39,7 +41,7 @@ class ExecutorProbeService @Inject constructor(
             executed = false,
             summary = commandMapper.noReadExecutorSummary(mode),
         )).let { result ->
-            if (!result.executed && result.summary.startsWith("没有可用于")) {
+            if (runner == null) {
                 commandMapper.withMode(mode, result, commandMapper.noReadExecutorSummary(mode))
             } else {
                 commandMapper.withMode(mode, result)
@@ -89,6 +91,7 @@ class ExecutorProbeService @Inject constructor(
                 controlledEnabled = enabled,
                 executed = false,
                 summary = commandMapper.alreadyInStateSummary(mode, enabled),
+                alreadyInRequestedState = true,
             )
         }
 

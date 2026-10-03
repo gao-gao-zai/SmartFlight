@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
 import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.settings.UserSettings
@@ -8,7 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class AutomationRuleEngineTest {
+class AutomationRuleEngineTest : LocalizedStringsTest() {
     private val engine = AutomationRuleEngine(ForegroundRuleEvaluator())
 
     @Test

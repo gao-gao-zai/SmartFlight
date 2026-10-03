@@ -29,9 +29,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.isOnline
 import com.gaozay.smartflight.apps.sourceTag
 import com.gaozay.smartflight.apps.statusLabel
@@ -50,17 +52,17 @@ internal fun EmptyAppsCard(onRefreshApps: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "还没有应用数据",
+                text = stringResource(R.string.no_app_data_yet),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "点击扫描读取已安装应用，并自动识别需要联网的应用。",
+                text = stringResource(R.string.apps_scan_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedButton(onClick = onRefreshApps) {
-                Text("扫描已安装应用")
+                Text(stringResource(R.string.scan_installed_apps))
             }
         }
     }
@@ -120,39 +122,39 @@ internal fun AppRow(
                             contentColor = it.tagContentColor(),
                         )
                     }
-                    InfoTag(text = if (app.declaresInternetPermission) "声明联网" else "未声明联网")
-                    InfoTag(text = if (app.isSystemApp) "系统应用" else "用户应用")
+                    InfoTag(text = if (app.declaresInternetPermission) stringResource(R.string.declares_internet_permission) else stringResource(R.string.no_internet_permission_declared))
+                    InfoTag(text = if (app.isSystemApp) stringResource(R.string.system_apps) else stringResource(R.string.user_apps))
                 }
             }
             Box {
                 IconButton(onClick = { expanded = true }) {
-                    Icon(Icons.Rounded.MoreVert, contentDescription = "更改规则")
+                    Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.change_rule))
                 }
                 DropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("当前：${app.statusLabel()}${sourceTag?.let { " · ${it.label}" } ?: ""}") },
+                        text = { Text(stringResource(R.string.current, app.statusLabel(), sourceTag?.let { " · ${it.label}" } ?: "")) },
                         enabled = false,
                         onClick = {},
                     )
                     DropdownMenuItem(
-                        text = { Text("设为联网") },
+                        text = { Text(stringResource(R.string.set_as_online)) },
                         onClick = {
                             expanded = false
                             onSetManualOnline(app.packageName)
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("设为非联网") },
+                        text = { Text(stringResource(R.string.set_as_offline)) },
                         onClick = {
                             expanded = false
                             onSetManualOffline(app.packageName)
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("恢复默认") },
+                        text = { Text(stringResource(R.string.restore_default)) },
                         onClick = {
                             expanded = false
                             onResetToDefault(app.packageName)

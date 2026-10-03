@@ -1,10 +1,8 @@
 package com.gaozay.smartflight.executor
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
+import com.gaozay.smartflight.i18n.AppStrings
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
@@ -12,6 +10,10 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 @Singleton
 class RootExecutorCommandRunner @Inject constructor() : ExecutorCommandRunner {
@@ -31,7 +33,7 @@ class RootExecutorCommandRunner @Inject constructor() : ExecutorCommandRunner {
             return@withContext ExecutorCommandResult(
                 executorType = ExecutorType.Root,
                 executed = false,
-                summary = "Root 命令未执行：未检测到 su",
+                summary = AppStrings.get(R.string.root_command_not_executed_su_not_found),
             )
         }
 
@@ -42,7 +44,7 @@ class RootExecutorCommandRunner @Inject constructor() : ExecutorCommandRunner {
                 return@withLock ExecutorCommandResult(
                     executorType = ExecutorType.Root,
                     executed = false,
-                    summary = "Root 命令未执行：无法启动 su 进程",
+                    summary = AppStrings.get(R.string.root_command_not_executed_unable_to_start_the_su_process),
                 )
             }
             runCatching {
@@ -53,7 +55,7 @@ class RootExecutorCommandRunner @Inject constructor() : ExecutorCommandRunner {
                 ExecutorCommandResult(
                     executorType = ExecutorType.Root,
                     executed = false,
-                    summary = "Root 命令执行异常",
+                    summary = AppStrings.get(R.string.root_command_execution_error),
                     stderr = it.message.orEmpty(),
                 )
             }
@@ -97,9 +99,9 @@ private class RootSession(
                     exitCode = exitCode,
                     stdout = stdout,
                     summary = if (exitCode == 0) {
-                        "Root 命令执行成功"
+                        AppStrings.get(R.string.root_command_executed_successfully)
                     } else {
-                        "Root 命令执行失败"
+                        AppStrings.get(R.string.root_command_execution_failed)
                     },
                 )
             }
@@ -111,7 +113,7 @@ private class RootSession(
             executorType = ExecutorType.Root,
             executed = false,
             stdout = outputLines.joinToString("\n").trim(),
-            summary = "Root 命令未执行：su 会话已关闭",
+            summary = AppStrings.get(R.string.root_command_not_executed_su_session_closed),
         )
     }
 

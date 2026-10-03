@@ -1,11 +1,12 @@
 package com.gaozay.smartflight.update
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class UpdateRepositoryTest {
+class UpdateRepositoryTest : LocalizedStringsTest() {
     @Test
     fun giteeSuccessDoesNotRequestGithub() = runTest {
         val apiClient = FakeReleaseApiClient(

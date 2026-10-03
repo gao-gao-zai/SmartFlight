@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.AccessibilityNew
+import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.VerifiedUser
@@ -22,8 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.permission.AccessCheckResult
 
 @Composable
@@ -49,10 +51,10 @@ internal fun SystemAccessCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.VerifiedUser, contentDescription = "一般权限")
+                Icon(Icons.Rounded.VerifiedUser, contentDescription = stringResource(R.string.general_permissions))
                 Spacer(modifier = Modifier.size(10.dp))
                 Text(
-                    text = "一般权限",
+                    text = stringResource(R.string.general_permissions),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -62,31 +64,31 @@ internal fun SystemAccessCard(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = canAutoGrant,
             ) {
-                Text("尝试自动授权")
+                Text(stringResource(R.string.try_automatic_permission_grants))
             }
             AccessResultRow(result = usageStatsAccess)
             OutlinedButton(onClick = onOpenUsageAccessSettings) {
-                Icon(Icons.Rounded.Settings, contentDescription = "打开使用情况访问设置")
+                Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.open_usage_access_settings))
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("打开使用情况访问设置")
+                Text(stringResource(R.string.open_usage_access_settings))
             }
             AccessResultRow(result = accessibilityAccess)
             OutlinedButton(onClick = onOpenAccessibilitySettings) {
-                Icon(Icons.Rounded.AccessibilityNew, contentDescription = "打开无障碍设置")
+                Icon(Icons.Rounded.AccessibilityNew, contentDescription = stringResource(R.string.open_accessibility_settings))
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("打开无障碍设置")
+                Text(stringResource(R.string.open_accessibility_settings))
             }
             AccessResultRow(result = notificationAccess)
             OutlinedButton(onClick = onOpenNotificationSettings) {
-                Icon(Icons.Rounded.Notifications, contentDescription = "打开通知设置")
+                Icon(Icons.Rounded.Notifications, contentDescription = stringResource(R.string.open_notification_settings))
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("打开通知设置")
+                Text(stringResource(R.string.open_notification_settings))
             }
             AccessResultRow(result = batteryOptimization)
             OutlinedButton(onClick = onOpenBatteryOptimizationSettings) {
-                Icon(Icons.Rounded.BatterySaver, contentDescription = "打开电池优化设置")
+                Icon(Icons.Rounded.BatterySaver, contentDescription = stringResource(R.string.open_battery_optimization_settings))
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("打开电池优化设置")
+                Text(stringResource(R.string.open_battery_optimization_settings))
             }
         }
     }

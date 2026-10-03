@@ -1,10 +1,11 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class RuntimeExpectedNetworkChangeTrackerTest {
+class RuntimeExpectedNetworkChangeTrackerTest : LocalizedStringsTest() {
     @Test
     fun consumesMatchingExpectedChangeWithinWindow() {
         val tracker = RuntimeExpectedNetworkChangeTracker()

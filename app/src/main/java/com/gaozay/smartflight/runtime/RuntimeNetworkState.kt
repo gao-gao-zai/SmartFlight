@@ -1,7 +1,9 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.UnifiedNetworkState
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.settings.UserSettings
 
 fun deriveUnifiedNetworkState(
@@ -43,8 +45,8 @@ fun UserSettings.mobileDataNoOpSuffix(): String {
         return ""
     }
     val parts = buildList {
-        if (preserveWifiState) add("保留 Wi‑Fi 状态：no-op")
-        if (preserveBluetoothState) add("保留蓝牙状态：no-op")
+        if (preserveWifiState) add(AppStrings.get(R.string.preserve_wi_fi_state_no_op))
+        if (preserveBluetoothState) add(AppStrings.get(R.string.preserve_bluetooth_state_no_op))
     }
-    return if (parts.isEmpty()) "" else "；${parts.joinToString("；")}"
+    return if (parts.isEmpty()) "" else AppStrings.get(R.string.summary_suffix, parts.joinToString(AppStrings.get(R.string.summary_separator)))
 }

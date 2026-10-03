@@ -1,11 +1,12 @@
 package com.gaozay.smartflight.permission
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class AccessResultFormatterTest {
+class AccessResultFormatterTest : LocalizedStringsTest() {
     private val formatter = AccessResultFormatter()
 
     @Test

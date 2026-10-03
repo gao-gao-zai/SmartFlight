@@ -1,12 +1,13 @@
 package com.gaozay.smartflight.executor
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class NetworkControlCommandMapperTest {
+class NetworkControlCommandMapperTest : LocalizedStringsTest() {
     private val mapper = NetworkControlCommandMapper()
 
     @Test

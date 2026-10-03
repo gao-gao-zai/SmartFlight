@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -89,6 +90,13 @@ class AutomationForegroundService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        createNotificationChannel()
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_ID, buildNotification())
+    }
 
     private fun detectCurrentScreenState(): ScreenState {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager

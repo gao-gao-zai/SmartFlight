@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.NetworkControlMode
@@ -10,7 +11,7 @@ import com.gaozay.smartflight.settings.UserSettings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class RuntimeSummaryFormatterTest {
+class RuntimeSummaryFormatterTest : LocalizedStringsTest() {
     @Test
     fun permanentDisabledSummaryUsesDisabledCopy() {
         val summary = buildRuntimeSummary(

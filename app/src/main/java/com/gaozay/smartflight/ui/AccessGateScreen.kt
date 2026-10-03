@@ -14,8 +14,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.permission.AccessGateState
 
 @Composable
@@ -41,12 +43,12 @@ fun AccessGateScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "SmartFlight 接入检查",
+                    text = stringResource(R.string.smartflight_setup_check),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "自动化功能至少需要一种高级执行能力，并授予使用情况访问权限。自动授权只会在你点击按钮后尝试执行。",
+                    text = stringResource(R.string.setup_access_description),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -57,7 +59,7 @@ fun AccessGateScreen(
         }
         item {
             AccessSectionCard(
-                title = "高级执行能力",
+                title = stringResource(R.string.advanced_execution_access),
                 icon = Icons.Rounded.Security,
                 checks = state.advancedAccess.checks,
                 onRequestShizukuPermission = onRequestShizukuPermission,
@@ -85,11 +87,11 @@ fun AccessGateScreen(
                     onClick = onRefresh,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (state.canEnterApp) "刷新状态" else "继续检查")
+                    Text(if (state.canEnterApp) stringResource(R.string.refresh_status) else stringResource(R.string.continue_checking))
                 }
                 if (state.advisoryChecks.isNotEmpty()) {
                     Text(
-                        text = "建议项未完成：${state.advisoryChecks.joinToString { it.title }}",
+                        text = stringResource(R.string.recommendations_incomplete, state.advisoryChecks.joinToString { it.title }),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

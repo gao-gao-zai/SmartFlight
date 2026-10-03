@@ -20,9 +20,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.update.UpdateUiState
 
 @Composable
@@ -39,17 +41,17 @@ internal fun UpdatePromptDialog(
         is UpdateUiState.UpToDate -> {
             AlertDialog(
                 onDismissRequest = onDismiss,
-                title = { Text("当前已是最新版本") },
+                title = { Text(stringResource(R.string.you_are_on_the_latest_version)) },
                 text = { Text(state.message) },
-                confirmButton = { TextButton(onClick = onDismiss) { Text("知道了") } },
+                confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.got_it)) } },
             )
         }
         is UpdateUiState.Failed -> {
             AlertDialog(
                 onDismissRequest = onDismiss,
-                title = { Text("检查更新失败") },
+                title = { Text(stringResource(R.string.update_check_failed_update_prompt_dialog)) },
                 text = { Text(state.message) },
-                confirmButton = { TextButton(onClick = onDismiss) { Text("知道了") } },
+                confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.got_it)) } },
             )
         }
         is UpdateUiState.UpdateAvailable -> {
@@ -57,7 +59,7 @@ internal fun UpdatePromptDialog(
             AlertDialog(
                 onDismissRequest = onDismiss,
                 icon = { Icon(Icons.Rounded.SystemUpdate, contentDescription = null) },
-                title = { Text("发现新版本 ${release.tagName}") },
+                title = { Text(stringResource(R.string.new_version_available, release.tagName)) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
@@ -68,7 +70,7 @@ internal fun UpdatePromptDialog(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            release.body.ifBlank { "发布页包含本次更新的完整说明。" },
+                            release.body.ifBlank { stringResource(R.string.the_release_page_has_the_full_details_of_this_update) },
                             modifier = Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -88,21 +90,21 @@ internal fun UpdatePromptDialog(
                             OutlinedButton(
                                 onClick = { onCopyLink(release.pageUrl) },
                                 modifier = Modifier.weight(1f),
-                            ) { Text("复制链接") }
+                            ) { Text(stringResource(R.string.copy_link)) }
                             OutlinedButton(
                                 onClick = { onOpenLink(release.pageUrl) },
                                 modifier = Modifier.weight(1f),
-                            ) { Text("浏览器打开") }
+                            ) { Text(stringResource(R.string.open_in_browser)) }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(
                                 onClick = onDismiss,
                                 modifier = Modifier.weight(1f),
-                            ) { Text("本次忽略") }
+                            ) { Text(stringResource(R.string.dismiss_for_now)) }
                             TextButton(
                                 onClick = { onSkipVersion(release.tagName) },
                                 modifier = Modifier.weight(1f),
-                            ) { Text("跳过此版本") }
+                            ) { Text(stringResource(R.string.skip_this_version)) }
                         }
                         Spacer(Modifier.size(0.dp))
                     }

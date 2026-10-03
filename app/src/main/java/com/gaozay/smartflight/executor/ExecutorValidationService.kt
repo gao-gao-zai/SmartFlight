@@ -1,6 +1,8 @@
 package com.gaozay.smartflight.executor
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.i18n.AppStrings
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,8 +41,8 @@ class ExecutorValidationService @Inject constructor(
             ?: ExecutorValidationResult(
                 executorType = ExecutorType.Unavailable,
                 isReady = false,
-                summary = "尚无可用执行器",
-                detail = results.joinToString(separator = "；") { it.summary },
+                summary = AppStrings.get(R.string.no_executor_available_yet),
+                detail = results.joinToString(separator = AppStrings.get(R.string.summary_separator)) { it.summary },
             )
     }
 }

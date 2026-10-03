@@ -4,7 +4,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.permission.AccessCheckResult
 
 @Composable
@@ -19,11 +21,11 @@ internal fun AdbBootstrapActions(
                 clipboardManager.setText(AnnotatedString(copyText))
             },
         ) {
-            Text(result.copyLabel ?: "复制命令")
+            Text(result.copyLabel ?: stringResource(R.string.copy_commands))
         }
     }
     val markAsReady = !result.satisfiesRequirement
     OutlinedButton(onClick = { onSetAdbBootstrapped(markAsReady) }) {
-        Text(if (markAsReady) "我已完成 ADB 初始化" else "重置 ADB 初始化状态")
+        Text(if (markAsReady) stringResource(R.string.i_have_completed_adb_initialization) else stringResource(R.string.reset_adb_initialization_status))
     }
 }

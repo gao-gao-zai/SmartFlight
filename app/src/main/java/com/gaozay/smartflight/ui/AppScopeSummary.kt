@@ -19,8 +19,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.AppsUiState
 
 @Composable
@@ -44,12 +46,12 @@ internal fun AppScopeSummary(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        text = "哪些应用会影响联网",
+                        text = stringResource(R.string.which_apps_affect_connectivity),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "联网列表决定应用是否会触发恢复联网，手动标记优先于自动识别",
+                        text = stringResource(R.string.apps_scope_description),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -60,22 +62,22 @@ internal fun AppScopeSummary(
                 ) {
                     Icon(Icons.Rounded.Refresh, contentDescription = null)
                     Spacer(modifier = Modifier.size(8.dp))
-                    Text(if (state.isScanning) "扫描中" else "扫描")
+                    Text(if (state.isScanning) stringResource(R.string.scanning) else stringResource(R.string.scan))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CountPill(
-                    label = "全部",
+                    label = stringResource(R.string.all),
                     count = state.totalCount,
                     modifier = Modifier.weight(1f),
                 )
                 CountPill(
-                    label = "联网",
+                    label = stringResource(R.string.online),
                     count = state.onlineCount,
                     modifier = Modifier.weight(1f),
                 )
                 CountPill(
-                    label = "非联网",
+                    label = stringResource(R.string.offline),
                     count = state.offlineCount,
                     modifier = Modifier.weight(1f),
                 )

@@ -1,5 +1,6 @@
 package com.gaozay.smartflight
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.data.local.entity.ExecutionLogEntity
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
@@ -10,7 +11,7 @@ import com.gaozay.smartflight.settings.UserSettings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class DashboardUiStateMapperTest {
+class DashboardUiStateMapperTest : LocalizedStringsTest() {
     private val mapper = DashboardUiStateMapper()
 
     @Test

@@ -1,11 +1,12 @@
 package com.gaozay.smartflight.apps
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class AppsUiStateMapperTest {
+class AppsUiStateMapperTest : LocalizedStringsTest() {
     @Test
     fun defaultFilterShowsUserAppsOnlyAndKeepsGlobalCounts() {
         val state = buildAppsUiState(

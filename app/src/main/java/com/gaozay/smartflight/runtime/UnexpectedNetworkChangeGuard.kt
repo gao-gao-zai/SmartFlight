@@ -1,6 +1,8 @@
 package com.gaozay.smartflight.runtime
 
 import android.util.Log
+import com.gaozay.smartflight.R
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.settings.AutomationDisableMode
 import com.gaozay.smartflight.settings.SettingsRepository
 import com.gaozay.smartflight.settings.isTemporaryDisableActive
@@ -41,7 +43,7 @@ class UnexpectedNetworkChangeGuard @Inject constructor(
             return state
         }
 
-        val reason = "检测到联网状态被外部改变，已暂停自动化直到应用切换"
+        val reason = AppStrings.get(R.string.runtime_external_change_paused)
         val foregroundPackageName = state.lastKnownForegroundApp?.packageName
             ?: updatedSnapshot.currentForegroundPackageName
             ?: UNKNOWN_FOREGROUND_PACKAGE

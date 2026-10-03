@@ -1,5 +1,7 @@
 package com.gaozay.smartflight.permission
 
+import com.gaozay.smartflight.R
+import com.gaozay.smartflight.i18n.AppStrings
 import java.text.DateFormat
 import java.util.Date
 import javax.inject.Inject
@@ -18,31 +20,32 @@ class AdbAccessChecker @Inject constructor(
             append("adb shell cmd appops get com.gaozay.smartflight\n")
         }
         return AccessCheckResult(
-            title = "ADB 初始化",
+            kind = AccessKind.Adb,
+            title = AppStrings.get(R.string.adb_initialization),
             status = if (bootstrapped) AccessCheckStatus.Ready else AccessCheckStatus.Missing,
-            summary = if (bootstrapped) "已记录 ADB 初始化完成" else "尚未完成 ADB 初始化",
+            summary = if (bootstrapped) AppStrings.get(R.string.adb_initialization_recorded_as_complete) else AppStrings.get(R.string.adb_initialization_is_not_complete_yet),
             recommendation = if (bootstrapped) {
-                "已记录一份 ADB 初始化完成状态，后续可继续补真实命令链路。"
+                AppStrings.get(R.string.adb_initialization_recorded_description)
             } else {
-                "先确认设备可被 adb 识别，再执行检查命令，确认 SmartFlight 已具备继续接入 ADB 执行器的前置条件。"
+                AppStrings.get(R.string.adb_setup_recommendation)
             },
             isBlocking = true,
             actionType = AccessActionType.Refresh,
             detail = if (bootstrapped) {
                 buildString {
-                    append("命令版本 v")
+                    append(AppStrings.get(R.string.command_version_v))
                     append(snapshot.commandVersion)
                     if (snapshot.completedAtMillis > 0) {
-                        append("，记录时间：")
+                        append(AppStrings.get(R.string.recorded_at))
                         append(DateFormat.getDateTimeInstance().format(Date(snapshot.completedAtMillis)))
                     }
-                    append("。当前仍缺少真实执行命令的联调。")
+                    append(AppStrings.get(R.string.actual_command_execution_still_needs_integration_testing))
                 }
             } else {
-                "检查顺序：1. 打开开发者选项；2. 打开 USB 调试；3. 连接电脑后执行下方命令；4. 确认无误后再标记初始化完成。"
+                AppStrings.get(R.string.adb_setup_steps)
             },
             copyText = commandText,
-            copyLabel = "复制 ADB 检查命令",
+            copyLabel = AppStrings.get(R.string.copy_adb_check_commands),
         )
     }
 }

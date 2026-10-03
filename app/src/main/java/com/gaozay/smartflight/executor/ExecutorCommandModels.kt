@@ -1,8 +1,10 @@
 package com.gaozay.smartflight.executor
 
 import android.Manifest
-import com.gaozay.smartflight.domain.model.NetworkControlMode
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.domain.model.NetworkControlMode
+import com.gaozay.smartflight.i18n.AppStrings
 
 data class ExecutorCommand(
     val rawCommand: String,
@@ -10,19 +12,19 @@ data class ExecutorCommand(
 )
 
 object ExecutorReadonlyCommands {
-    val CheckPhoneService = ExecutorCommand(
+    val CheckPhoneService get() = ExecutorCommand(
         rawCommand = "service check phone",
-        purpose = "检测移动数据控制服务",
+        purpose = AppStrings.get(R.string.check_mobile_data_control_service),
     )
 
-    val ReadAirplaneModeState = ExecutorCommand(
+    val ReadAirplaneModeState get() = ExecutorCommand(
         rawCommand = "settings get global airplane_mode_on",
-        purpose = "读取飞行模式状态",
+        purpose = AppStrings.get(R.string.read_airplane_mode_state),
     )
 
-    val ReadMobileDataState = ExecutorCommand(
+    val ReadMobileDataState get() = ExecutorCommand(
         rawCommand = "settings get global mobile_data",
-        purpose = "读取移动数据状态",
+        purpose = AppStrings.get(R.string.read_mobile_data_state),
     )
 }
 
@@ -37,27 +39,27 @@ object ExecutorWriteCommands {
             append(if (enabled) "true" else "false")
             append(")")
         },
-        purpose = if (enabled) "开启飞行模式" else "关闭飞行模式",
+        purpose = if (enabled) AppStrings.get(R.string.enable_airplane_mode) else AppStrings.get(R.string.disable_airplane_mode),
     )
 
     fun setMobileDataEnabled(enabled: Boolean): ExecutorCommand = ExecutorCommand(
         rawCommand = "svc data ${if (enabled) "enable" else "disable"}",
-        purpose = if (enabled) "开启移动数据" else "关闭移动数据",
+        purpose = if (enabled) AppStrings.get(R.string.enable_mobile_data) else AppStrings.get(R.string.disable_mobile_data),
     )
 
     fun grantUsageStatsAccess(packageName: String): ExecutorCommand = ExecutorCommand(
         rawCommand = "cmd appops set $packageName android:get_usage_stats allow",
-        purpose = "授予使用情况访问权限",
+        purpose = AppStrings.get(R.string.grant_usage_access),
     )
 
     fun grantNotificationPermission(packageName: String): ExecutorCommand = ExecutorCommand(
         rawCommand = "pm grant $packageName ${Manifest.permission.POST_NOTIFICATIONS}",
-        purpose = "授予通知权限",
+        purpose = AppStrings.get(R.string.grant_notification_permission),
     )
 
     fun whitelistBatteryOptimization(packageName: String): ExecutorCommand = ExecutorCommand(
         rawCommand = "dumpsys deviceidle whitelist +$packageName",
-        purpose = "加入电池优化白名单",
+        purpose = AppStrings.get(R.string.allow_unrestricted_battery_usage),
     )
 }
 
@@ -70,6 +72,7 @@ data class ExecutorCommandResult(
     val stdout: String = "",
     val stderr: String = "",
     val summary: String,
+    val alreadyInRequestedState: Boolean = false,
 )
 
 fun parseBinaryToggleState(stdout: String): Boolean? = when (stdout.trim()) {

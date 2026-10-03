@@ -1,5 +1,6 @@
 package com.gaozay.smartflight
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.apps.AppTypeFilter
 import com.gaozay.smartflight.apps.InstalledAppRepository
 import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
@@ -11,7 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
-class AppsManagementControllerTest {
+class AppsManagementControllerTest : LocalizedStringsTest() {
     @Test
     fun clearAdvancedFiltersRestoresDefaultValues() = runTest {
         val controller = AppsManagementController(FakeInstalledAppRepository())

@@ -1,17 +1,19 @@
 package com.gaozay.smartflight.permission
 
 import android.util.Log
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.executor.ExecutorCommandResult
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.runtime.RuntimeStatusRepository
 import com.gaozay.smartflight.runtime.isDisconnected
 import com.gaozay.smartflight.runtime.snapshotState
 import com.gaozay.smartflight.settings.SettingsRepository
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
 
 class NetworkControlActionExecutor @Inject constructor(
     private val settingsRepository: SettingsRepository,
@@ -31,14 +33,14 @@ class NetworkControlActionExecutor @Inject constructor(
                 applyNetworkControlResult(
                     result = networkControlProbe.probeNetworkControlState(NetworkControlMode.AirplaneMode),
                     triggerSource = TriggerSource.Manual,
-                    reasonPrefix = "手动切换飞行模式",
+                    reasonPrefix = AppStrings.get(R.string.manually_toggle_airplane_mode),
                 )
                 return
             }
             setDisconnectedState(
                 disconnected = !currentEnabled,
                 triggerSource = TriggerSource.Manual,
-                reason = "手动切换飞行模式",
+                reason = AppStrings.get(R.string.manually_toggle_airplane_mode),
             )
             return
         }
@@ -50,8 +52,8 @@ class NetworkControlActionExecutor @Inject constructor(
             result = result,
             triggerSource = TriggerSource.Manual,
             reasonPrefix = when (result.controlMode ?: NetworkControlMode.AirplaneMode) {
-                NetworkControlMode.AirplaneMode -> "手动切换飞行模式"
-                NetworkControlMode.MobileData -> "手动切换移动数据"
+                NetworkControlMode.AirplaneMode -> AppStrings.get(R.string.manually_toggle_airplane_mode)
+                NetworkControlMode.MobileData -> AppStrings.get(R.string.manually_toggle_mobile_data)
             },
         )
     }
@@ -66,7 +68,7 @@ class NetworkControlActionExecutor @Inject constructor(
             applyAirplaneModeResult(
                 disconnected = disconnected,
                 triggerSource = triggerSource,
-                reasonPrefix = reason ?: if (disconnected) "自动开启飞行模式" else "自动关闭飞行模式",
+                reasonPrefix = reason ?: if (disconnected) AppStrings.get(R.string.automatically_enable_airplane_mode) else AppStrings.get(R.string.automatically_disable_airplane_mode),
             )
             return
         }
@@ -80,9 +82,9 @@ class NetworkControlActionExecutor @Inject constructor(
             triggerSource = triggerSource,
             reasonPrefix = reason ?: when (mode) {
                 NetworkControlMode.AirplaneMode ->
-                    if (disconnected) "自动开启飞行模式" else "自动关闭飞行模式"
+                    if (disconnected) AppStrings.get(R.string.automatically_enable_airplane_mode) else AppStrings.get(R.string.automatically_disable_airplane_mode)
                 NetworkControlMode.MobileData ->
-                    if (disconnected) "自动关闭移动数据" else "自动开启移动数据"
+                    if (disconnected) AppStrings.get(R.string.automatically_disable_mobile_data) else AppStrings.get(R.string.automatically_enable_mobile_data)
             },
         )
     }

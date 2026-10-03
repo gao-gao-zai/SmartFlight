@@ -1,14 +1,17 @@
 package com.gaozay.smartflight.apps
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
 import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
+import com.gaozay.smartflight.i18n.AppStrings
+import com.gaozay.smartflight.i18n.ResourceLabel
 
-enum class AppFilter(val label: String) {
-    All("All"),
-    Online("Online"),
-    Offline("Offline"),
-    Whitelist("Whitelist"),
-    Blacklist("Blacklist"),
+enum class AppFilter(override val labelRes: Int) : ResourceLabel {
+    All(R.string.all_apps_ui_models),
+    Online(R.string.online_apps_ui_models),
+    Offline(R.string.offline_apps_ui_models),
+    Whitelist(R.string.whitelist),
+    Blacklist(R.string.blacklist),
 }
 
 enum class InternetPermissionFilter {
@@ -72,4 +75,4 @@ fun InstalledAppEntity.sourceTag(): AppOnlineSourceTag? = when {
 fun InstalledAppEntity.isPureAutoOnline(): Boolean =
     isInOnlineList && isAutoDetectedOnline && !isInWhitelist && !isInBlacklist
 
-fun InstalledAppEntity.statusLabel(): String = if (isOnline()) "联网" else "非联网"
+fun InstalledAppEntity.statusLabel(): String = if (isOnline()) AppStrings.get(R.string.online) else AppStrings.get(R.string.offline)

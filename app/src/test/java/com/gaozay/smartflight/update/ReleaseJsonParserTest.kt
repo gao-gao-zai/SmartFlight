@@ -1,10 +1,11 @@
 package com.gaozay.smartflight.update
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ReleaseJsonParserTest {
+class ReleaseJsonParserTest : LocalizedStringsTest() {
     private val parser = ReleaseJsonParser()
 
     @Test

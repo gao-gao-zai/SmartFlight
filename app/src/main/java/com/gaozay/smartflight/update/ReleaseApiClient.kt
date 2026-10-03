@@ -1,12 +1,14 @@
 package com.gaozay.smartflight.update
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.gaozay.smartflight.R
+import com.gaozay.smartflight.i18n.AppStrings
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 interface ReleaseApiClient {
     suspend fun fetchLatest(source: UpdateSource): Result<ReleaseInfo>
@@ -29,7 +31,7 @@ class HttpReleaseApiClient @Inject constructor(
                     val errorBody = connection.errorStream?.use { stream ->
                         BufferedReader(InputStreamReader(stream)).readText()
                     }.orEmpty()
-                    error("${source.label} release 请求失败：HTTP $code ${errorBody.take(160)}")
+                    error(AppStrings.get(R.string.release_request_failed_http, source.label, code, errorBody.take(160)))
                 }
                 val body = connection.inputStream.use { stream ->
                     BufferedReader(InputStreamReader(stream)).readText()

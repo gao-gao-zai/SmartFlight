@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
@@ -12,7 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ForegroundAutomationHandlerTest {
+class ForegroundAutomationHandlerTest : LocalizedStringsTest() {
     @Test
     fun firstSyncUpdatesTargetStateWithoutNetworkRequest() = runTest {
         val fixture = fixture(

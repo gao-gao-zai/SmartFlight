@@ -31,14 +31,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.gaozay.smartflight.domain.model.CornerStyle
-import com.gaozay.smartflight.domain.model.ExecutorType
-import com.gaozay.smartflight.domain.model.NetworkControlMode
-import com.gaozay.smartflight.domain.model.ThemeIntensity
-import com.gaozay.smartflight.domain.model.ThemeMode
-import com.gaozay.smartflight.settings.AutomationDisableMode
+import com.gaozay.smartflight.R
+import com.gaozay.smartflight.i18n.ResourceLabel
 
 @Composable
 internal fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
@@ -66,18 +64,19 @@ internal fun NumberRow(title: String, value: Int, onValueChange: (Int) -> Unit) 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
         OutlinedButton(onClick = { onValueChange(value - 5) }) { Text("-") }
-        Text("$value 秒", modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
+        Text(pluralStringResource(R.plurals.seconds, (value).toInt(), value), modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
         OutlinedButton(onClick = { onValueChange(value + 5) }) { Text("+") }
     }
 }
 
 @Composable
-internal fun TextInputRow(title: String, value: String, onValueChange: (String) -> Unit) {
+internal fun TextInputRow(title: String, value: String, placeholder: String? = null, onValueChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
         label = { Text(title) },
+        placeholder = { placeholder?.let { Text(it) } },
         singleLine = true,
     )
 }
@@ -87,15 +86,7 @@ internal fun <T> ChoiceRow(title: String, options: List<T>, selected: T, onSelec
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
         options.forEach { option ->
-            val label = when (option) {
-                is NetworkControlMode -> option.label
-                is ExecutorType -> option.label
-                is ThemeMode -> option.label
-                is ThemeIntensity -> option.label
-                is CornerStyle -> option.label
-                is AutomationDisableMode -> option.label
-                else -> option.name
-            }
+            val label = if (option is ResourceLabel) stringResource(option.labelRes) else option.name
             FilterChip(selected = selected == option, onClick = { onSelect(option) }, label = { Text(label) })
         }
     }
@@ -107,7 +98,7 @@ internal fun OptionRow(title: String, selected: Boolean, color: Color, onClick: 
         Box(Modifier.size(24.dp).clip(CircleShape).background(color))
         Spacer(Modifier.size(12.dp))
         Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        if (selected) Icon(Icons.Rounded.CheckCircle, contentDescription = "已选择", tint = MaterialTheme.colorScheme.primary)
+        if (selected) Icon(Icons.Rounded.CheckCircle, contentDescription = stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -128,7 +119,7 @@ internal fun AccessSummaryRow(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         StatusBadge(
-            text = if (ready) "正常" else "处理",
+            text = if (ready) stringResource(R.string.ok) else stringResource(R.string.resolve),
             kind = if (ready) StatusKind.Success else StatusKind.Warning,
             onClick = onBadgeClick,
         )

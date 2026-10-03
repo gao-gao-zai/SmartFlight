@@ -1,6 +1,8 @@
 package com.gaozay.smartflight.executor
 
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
+import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.permission.AdbBootstrapRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,14 +17,14 @@ class AdbExecutorValidator @Inject constructor(
             executorType = ExecutorType.AdbBootstrapped,
             isReady = bootstrapped,
             summary = if (bootstrapped) {
-                "ADB 执行器具备读取飞行模式状态的初始化前提"
+                AppStrings.get(R.string.adb_airplane_read_prerequisites_met)
             } else {
-                "ADB 执行器尚未初始化"
+                AppStrings.get(R.string.adb_executor_is_not_initialized_yet)
             },
             detail = if (bootstrapped) {
-                "初始化状态已记录，但真实的设备侧命令执行链路还未接入。"
+                AppStrings.get(R.string.adb_execution_not_integrated)
             } else {
-                "需要先完成 ADB 初始化，执行器才会进入可用候选。"
+                AppStrings.get(R.string.complete_adb_initialization_before_the_executor_can_become_a_candidate)
             },
             command = ExecutorReadonlyCommands.ReadAirplaneModeState.rawCommand,
         )

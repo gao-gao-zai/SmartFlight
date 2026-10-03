@@ -15,8 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.CornerStyle
 import com.gaozay.smartflight.domain.model.ThemeIntensity
 import com.gaozay.smartflight.domain.model.ThemeMode
@@ -39,25 +41,25 @@ internal fun AppearanceScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { ThemePreviewCard(settings) }
-        item { SettingsSection("显示模式") { ChoiceRow("模式", ThemeMode.entries, settings.themeMode, onSetThemeMode) } }
-        item { SettingsSection("配色风格") {
+        item { SettingsSection(stringResource(R.string.display_mode)) { ChoiceRow(stringResource(R.string.mode), ThemeMode.entries, settings.themeMode, onSetThemeMode) } }
+        item { SettingsSection(stringResource(R.string.color_palette)) {
             enumValues<ThemePalette>().forEach { palette: ThemePalette ->
-                OptionRow(palette.label, settings.themePalette == palette, Color(palette.seedColorArgb)) { onSetThemePalette(palette) }
+                OptionRow(stringResource(palette.labelRes), settings.themePalette == palette, Color(palette.seedColorArgb)) { onSetThemePalette(palette) }
             }
         } }
-        item { SettingsSection("自定义 seed color") {
+        item { SettingsSection(stringResource(R.string.custom_seed_color)) {
             listOf<Int>(0xFF545D6D.toInt(), 0xFF657181.toInt(), 0xFF2F3948.toInt(), 0xFFA1859B.toInt(), 0xFF5E6D5A.toInt(), 0xFF73545D.toInt()).forEach { seed: Int ->
                 OptionRow(
-                    title = "Seed #${Integer.toHexString(seed).takeLast(6).uppercase()}",
+                    title = stringResource(R.string.theme_seed_color, Integer.toHexString(seed).takeLast(6).uppercase()),
                     selected = settings.themePalette == ThemePalette.Custom && settings.customSeedColorArgb == seed,
                     color = Color(seed),
                     onClick = { onSetCustomSeedColor(seed) },
                 )
             }
         } }
-        item { SettingsSection("显示强度") {
-            ChoiceRow("颜色强度", ThemeIntensity.entries, settings.themeIntensity, onSetThemeIntensity)
-            ChoiceRow("圆角风格", CornerStyle.entries, settings.cornerStyle, onSetCornerStyle)
+        item { SettingsSection(stringResource(R.string.visual_intensity)) {
+            ChoiceRow(stringResource(R.string.color_intensity), ThemeIntensity.entries, settings.themeIntensity, onSetThemeIntensity)
+            ChoiceRow(stringResource(R.string.corner_style), CornerStyle.entries, settings.cornerStyle, onSetCornerStyle)
         } }
     }
 }
@@ -66,14 +68,14 @@ internal fun AppearanceScreen(
 private fun ThemePreviewCard(settings: UserSettings) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("实时预览", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text("${settings.themePalette.label} · ${settings.themeMode.label}", color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(stringResource(R.string.live_preview), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("${stringResource(settings.themePalette.labelRes)} · ${stringResource(settings.themeMode.labelRes)}", color = MaterialTheme.colorScheme.onPrimaryContainer)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusBadge("成功", StatusKind.Success)
-                StatusBadge("注意", StatusKind.Warning)
-                StatusBadge("失败", StatusKind.Error)
+                StatusBadge(stringResource(R.string.success), StatusKind.Success)
+                StatusBadge(stringResource(R.string.attention), StatusKind.Warning)
+                StatusBadge(stringResource(R.string.failed), StatusKind.Error)
             }
-            Button(onClick = {}) { Text("主按钮") }
+            Button(onClick = {}) { Text(stringResource(R.string.primary_button)) }
         }
     }
 }

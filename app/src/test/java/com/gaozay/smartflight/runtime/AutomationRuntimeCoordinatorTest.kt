@@ -1,10 +1,11 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.domain.model.ScreenState
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class AutomationRuntimeCoordinatorTest {
+class AutomationRuntimeCoordinatorTest : LocalizedStringsTest() {
     @Test
     fun screenOnProbeIntervalKeepsOriginalCadence() {
         assertEquals(
