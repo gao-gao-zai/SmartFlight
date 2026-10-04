@@ -16,7 +16,7 @@ bash scripts/build_activity_fixtures.sh
 "$adb_bin" push app/build/activity-fixtures/fixture-v1.apk /data/local/tmp/smartflight-activity-v1.apk
 "$adb_bin" push app/build/activity-fixtures/fixture-v2.apk /data/local/tmp/smartflight-activity-v2.apk
 "$adb_bin" install -r app/build/activity-fixtures/fixture-v1.apk
-"$adb_bin" install -r app/build/outputs/apk/debug/app-debug.apk
+"$adb_bin" install -r app/build/outputs/apk/debug/app-x86_64-debug.apk
 "$adb_bin" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 "$adb_bin" shell am force-stop com.google.android.apps.nexuslauncher
 "$adb_bin" shell wm size 410x502
