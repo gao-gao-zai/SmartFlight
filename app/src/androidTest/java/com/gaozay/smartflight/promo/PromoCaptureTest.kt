@@ -70,8 +70,13 @@ class PromoCaptureTest {
     }
     private fun nativeClick(vararg names: String): Boolean {
         val root = inst.uiAutomation.rootInActiveWindow ?: return false
+        fun descendants(node: AccessibilityNodeInfo): List<AccessibilityNodeInfo> = buildList {
+            add(node)
+            for (i in 0 until node.childCount) node.getChild(i)?.let { addAll(descendants(it)) }
+        }
+        val nodes = descendants(root)
         for (name in names) {
-            for (node in root.findAccessibilityNodeInfosByText(name)) {
+            for (node in nodes.filter { it.text?.toString()?.contains(name,ignoreCase=true)==true || it.contentDescription?.toString()?.contains(name,ignoreCase=true)==true }) {
                 val bounds = Rect(); node.getBoundsInScreen(bounds)
                 if (node.isVisibleToUser && bounds.width() > 0 && bounds.height() > 0) {
                     var clickable = node
@@ -143,7 +148,7 @@ class PromoCaptureTest {
         shell("am start -W -a android.intent.action.VIEW -d geo:59.9139,10.7522 -n $weather/.ui.main.MainActivity")
         hold(4500)
         repeat(18) {
-            nativeClick("完成", "Done", "稍后", "Later", "取消", "Cancel")
+            nativeClick("保存", "Save", "完成", "Done", "稍后", "Later")
             hold(700)
         }
         nativeClick("奥斯陆", "Oslo")

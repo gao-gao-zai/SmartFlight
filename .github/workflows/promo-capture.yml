@@ -37,5 +37,8 @@ jobs:
         if: always()
         with:
           name: smartflight-promo-recordings
-          path: app/build/emulator-artifacts/promo
+          path: |
+            app/build/emulator-artifacts/promo
+            !app/build/emulator-artifacts/promo/*.apk
+            !app/build/emulator-artifacts/promo/shizuku-starter
           retention-days: 14
