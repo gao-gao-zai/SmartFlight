@@ -152,7 +152,9 @@ class PromoCaptureTest {
             nativeClick("保存", "Save", "完成", "Done", "稍后", "Later")
             hold(700)
         }
-        nativeClick("奥斯陆", "Oslo")
+        // Reverse geocoding uses the location's own spelling, sometimes 奧斯陸.
+        assertTrue("Prepared weather location was not selected", nativeClick("奥斯陆", "奧斯陸", "Sjøtomta", "Oslo"))
+        hold(1800)
         val until = SystemClock.elapsedRealtime()+45000
         while (SystemClock.elapsedRealtime() < until && !allNativeText().contains("°") && !allNativeText().contains("℃")) hold(1000)
         File(out, "weather-ui.txt").writeText(allNativeText())
@@ -231,8 +233,11 @@ class PromoCaptureTest {
             dashboard(); click(R.string.automation_rules)
             scroll(text(R.string.disconnect_automatically_when_the_screen_turns_off)); hold(1000)
             startClip("screen-rule")
-            compose.onNodeWithContentDescription(text(R.string.disconnect_automatically_when_the_screen_turns_off)).performTouchInput { click() }
+            val switchTitle = compose.onNodeWithText(text(R.string.disconnect_automatically_when_the_screen_turns_off)).fetchSemanticsNode().boundsInRoot
+            // SwitchRow's title and switch are siblings; tap the actual switch beside it.
+            shell("input tap 342 ${(switchTitle.center.y+18).toInt()}")
             hold(2300)
+            assertTrue("Screen-off setting did not enable", settings.settings.first().screenOffDisconnectEnabled)
             scroll(text(R.string.screen_off_delay_in_seconds)); hold(2600)
             stopClip()
             settings.updateSettings { s -> s.copy(appExitDisconnectEnabled=false, screenOffDisconnectEnabled=true) }
