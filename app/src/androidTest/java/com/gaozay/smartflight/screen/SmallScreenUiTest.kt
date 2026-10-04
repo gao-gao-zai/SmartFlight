@@ -86,12 +86,15 @@ class SmallScreenUiTest {
         back()
         scrollTo(R.string.automation_rules).performClick()
         scrollTo(R.string.app_exit_delay_in_seconds).assertIsDisplayed()
-        // The whole delay label and both buttons must retain nonzero, in-window bounds.
+        // The delay title must retain width; controls can be reached by scrolling.
         val label = compose.onNodeWithText(text(R.string.app_exit_delay_in_seconds)).fetchSemanticsNode()
         assertTrue("Delay label lost its width", label.boundsInRoot.width > 1f)
-        compose.onAllNodesWithText("+").onFirst().assertIsDisplayed().performClick()
+        capture("settings-delay-title")
+        compose.onAllNodesWithText("+").onFirst().performScrollTo().assertIsDisplayed().performClick()
         assertEquals(1, updates)
         capture("settings-delay")
+        compose.onAllNodesWithText("-").onFirst().performScrollTo().assertIsDisplayed().performClick()
+        assertEquals(2, updates)
         scrollTo(R.string.disconnect_prompt_text).assertIsDisplayed()
         capture("settings-bottom")
         back()
