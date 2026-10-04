@@ -34,15 +34,15 @@ class QuickRuleIntegrationTest {
             name?.let { putExtra(QuickRuleContract.EXTRA_ACTIVITY_NAME, it) }
         }
     private fun waitForDialog() {
-        compose.waitUntil(15_000) { compose.onAllNodesWithText(text(R.string.quick_rule_scope_app)).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText(text(R.string.quick_rule_scope_app)).fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
     }
     private fun save() {
         compose.onNodeWithText(text(R.string.activity_save)).performClick()
-        compose.waitUntil(15_000) { compose.onAllNodesWithText(text(R.string.quick_rule_scope_app)).fetchSemanticsNodes().isEmpty() }
+        compose.waitUntil(15_000) { compose.onAllNodesWithText(text(R.string.quick_rule_scope_app)).fetchSemanticsNodes(atLeastOneRootRequired = false).isEmpty() }
     }
 
     @Test
-    fun publicActivityEntryPreservesNotesAppDefaultAndPausedChildren() = runBlocking {
+    fun publicActivityEntryPreservesNotesAppDefaultAndPausedChildren() = runBlocking<Unit> {
         installActivityFixture()
         val repo = entry.activityRepository()
         val apps = entry.installedAppRepository()
@@ -93,7 +93,7 @@ class QuickRuleIntegrationTest {
     }
 
     @Test
-    fun appChoicesCancelAndInvalidActivityDoNotDeleteChildRules() = runBlocking {
+    fun appChoicesCancelAndInvalidActivityDoNotDeleteChildRules() = runBlocking<Unit> {
         installActivityFixture()
         val apps = entry.installedAppRepository()
         val repo = entry.activityRepository()
@@ -125,7 +125,7 @@ class QuickRuleIntegrationTest {
             assertEquals(ActivityRuleMode.Offline.name, repo.observeDetails(ACTIVITY_FIXTURE).first().rules.first { it.activityName == second }.mode)
             ActivityScenario.launch<QuickRuleActivity>(Intent(QuickRuleContract.ACTION).setPackage(context.packageName)
                 .putExtra(QuickRuleContract.EXTRA_ACTIVITY_NAME, second)).use {
-                compose.waitUntil(15_000) { compose.onAllNodesWithText(text(R.string.quick_rule_invalid_request)).fetchSemanticsNodes().isNotEmpty() }
+                compose.waitUntil(15_000) { compose.onAllNodesWithText(text(R.string.quick_rule_invalid_request)).fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty() }
                 compose.onNodeWithText(text(R.string.activity_save)).assertIsNotEnabled()
                 compose.onNodeWithText(text(R.string.cancel)).performClick()
             }
@@ -136,7 +136,7 @@ class QuickRuleIntegrationTest {
     }
 
     @Test
-    fun realSystemTileCapturesUnderlyingActivityAndPublicNoExtrasEntryDoesToo() = runBlocking {
+    fun realSystemTileCapturesUnderlyingActivityAndPublicNoExtrasEntryDoesToo() = runBlocking<Unit> {
         installActivityFixture()
         val settings = entry.settingsRepository()
         val original = settings.settings.first()

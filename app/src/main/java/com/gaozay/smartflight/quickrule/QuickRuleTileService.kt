@@ -1,5 +1,7 @@
 package com.gaozay.smartflight.quickrule
 
+import android.annotation.SuppressLint
+import android.content.Intent
 import android.app.PendingIntent
 import android.graphics.drawable.Icon
 import android.os.Build
@@ -41,12 +43,16 @@ class QuickRuleTileService : TileService() {
                     startActivityAndCollapse(PendingIntent.getActivity(this@QuickRuleTileService, 0, intent,
                         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
                 } else {
-                    @Suppress("DEPRECATION")
-                    startActivityAndCollapse(intent)
+                    launchOnLegacyAndroid(intent)
                 }
             } finally { launching = false }
         }
     }
+    // The PendingIntent overload was added in API 34; API 26–33 require the old method.
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    @Suppress("DEPRECATION")
+    private fun launchOnLegacyAndroid(intent: Intent) { startActivityAndCollapse(intent) }
+
     override fun onStopListening() { launching = false; super.onStopListening() }
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
 }
