@@ -22,6 +22,7 @@ data class SmartFlightActions(
     val diagnostics: DiagnosticsActions,
     val system: SystemIntentActions,
     val update: UpdateActions,
+    val activities: ActivityActions = ActivityActions(),
 )
 
 data class SettingsActions(
@@ -85,4 +86,15 @@ data class UpdateActions(
     val skipUpdateVersion: (String) -> Unit,
     val copyUpdateLink: (String) -> Unit,
     val openUpdateLink: (String) -> Unit,
+)
+
+data class ActivityActions(
+    val selectApp: (String?) -> Unit = {},
+    val refresh: () -> Unit = {},
+    val save: (String, com.gaozay.smartflight.activities.ActivityRuleMode, String) -> Unit = { _, _, _ -> },
+    val setEnabled: (Boolean) -> Unit = {},
+    val acknowledgeReview: () -> Unit = {},
+    val startRecording: (Boolean) -> Unit = {},
+    val stopRecording: () -> Unit = {},
+    val refreshIdentification: () -> Unit = {},
 )

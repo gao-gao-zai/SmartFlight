@@ -36,6 +36,7 @@ fun AppManagementScreen(
     onSetManualOnline: (String) -> Unit,
     onSetManualOffline: (String) -> Unit,
     onResetToDefault: (String) -> Unit,
+    onOpenDetails: (String) -> Unit = {},
 ) {
     LazyColumn(
         modifier = Modifier
@@ -85,6 +86,8 @@ fun AppManagementScreen(
                     onSetManualOnline = onSetManualOnline,
                     onSetManualOffline = onSetManualOffline,
                     onResetToDefault = onResetToDefault,
+                    onOpenDetails = onOpenDetails,
+                    activitySummary = state.activityRuleSummaries[app.packageName],
                 )
             }
         }

@@ -1,5 +1,6 @@
 package com.gaozay.smartflight
 
+import com.gaozay.smartflight.activities.ActivityRepository
 import com.gaozay.smartflight.apps.AppsUiState
 import com.gaozay.smartflight.apps.InstalledAppRepository
 import com.gaozay.smartflight.apps.buildAppsUiState
@@ -18,6 +19,7 @@ class MainUiStateAssembler @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val runtimeStatusRepository: RuntimeStatusRepository,
     private val installedAppRepository: InstalledAppRepository,
+    private val activityRepository: ActivityRepository,
     private val executionLogRepository: ExecutionLogRepository,
     private val accessRepository: AccessRepository,
     private val appsManagementController: AppsManagementController,
@@ -53,14 +55,15 @@ class MainUiStateAssembler @Inject constructor(
 
     fun appsUiState(): Flow<AppsUiState> =
         combine(
-            installedAppRepository.observeApps(),
+            installedAppRepository.observeApps().combine(activityRepository.observeSummaries()) { apps, summaries -> apps to summaries },
             appsManagementController.appQuery,
             appsManagementController.appFilterStateFlow(),
             appsManagementController.appScanning,
             appsManagementController.appLastScanSummary,
         ) { apps, query, filterState, isScanning, lastScanSummary ->
             buildAppsUiState(
-                apps = apps,
+                apps = apps.first,
+                activityRuleSummaries = apps.second,
                 query = query,
                 filterState = filterState,
                 isScanning = isScanning,

@@ -207,10 +207,11 @@ private fun AdvancedFilterMenu(
 @Composable
 private fun AppFilter.localizedLabel(): String = when (this) {
     AppFilter.All -> stringResource(R.string.all_apps)
-    AppFilter.Online -> stringResource(R.string.online)
-    AppFilter.Offline -> stringResource(R.string.offline)
+    AppFilter.Online -> stringResource(R.string.activity_default_online)
+    AppFilter.Offline -> stringResource(R.string.activity_default_offline)
     AppFilter.Whitelist -> stringResource(R.string.allowlist)
     AppFilter.Blacklist -> stringResource(R.string.blocklist)
+    AppFilter.WithActivities -> stringResource(R.string.activity_filter_rules)
 }
 
 @Composable

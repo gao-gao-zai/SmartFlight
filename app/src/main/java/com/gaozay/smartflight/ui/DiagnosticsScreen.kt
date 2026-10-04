@@ -123,6 +123,17 @@ internal fun DiagnosticsScreen(
                 )
             }
         } }
+        item { SettingsSection(stringResource(R.string.activity_recent_confirmation)) {
+            Text(state.foregroundApp)
+            ClassText(state.foregroundActivity ?: stringResource(R.string.activity_unknown))
+            Text(stringResource(R.string.activity_confirmation_source,
+                com.gaozay.smartflight.runtime.ForegroundInfoSource.entries.find { it.name == state.foregroundActivitySource }?.label ?: stringResource(R.string.activity_source_unknown)))
+            Text(stringResource(R.string.activity_confirmation_time, if (state.foregroundEventTimestampMillis > 0)
+                java.text.DateFormat.getDateTimeInstance().format(java.util.Date(state.foregroundEventTimestampMillis)) else stringResource(R.string.unknown)))
+            Text(com.gaozay.smartflight.runtime.ActivityMatchReason.entries.find { it.name == state.foregroundRuleReason }?.label ?: stringResource(R.string.activity_match_app_default))
+            if (state.automationDisabled) Text(stringResource(R.string.activity_global_pause))
+            Text(stringResource(R.string.activity_cached_help), style = MaterialTheme.typography.bodySmall)
+        } }
         item { SettingsSection(stringResource(R.string.executor_checks)) {
             Button(onClick = onRefreshAccessChecks, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Rounded.Refresh, contentDescription = null)

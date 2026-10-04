@@ -24,4 +24,7 @@ data class ExecutionLogEntity(
     val executorType: String = ExecutorType.Unavailable.name,
     val result: String = ExecutionResult.Pending.name,
     val errorMessage: String?,
+    val foregroundActivityName: String? = null,
+    val foregroundRuleLayer: String? = null,
+    val foregroundRuleReason: String? = null,
 )

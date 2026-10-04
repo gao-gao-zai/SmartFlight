@@ -12,6 +12,12 @@ import com.gaozay.smartflight.i18n.AppStrings
 data class RuntimeSnapshot(
     val currentForegroundPackageName: String? = null,
     val currentForegroundAppLabel: String? = null,
+    val currentForegroundActivityName: String? = null,
+    val foregroundEventTimestampMillis: Long = 0,
+    val foregroundInfoSource: String = "Unknown",
+    val foregroundActivityConfirmed: Boolean = false,
+    val foregroundRuleLayer: String = "App",
+    val foregroundRuleReason: String = "AppDefault",
     val screenState: ScreenState = ScreenState.Unknown,
     val unifiedNetworkState: UnifiedNetworkState = UnifiedNetworkState.Unknown,
     val isAirplaneModeEnabled: Boolean? = null,

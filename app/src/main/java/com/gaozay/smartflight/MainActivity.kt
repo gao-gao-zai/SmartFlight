@@ -1,5 +1,9 @@
 package com.gaozay.smartflight
 
+import com.gaozay.smartflight.activities.ActivityManagementViewModel
+import com.gaozay.smartflight.activities.ActivityRecorder
+import com.gaozay.smartflight.ui.ActivityActions
+import javax.inject.Inject
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -33,6 +37,8 @@ class MainActivity : ComponentActivity() {
         const val SHIZUKU_REQUEST_CODE = 1001
     }
 
+    @Inject lateinit var activityRecorder: ActivityRecorder
+    private val activityViewModel: ActivityManagementViewModel by viewModels()
     private val viewModel: MainViewModel by viewModels()
     private val shizukuPermissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, _ ->
         if (requestCode == SHIZUKU_REQUEST_CODE) {
@@ -52,6 +58,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val uiState = viewModel.uiState.collectAsStateWithLifecycle()
             val appsUiState = viewModel.appsUiState.collectAsStateWithLifecycle()
+            val activityState = activityViewModel.state.collectAsStateWithLifecycle()
             val updateUiState = viewModel.updateUiState.collectAsStateWithLifecycle()
             SmartFlightTheme(settings = uiState.value.settings) {
                 SmartFlightRoot(
@@ -59,6 +66,7 @@ class MainActivity : ComponentActivity() {
                     appsState = appsUiState.value,
                     updateState = updateUiState.value,
                     actions = buildSmartFlightActions(),
+                    activityState = activityState.value,
                 )
             }
         }
@@ -67,6 +75,12 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshAccessChecks()
+        activityRecorder.stopOnHostReturn()
+    }
+
+    override fun onPause() {
+        activityRecorder.markHostPaused()
+        super.onPause()
     }
 
     override fun onDestroy() {
@@ -76,6 +90,13 @@ class MainActivity : ComponentActivity() {
 
     private fun buildSmartFlightActions(): SmartFlightActions =
         SmartFlightActions(
+            activities = ActivityActions(
+                selectApp = activityViewModel::selectApp, refresh = activityViewModel::refresh,
+                save = activityViewModel::save, setEnabled = activityViewModel::setEnabled,
+                acknowledgeReview = activityViewModel::acknowledgeReview,
+                startRecording = activityViewModel::startRecording, stopRecording = activityViewModel::stopRecording,
+                refreshIdentification = activityViewModel::refreshIdentification,
+            ),
             settings = SettingsActions(
                 updateSettings = viewModel::updateSettings,
                 setNetworkControlMode = viewModel::setNetworkControlMode,

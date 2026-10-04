@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.activities.ActivityRuntimeRule
 import com.gaozay.smartflight.apps.sourceTag
 import com.gaozay.smartflight.data.local.entity.InstalledAppEntity
 import com.gaozay.smartflight.domain.model.AppOnlineSourceTag
@@ -24,6 +25,7 @@ sealed interface RuntimeEvent {
     data class AppsChanged(
         val appRulesByPackageName: Map<String, AppRuntimeRuleInfo>,
     ) : RuntimeEvent
+    data class ActivityRulesChanged(val rules: List<ActivityRuntimeRule>) : RuntimeEvent
     data object NetworkChanged : RuntimeEvent
     data object TemporaryDisableExpired : RuntimeEvent
     data object ScreenOffDisconnectDue : RuntimeEvent
@@ -41,6 +43,7 @@ fun RuntimeEvent.nameForLog(): String = when (this) {
     RuntimeEvent.ForegroundEventSourceChanged -> "ForegroundEventSourceChanged"
     is RuntimeEvent.SettingsChanged -> "SettingsChanged"
     is RuntimeEvent.AppsChanged -> "AppsChanged"
+    is RuntimeEvent.ActivityRulesChanged -> "ActivityRulesChanged"
     RuntimeEvent.NetworkChanged -> "NetworkChanged"
     RuntimeEvent.TemporaryDisableExpired -> "TemporaryDisableExpired"
     RuntimeEvent.ScreenOffDisconnectDue -> "ScreenOffDisconnectDue"
@@ -52,6 +55,7 @@ data class RuntimeState(
     val screenState: ScreenState = ScreenState.Unknown,
     val lastTargetAppActive: Boolean? = null,
     val appRulesByPackageName: Map<String, AppRuntimeRuleInfo> = emptyMap(),
+    val activityRules: List<ActivityRuntimeRule> = emptyList(),
     val lastKnownForegroundApp: ForegroundAppInfo? = null,
 )
 

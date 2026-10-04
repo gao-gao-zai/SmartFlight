@@ -25,6 +25,19 @@ jobs:
         run: python3 scripts/check_localization.py
       - name: Build, test and lint
         run: bash gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --no-daemon
+      - name: Build optimized installable Release preview
+        run: bash gradlew assembleRelease -PpreviewBuild=true --no-daemon
+      - name: Verify Release preview APKs
+        run: bash scripts/verify_release_preview.sh
+      - name: Upload Release preview APKs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartflight-release-preview-apks
+          path: |
+            app/build/outputs/apk/release
+            app/build/release-preview-verification
+          retention-days: 14
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -50,6 +63,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Build emulator APKs
         run: bash gradlew assembleDebug assembleDebugAndroidTest -PemulatorAbi=x86_64 --no-daemon
+      - name: Build optimized emulator Release preview
+        run: bash gradlew assembleRelease -PpreviewBuild=true -PemulatorAbi=x86_64 --no-daemon
+      - name: Verify optimized emulator APK
+        run: bash scripts/verify_release_preview.sh
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -64,11 +81,13 @@ jobs:
           api-level: 35
           target: google_apis
           arch: x86_64
-          cores: 2
-          ram-size: 2048M
+          cores: 4
+          ram-size: 3072M
           disable-linux-hw-accel: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: bash scripts/run_emulator_tests.sh
+          script: |
+            bash scripts/run_emulator_tests.sh
+            bash scripts/smoke_release_preview.sh
       - name: Upload emulator reports and screenshots
         if: always()
         uses: actions/upload-artifact@v4

@@ -8,6 +8,29 @@ import org.junit.Test
 
 class HybridForegroundAppSourceTest : LocalizedStringsTest() {
     @Test
+    fun configuredActivitiesSupplementAccessibilityWithNewerUsageConfirmation() {
+        val accessibility = ForegroundAppInfo("same.app", "Same", 1000, "same.app.First", ForegroundInfoSource.Accessibility, true, 1000)
+        val usage = accessibility.copy(activityName = "same.app.Second", source = ForegroundInfoSource.UsageStats, eventTimestampMillis = 1100)
+        assertEquals(usage, detectHybridForegroundApp(ForegroundMonitorMode.Auto, true, { accessibility }, { usage }, true))
+        assertEquals(accessibility, detectHybridForegroundApp(ForegroundMonitorMode.Auto, true, { accessibility }, { usage.copy(eventTimestampMillis = 900) }, true))
+    }
+
+    @Test
+    fun noActivityRulesPreserveTheLowCostAccessibilityPath() {
+        var calls = 0
+        val accessibility = ForegroundAppInfo("same.app", "Same", 1000)
+        assertEquals(accessibility, detectHybridForegroundApp(ForegroundMonitorMode.Auto, true, { accessibility }, { calls++; null }))
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun accessibilityOnlyModeNeverUsesUsageConfirmationForActivityRules() {
+        var calls = 0
+        detectHybridForegroundApp(ForegroundMonitorMode.Accessibility, true, { null }, { calls++; null }, true)
+        assertEquals(0, calls)
+    }
+
+    @Test
     fun accessibilityModeDoesNotCallUsageStatsFallbackWhenCacheIsEmpty() {
         var usageStatsDetectCalls = 0
 

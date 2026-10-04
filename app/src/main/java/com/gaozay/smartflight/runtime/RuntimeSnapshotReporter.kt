@@ -68,11 +68,20 @@ class RuntimeSnapshotReporter @Inject constructor(
             snapshot.copy(
                 currentForegroundPackageName = foregroundApp?.packageName,
                 currentForegroundAppLabel = foregroundApp?.appLabel,
+                currentForegroundActivityName = foregroundApp?.confirmedActivity(),
+                foregroundEventTimestampMillis = foregroundApp?.eventTimestampMillis ?: 0,
+                foregroundInfoSource = foregroundApp?.source?.name ?: "Unknown",
+                foregroundActivityConfirmed = foregroundApp?.confirmedActivity() != null,
                 screenState = screenState,
                 isForegroundServiceRunning = true,
                 updatedAtMillis = if (foregroundApp != null) System.currentTimeMillis() else snapshot.updatedAtMillis,
             )
         }
+    }
+
+    suspend fun markForegroundRule(resolved: ResolvedForegroundRule) {
+        update { it.copy(foregroundRuleLayer = if (resolved.reason == ActivityMatchReason.ActivityOverride) "Activity" else "App",
+            foregroundRuleReason = resolved.reason.name) }
     }
 
     suspend fun markTemporaryDisabled(triggerSource: TriggerSource, reason: String) {

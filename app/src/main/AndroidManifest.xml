@@ -28,7 +28,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/logo"
-        android:label="@string/app_name"
+        android:label="${appLabel}"
         android:localeConfig="@xml/locales_config"
         android:roundIcon="@drawable/logo"
         android:supportsRtl="true"
@@ -52,6 +52,19 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".quickrule.QuickRuleActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.SmartFlight.QuickRule"
+            android:label="@string/quick_rule_title">
+            <intent-filter>
+                <action android:name="com.gaozay.smartflight.action.QUICK_RULE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".runtime.AutomationForegroundService"
             android:exported="false"
@@ -59,7 +72,7 @@
 
         <service
             android:name=".runtime.SmartFlightAccessibilityService"
-            android:exported="false"
+            android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
@@ -81,6 +94,16 @@
             <meta-data
                 android:name="android.service.quicksettings.TOGGLEABLE_TILE"
                 android:value="true" />
+        </service>
+        <service
+            android:name=".quickrule.QuickRuleTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_quick_rule_tile"
+            android:label="@string/quick_rule_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
         </service>
     </application>
 

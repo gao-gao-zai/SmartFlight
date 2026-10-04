@@ -9,6 +9,7 @@ SmartFlight 是一个面向 Android 高级用户的规则驱动联网控制工�
 - 接入检查页：检测使用情况访问、通知权限、电池优化，以及 Shizuku / ADB / Root 可用性
 - 自动化控制台：展示当前模式、执行器、前台应用、最近动作和规则解释
 - 应用范围管理：启动时扫描已安装应用；运行期间自动同步安装、更新、卸载，支持联网列表、白名单、黑名单的手动调整，卸载后保留手动规则供重装恢复
+- Activity 级应用管理：按应用查看组件、记录实际进入的 Activity，分别设置跟随应用 / 联网 / 断网及备注；支持暂停子规则、更新失效提示和识别诊断，详见 [使用与实现说明](docs/smartflight-activity-rules.md)
 - 自动化规则配置：支持息屏断网、离开目标应用断网、Wi-Fi 例外、Wi-Fi / 蓝牙状态保留等规则
 - 诊断与日志：查看执行器状态、统一网络状态、最近执行日志，并提供手动探测/切换操作
 - 外观设置：支持主题模式、配色、强度和圆角风格调整
@@ -63,10 +64,19 @@ Windows:
 
 如果需要发布签名包，项目会在根目录存在 `keystore.properties` 时自动加载本地签名配置。
 
+CI 另提供可安装的 Release 预览包（`smartflight-release-preview-apks` artifact）：
+
+```bash
+./gradlew assembleRelease -PpreviewBuild=true
+```
+
+该构建开启代码压缩和资源裁剪，使用调试证书签名，但不启用调试功能；独立包名为 `com.gaozay.smartflight.preview`，应用名标为预览，可与正式版并存，配置与权限需要单独设置。它不用于覆盖正式版或商店发布。未添加此参数时仍使用原包名和原正式签名配置。第三方调用预览包时，将目标 package 改为 `com.gaozay.smartflight.preview`，action 和 Activity 完整类名保持相同。CI 会核对签名与非调试标志，并在 Android 15 上验证压缩后的主界面与快捷声明入口。
+
 ## 项目结构
 
 ```text
 app/src/main/java/com/gaozay/smartflight
+├─ activities    Activity 扫描、规则、进入记录与管理状态
 ├─ apps          已安装应用扫描、筛选与联网状态管理
 ├─ data          Room 数据库、DAO、实体
 ├─ di            Hilt 依赖注入

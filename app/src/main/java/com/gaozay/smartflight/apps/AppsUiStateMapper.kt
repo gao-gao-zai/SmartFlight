@@ -15,10 +15,11 @@ internal fun buildAppsUiState(
     filterState: AppFilterState,
     isScanning: Boolean,
     lastScanSummary: String,
+    activityRuleSummaries: Map<String, com.gaozay.smartflight.activities.ActivityRuleSummary> = emptyMap(),
 ): AppsUiState {
     val filteredApps = apps.filter { app ->
         app.matchesQuery(query) &&
-            app.matchesStatusFilter(filterState.filter) &&
+            app.matchesStatusFilter(filterState.filter, activityRuleSummaries[app.packageName]?.ruleCount ?: 0) &&
             app.matchesInternetPermissionFilter(filterState.internetPermissionFilter) &&
             app.matchesTypeFilter(filterState.typeFilter) &&
             app.matchesLauncherFilter(filterState.launcherFilter)
@@ -35,6 +36,8 @@ internal fun buildAppsUiState(
         offlineCount = apps.count { !it.isOnline() },
         whitelistCount = apps.count { it.isInWhitelist },
         blacklistCount = apps.count { it.isInBlacklist },
+        activityRuleSummaries = activityRuleSummaries,
+        activityRuleAppCount = apps.count { (activityRuleSummaries[it.packageName]?.ruleCount ?: 0) > 0 },
         filteredCount = filteredApps.size,
         isScanning = isScanning,
         lastScanSummary = lastScanSummary,
@@ -46,12 +49,13 @@ private fun InstalledAppEntity.matchesQuery(query: String): Boolean =
         label.contains(query, ignoreCase = true) ||
         packageName.contains(query, ignoreCase = true)
 
-private fun InstalledAppEntity.matchesStatusFilter(filter: AppFilter): Boolean = when (filter) {
+private fun InstalledAppEntity.matchesStatusFilter(filter: AppFilter, activityCount: Int): Boolean = when (filter) {
     AppFilter.All -> true
     AppFilter.Online -> isOnline()
     AppFilter.Offline -> !isOnline()
     AppFilter.Whitelist -> isInWhitelist
     AppFilter.Blacklist -> isInBlacklist
+    AppFilter.WithActivities -> activityCount > 0
 }
 
 private fun InstalledAppEntity.matchesInternetPermissionFilter(filter: InternetPermissionFilter): Boolean =

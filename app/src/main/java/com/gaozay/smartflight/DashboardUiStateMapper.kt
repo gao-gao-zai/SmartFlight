@@ -35,6 +35,11 @@ class DashboardUiStateMapper @Inject constructor() {
             foregroundApp = runtimeSnapshot.currentForegroundAppLabel
                 ?: runtimeSnapshot.currentForegroundPackageName
                 ?: "Not connected yet",
+            foregroundActivity = runtimeSnapshot.currentForegroundActivityName,
+            foregroundActivitySource = runtimeSnapshot.foregroundInfoSource,
+            foregroundEventTimestampMillis = runtimeSnapshot.foregroundEventTimestampMillis,
+            foregroundRuleReason = runtimeSnapshot.foregroundRuleReason,
+            foregroundRuleLayer = runtimeSnapshot.foregroundRuleLayer,
             runtimeExecutor = runtimeSnapshot.activeExecutorType.label,
             runtimeLastCheck = runtimeSnapshot.runtimeStatusSummary,
             runtimeLastResult = runtimeSnapshot.runtimeStatusResult.label,
@@ -79,7 +84,14 @@ fun ExecutionLogEntity.toUiItem(): ExecutionLogItem {
         action = actionLabel,
         executor = executorLabel,
         result = resultLabel,
-        detail = errorMessage ?: AppStrings.get(R.string.no_additional_information),
+        detail = buildString {
+            append(errorMessage ?: AppStrings.get(R.string.no_additional_information))
+            foregroundActivityName?.let { append("\n").append(foregroundPackageName.orEmpty()).append(" / ").append(it) }
+            foregroundRuleLayer?.let { append("\n").append(AppStrings.get(if (it == "Activity") R.string.activity_match_override else R.string.activity_match_app_default)) }
+            foregroundRuleReason?.let { value ->
+                com.gaozay.smartflight.runtime.ActivityMatchReason.entries.find { it.name == value }?.let { append(" · ").append(it.label) }
+            }
+        },
     )
 }
 
