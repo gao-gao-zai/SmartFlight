@@ -14,17 +14,22 @@ cleanup() {
 }
 trap cleanup EXIT
 bash scripts/build_activity_fixtures.sh
-# Chinese system UI for the actual capture device, before any recording begins.
-"$adb_bin" root
+# Root restarts adbd and may return 'closed' even after a successful restart.
+"$adb_bin" root || true
 "$adb_bin" wait-for-device
-"$adb_bin" shell setprop persist.sys.locale zh-CN
-"$adb_bin" shell setprop sys.boot_completed 0
-"$adb_bin" shell stop
-"$adb_bin" shell start
-for attempt in $(seq 1 90); do
-  if [ "$("$adb_bin" shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; then break; fi
-  sleep 1
-done
+sleep 2
+capture_uid=$("$adb_bin" shell id)
+if [[ "$capture_uid" == *"uid=0"* ]]; then
+  "$adb_bin" shell setprop persist.sys.locale zh-CN
+  "$adb_bin" shell setprop sys.boot_completed 0
+  "$adb_bin" shell stop
+  "$adb_bin" shell start
+  for attempt in $(seq 1 90); do
+    if [ "$("$adb_bin" shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; then break; fi
+    sleep 1
+  done
+fi
+"$adb_bin" wait-for-device
 "$adb_bin" shell wm dismiss-keyguard
 curl --fail --location --retry 3 --output "$out/shizuku.apk" https://github.com/RikkaApps/Shizuku/releases/download/v13.6.0/shizuku-v13.6.0.r1086.2650830c-release.apk
 unzip -p "$out/shizuku.apk" lib/x86_64/libshizuku.so > "$out/shizuku-starter"
