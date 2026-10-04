@@ -133,8 +133,8 @@ class PromoCaptureTest {
     private fun launchWeather() { shell("am start -W -n $weather/.ui.main.MainActivity"); hold(800) }
     private fun openAppDetails(name: String) {
         dashboard(); click(R.string.app_scope)
-        compose.onNodeWithText(text(R.string.search_app_name_or_package_name)).performScrollTo()
-            .performTextClearance().performTextInput(name)
+        val input = compose.onNodeWithText(text(R.string.search_app_name_or_package_name)).performScrollTo()
+        input.performTextClearance(); input.performTextInput(name)
         shell("input keyevent KEYCODE_BACK"); hold(900)
         scroll(name).performTouchInput { click() }; hold(1400)
     }
