@@ -20,6 +20,7 @@ bash scripts/build_activity_fixtures.sh
 "$adb_bin" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 "$adb_bin" shell am force-stop com.google.android.apps.nexuslauncher
 "$adb_bin" shell wm size 410x502
+failed_cases=0
 for config in '160 1.0 zh' '160 1.0 en' '240 1.0 zh' '240 1.3 en'; do
     read -r density font locale <<< "$config"
     case_name="410x502-${density}dpi-${font}font-${locale}"
@@ -33,18 +34,21 @@ for config in '160 1.0 zh' '160 1.0 en' '240 1.0 zh' '240 1.3 en'; do
         -e class com.gaozay.smartflight.screen.SmallScreenUiTest \
         -e screenCase "$case_name" -e screenLocale "$locale" \
         com.gaozay.smartflight.test/androidx.test.runner.AndroidJUnitRunner | tee "$artifacts/$case_name-ui.txt"
-    python3 - "$artifacts/$case_name-ui.txt" <<'PY'
+    if ! python3 - "$artifacts/$case_name-ui.txt" <<'PY'
 import pathlib,sys
 text=pathlib.Path(sys.argv[1]).read_text()
 assert 'OK (3 tests)' in text and 'FAILURES!!!' not in text, text
 PY
+    then failed_cases=$((failed_cases + 1)); fi
     "$adb_bin" shell am instrument -w -r \
         -e class com.gaozay.smartflight.quickrule.QuickRuleIntegrationTest \
         com.gaozay.smartflight.test/androidx.test.runner.AndroidJUnitRunner | tee "$artifacts/$case_name-quick-rule.txt"
-    python3 - "$artifacts/$case_name-quick-rule.txt" <<'PY'
+    if ! python3 - "$artifacts/$case_name-quick-rule.txt" <<'PY'
 import pathlib,sys
 text=pathlib.Path(sys.argv[1]).read_text()
 assert 'OK (3 tests)' in text and 'FAILURES!!!' not in text, text
 PY
+    then failed_cases=$((failed_cases + 1)); fi
     "$adb_bin" pull /sdcard/Download/smartflight-activities "$artifacts/$case_name-quick-rule-screenshots"
 done
+test "$failed_cases" -eq 0

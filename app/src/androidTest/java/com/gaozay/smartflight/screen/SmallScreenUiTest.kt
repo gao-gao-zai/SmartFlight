@@ -25,6 +25,7 @@ import java.io.File
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Before
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -45,6 +46,7 @@ class SmallScreenUiTest {
         context.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(arguments.getString("screenLocale", "en"))
         compose.waitForIdle()
     }
+    @After fun captureFinalWindow() { capture("final-window") }
 
     @Test fun setupCanScrollToLastAction() {
         // MainActivity's real cold-start access gate (no root on the emulator).
@@ -92,6 +94,7 @@ class SmallScreenUiTest {
         capture("settings-bottom")
         back()
         scrollTo(R.string.diagnostics_and_logs).performClick()
+        scrollTo(R.string.advanced_actions).performClick()
         scrollTo(R.string.clear_logs).assertIsDisplayed()
         capture("diagnostics-bottom")
         back()
