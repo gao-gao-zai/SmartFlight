@@ -19,7 +19,7 @@ for version in 1 2; do
     package="com.gaozay.smartflight.activityfixture" android:versionCode="$version" android:versionName="$version">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:label="Activity Rule Fixture" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <application android:label="联网演示" android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".FirstActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
