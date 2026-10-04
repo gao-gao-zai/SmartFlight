@@ -2,6 +2,8 @@ package com.gaozay.smartflight.promo
 
 import android.app.LocaleManager
 import android.content.Intent
+import android.content.pm.PackageManager
+import rikka.shizuku.Shizuku
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.LocaleList
@@ -67,7 +69,13 @@ class PromoCaptureTest {
             for (node in root.findAccessibilityNodeInfosByText(name)) {
                 val bounds = Rect(); node.getBoundsInScreen(bounds)
                 if (node.isVisibleToUser && bounds.width() > 0 && bounds.height() > 0) {
-                    shell("input tap ${bounds.centerX()} ${bounds.centerY()}"); hold(900); return true
+                    var clickable = node
+                    while (!clickable.isClickable && clickable.parent != null) clickable = clickable.parent
+                    if (!clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        hold(500); clickable.getBoundsInScreen(bounds)
+                        shell("input tap ${bounds.centerX()} ${bounds.centerY()}")
+                    }
+                    hold(900); return true
                 }
             }
         }
@@ -119,9 +127,15 @@ class PromoCaptureTest {
             startClip("access")
             click(R.string.request_shizuku_permission)
             var allowed = false
-            repeat(20) { if (!allowed) { allowed = nativeClick("Allow all the time", "始终允许", "总是允许"); if (!allowed) hold(300) } }
+            repeat(30) { if (!allowed) {
+                nativeClick("Allow all the time", "始终允许", "总是允许")
+                allowed = runCatching { Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED }.getOrDefault(false)
+                if (!allowed) hold(500)
+            } }
             assertTrue("Shizuku permission dialog was not accepted", allowed)
-            hold(1800)
+            hold(1200)
+            entry.accessRepository().refresh()
+            assertTrue("Real advanced access did not become available", entry.accessRepository().accessGateState.value.advancedAccess.isAvailable)
             click(R.string.try_automatic_permission_grants)
             hold(2000)
             for (label in listOf("关闭", "完成", "确定", "知道了")) if (exists(label)) compose.onAllNodesWithText(label).onLast().performTouchInput { click() }
