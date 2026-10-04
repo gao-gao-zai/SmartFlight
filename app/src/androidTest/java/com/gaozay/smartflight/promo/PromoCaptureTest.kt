@@ -51,7 +51,12 @@ class PromoCaptureTest {
             android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().readText()
         }
     }
-    private fun hold(ms: Long = 1000) { SystemClock.sleep(ms) }
+    private fun hold(ms: Long = 1000) {
+        SystemClock.sleep(ms)
+        // Instrumentation owns the Compose frame clock. Let saved state render too.
+        compose.mainClock.advanceTimeBy(240)
+        SystemClock.sleep(120)
+    }
     private fun exists(s: String) = compose.onAllNodesWithText(s).fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
     private fun scroll(s: String): SemanticsNodeInteraction {
         val match = hasText(s) and !hasSetTextAction()
@@ -208,6 +213,7 @@ class PromoCaptureTest {
             repo.setRulesEnabled(fixture, true)
             settings.updateSettings { s -> s.withAutomationEnabled() }
             hold(2200)
+            compose.waitForIdle()
             val sampler = Thread {
                 while (sampling) {
                     if (clip.isNotEmpty()) runCatching { event("sample") }
