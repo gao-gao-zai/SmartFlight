@@ -83,7 +83,7 @@ class PromoCaptureTest {
     private fun stopClip() {
         event("stop"); capture(clip)
         File(out, "active-clip").writeText("")
-        shell("cp ${out.absolutePath}/active-clip /sdcard/Download/smartflight-promo/active-clip"); shell("pkill -2 screenrecord"); hold(1500)
+        shell("cp ${out.absolutePath}/active-clip /sdcard/Download/smartflight-promo/active-clip"); hold(2000)
     }
     private fun event(name: String) {
         val data = shell("settings get global mobile_data").trim()

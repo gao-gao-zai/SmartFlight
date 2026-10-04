@@ -5,8 +5,10 @@ out=app/build/emulator-artifacts/promo
 mkdir -p "$out"
 watcher_pid=""
 cleanup() {
+  # The watcher alone sends SIGINT: a second signal can abort MP4 finalization.
+  "$adb_bin" shell 'echo > /sdcard/Download/smartflight-promo/active-clip' || true
+  sleep 3
   if [ -n "$watcher_pid" ]; then kill "$watcher_pid" || true; fi
-  "$adb_bin" shell pkill -2 screenrecord || true
   "$adb_bin" pull /sdcard/Download/smartflight-promo "$out/recordings" || true
   "$adb_bin" logcat -d > "$out/logcat.txt" || true
 }
