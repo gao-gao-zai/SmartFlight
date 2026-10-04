@@ -39,12 +39,17 @@ class PromoCaptureTest {
     private val fixture = "com.gaozay.smartflight.activityfixture"
     private val first = "$fixture.FirstActivity"
     private val second = "$fixture.SecondActivity"
+    private val weather = "org.breezyweather"
+    private val shellLock = Any()
+    @Volatile private var sampling = true
     private val out get() = File(context.getExternalFilesDir(null), "promo").also { it.mkdirs() }
-    private var clip = ""
-    private var clipStarted = 0L
+    @Volatile private var clip = ""
+    @Volatile private var clipStarted = 0L
     private fun text(id: Int) = context.getString(id)
-    private fun shell(command: String): String = inst.uiAutomation.executeShellCommand(command).use { fd ->
-        android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().readText()
+    private fun shell(command: String): String = synchronized(shellLock) {
+        inst.uiAutomation.executeShellCommand(command).use { fd ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().readText()
+        }
     }
     private fun hold(ms: Long = 1000) { SystemClock.sleep(ms) }
     private fun exists(s: String) = compose.onAllNodesWithText(s).fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
@@ -89,13 +94,17 @@ class PromoCaptureTest {
         hold(900); event("start")
     }
     private fun stopClip() {
-        event("stop"); capture(clip)
+        event("stop"); runCatching { capture(clip) }
+        clip = ""
         File(out, "active-clip").writeText("")
         shell("cp ${out.absolutePath}/active-clip /sdcard/Download/smartflight-promo/active-clip"); hold(2000)
     }
     private fun event(name: String) {
+        if (clip.isEmpty()) return
         val data = shell("settings get global mobile_data").trim()
-        File(out, "events.jsonl").appendText("{\"clip\":\"$clip\",\"timeMs\":${SystemClock.elapsedRealtime()-clipStarted},\"event\":\"$name\",\"mobileData\":\"$data\"}\n")
+        synchronized(out.absolutePath.intern()) {
+            File(out, "events.jsonl").appendText("{\"clip\":\"$clip\",\"timeMs\":${SystemClock.elapsedRealtime()-clipStarted},\"event\":\"$name\",\"mobileData\":\"$data\"}\n")
+        }
         shell("cp ${out.absolutePath}/events.jsonl /sdcard/Download/smartflight-promo/events.jsonl")
     }
     private fun capture(name: String) {
@@ -111,6 +120,40 @@ class PromoCaptureTest {
             hold(200)
         }
         fail("Actual mobile data did not become $expected")
+    }
+
+    private fun allNativeText(): String {
+        val root = inst.uiAutomation.rootInActiveWindow ?: return ""
+        fun collect(node: AccessibilityNodeInfo): String = buildString {
+            append(node.text ?: ""); append(' '); append(node.contentDescription ?: ""); append('\n')
+            for (i in 0 until node.childCount) node.getChild(i)?.let { append(collect(it)) }
+        }
+        return collect(root)
+    }
+    private fun launchWeather() { shell("am start -W -n $weather/.ui.main.MainActivity"); hold(800) }
+    private fun openAppDetails(name: String) {
+        dashboard(); click(R.string.app_scope)
+        compose.onNodeWithText(text(R.string.search_app_name_or_package_name)).performScrollTo()
+            .performTextClearance().performTextInput(name)
+        shell("input keyevent KEYCODE_BACK"); hold(900)
+        scroll(name).performTouchInput { click() }; hold(1400)
+    }
+    private fun prepareWeather() {
+        shell("svc data enable")
+        shell("am start -W -a android.intent.action.VIEW -d geo:59.9139,10.7522 -n $weather/.ui.main.MainActivity")
+        hold(4500)
+        repeat(18) {
+            nativeClick("完成", "Done", "稍后", "Later", "取消", "Cancel")
+            hold(700)
+        }
+        nativeClick("奥斯陆", "Oslo")
+        val until = SystemClock.elapsedRealtime()+45000
+        while (SystemClock.elapsedRealtime() < until && !allNativeText().contains("°") && !allNativeText().contains("℃")) hold(1000)
+        File(out, "weather-ui.txt").writeText(allNativeText())
+        shell("cp ${out.absolutePath}/weather-ui.txt /sdcard/Download/smartflight-promo/weather-ui.txt")
+        capture("weather-prepared")
+        assertTrue("Weather app did not display genuine forecast data", allNativeText().contains("°") || allNativeText().contains("℃"))
+        shell("input keyevent KEYCODE_HOME"); hold(1200)
     }
 
     @Test fun capturePromotionalOperations() = runBlocking<Unit> {
@@ -143,120 +186,117 @@ class PromoCaptureTest {
             scroll(text(R.string.app_scope))
             hold(1400); stopClip()
 
+            prepareWeather()
             val apps = entry.installedAppRepository()
             apps.refreshPackage(fixture); apps.setManualOnline(fixture)
+            apps.refreshPackage(weather); apps.setManualOffline(weather)
             apps.refreshPackage(context.packageName); apps.setManualOffline(context.packageName)
-            for (pkg in listOf("com.google.android.apps.nexuslauncher", "com.android.launcher3")) {
+            for (pkg in listOf("com.google.android.apps.nexuslauncher", "com.android.launcher3", "com.android.systemui", "com.android.settings")) {
                 if (apps.getApp(pkg) != null) apps.setManualOffline(pkg)
             }
             val repo = entry.activityRepository(); repo.refreshActivities(fixture)
+            repo.saveRule(fixture, first, ActivityRuleMode.Online, "在线功能")
+            repo.saveRule(fixture, second, ActivityRuleMode.FollowApp, "离线功能")
+            repo.setRulesEnabled(fixture, true)
             settings.updateSettings { s -> s.withAutomationEnabled() }
-            hold(2500)
+            hold(2200)
+            val sampler = Thread {
+                while (sampling) {
+                    if (clip.isNotEmpty()) runCatching { event("sample") }
+                    hold(250)
+                }
+            }.also { it.start() }
 
-            startClip("rules")
-            click(R.string.automation_rules)
-            scroll(text(R.string.connectivity_control_method)); hold(1300)
-            click(R.string.app_exit_delay_in_seconds)
-            compose.onAllNodesWithText("+").onFirst().performScrollTo().performTouchInput { click() }; hold(1400)
-            compose.onAllNodesWithText("-").onFirst().performTouchInput { click() }; hold(1200)
-            scroll(text(R.string.disconnect_automatically_when_the_screen_turns_off)); hold(1300)
-            scroll(text(R.string.do_not_disconnect_automatically_while_connected_to_wi_fi)); hold(1400)
-            stopClip(); back()
-
-            // Only initial preparation writes mobile data. Clip actions are handled by the app.
-            shell("svc data disable"); shell("input keyevent KEYCODE_HOME"); hold(1500)
-            startClip("app-auto")
-            shell("am start -W -n $fixture/.FirstActivity")
-            awaitData(true); hold(1400)
-            event("leave-app"); shell("input keyevent KEYCODE_HOME")
-            hold(5100); awaitData(false)
-            main(); click(R.string.diagnostics_and_logs); scroll(text(R.string.mobile_data_state)); hold(1700)
+            openAppDetails(checkNotNull(apps.getApp(weather)).label)
+            scroll(text(R.string.online)); hold(1100)
+            startClip("weather-rule")
+            click(R.string.online); hold(2600); event("rule-saved")
+            assertTrue(apps.getApp(weather)!!.isInWhitelist)
             stopClip()
 
+            shell("svc data disable"); shell("input keyevent KEYCODE_HOME"); hold(1500)
+            startClip("weather-auto")
+            hold(1700); event("open-weather"); launchWeather()
+            awaitData(true); hold(4000)
+            event("leave-app"); shell("input keyevent KEYCODE_HOME")
+            hold(5400); awaitData(false); hold(2300)
+            stopClip()
+
+            dashboard(); click(R.string.automation_rules)
+            scroll(text(R.string.disconnect_automatically_when_the_screen_turns_off)); hold(1000)
+            startClip("screen-rule")
+            compose.onNodeWithContentDescription(text(R.string.disconnect_automatically_when_the_screen_turns_off)).performTouchInput { click() }
+            hold(2300)
+            scroll(text(R.string.screen_off_delay_in_seconds)); hold(2600)
+            stopClip()
             settings.updateSettings { s -> s.copy(appExitDisconnectEnabled=false, screenOffDisconnectEnabled=true) }
-            dashboard(); shell("am start -W -n $fixture/.FirstActivity"); awaitData(true)
-            startClip("screen-off")
-            hold(1600); event("screen-off"); shell("input keyevent KEYCODE_SLEEP")
-            hold(5600); awaitData(false); event("off-while-asleep")
-            shell("input keyevent KEYCODE_WAKEUP"); shell("wm dismiss-keyguard"); hold(1500)
-            main(); click(R.string.diagnostics_and_logs); scroll(text(R.string.recent_logs)); hold(2200)
-            stopClip(); dashboard()
+            launchWeather(); awaitData(true)
+            startClip("screen-sleep")
+            hold(2000); event("screen-off"); shell("input keyevent KEYCODE_SLEEP")
+            hold(5700); awaitData(false); event("off-while-asleep"); hold(2500)
+            assertTrue(shell("dumpsys power").contains("mWakefulness=Asleep"))
+            stopClip()
+            // Bring a non-network target to the front while asleep, then wake.
+            shell("am start -W -n ${context.packageName}/.MainActivity")
+            shell("input keyevent KEYCODE_WAKEUP"); shell("wm dismiss-keyguard"); hold(1800)
+            dashboard(); click(R.string.diagnostics_and_logs); scroll(text(R.string.recent_logs))
+            startClip("screen-log"); hold(3800); event("verified-screen-off-result"); stopClip()
+            dashboard()
             settings.updateSettings { s -> s.copy(appExitDisconnectEnabled=true, screenOffDisconnectEnabled=false) }
 
-            startClip("activity-editor")
-            click(R.string.app_scope)
-            val search = compose.onNodeWithText(text(R.string.search_app_name_or_package_name)).performScrollTo()
-            search.performTouchInput { click() }; search.performTextInput("联网演示"); hold(1100); shell("input keyevent KEYCODE_BACK"); hold(700)
-            scroll("联网演示").performTouchInput { click() }; hold(1700)
+            openAppDetails("联网演示")
+            scroll(text(R.string.activity_enable_rules)); hold(1200)
+            startClip("activity-enabled"); hold(2500); stopClip()
+            scroll(second).performTouchInput { click() }; hold(1000)
+            scroll(text(R.string.activity_follow_app)); hold(1400)
+            startClip("activity-edit")
+            hold(1500); click(R.string.offline); hold(2300)
+            click(R.string.activity_save); event("activity-offline-saved"); hold(2000)
             scroll(second).performTouchInput { click() }; hold(900)
-            click(R.string.offline); click(R.string.activity_save); hold(1500)
-            scroll(second).performTouchInput { click() }; hold(800)
-            scroll(text(R.string.activity_follow_app)); hold(2200)
-            stopClip(); back()
-            // Real repository result of the filmed save, plus the independently configured online component.
+            scroll(text(R.string.offline)); hold(2600); stopClip(); back()
             assertEquals(ActivityRuleMode.Offline.name, repo.observeDetails(fixture).first().rules.first { r -> r.activityName==second }.mode)
-            repo.saveRule(fixture, first, ActivityRuleMode.Online, "在线功能")
-            repo.setRulesEnabled(fixture,true)
-            shell("svc data disable"); shell("input keyevent KEYCODE_HOME"); hold(900)
-            startClip("activity-switch")
-            shell("am start -W -n $fixture/.FirstActivity"); awaitData(true)
-            assertTrue(nativeClick("进入离线功能")); awaitData(false); hold(1400)
+
+            shell("input keyevent KEYCODE_HOME"); hold(800)
+            startClip("activity-demo")
+            shell("am start -W -n $fixture/.FirstActivity"); awaitData(true); hold(3000)
+            event("enter-offline"); assertTrue(nativeClick("进入离线功能")); awaitData(false); hold(2300)
             stopClip()
 
-            shell("am start -W -n $fixture/.FirstActivity"); hold(1800)
             val component="${context.packageName}/.quickrule.QuickRuleTileService"
             shell("cmd statusbar add-tile $component")
             shell("settings put secure sysui_qs_tiles custom($component)")
-            startClip("quick-rule")
-            shell("cmd statusbar expand-settings"); hold(1600)
+            startClip("quick-flow")
+            hold(2000); event("expand-quick-settings"); shell("cmd statusbar expand-settings"); hold(2400)
             shell("cmd statusbar click-tile $component")
             compose.waitUntil(15000) { exists(text(R.string.quick_rule_scope_app)) }
-            compose.onNodeWithText(text(R.string.quick_rule_scope_activity)).performScrollTo().performTouchInput { click() }; hold(900)
-            compose.onNodeWithText(text(R.string.quick_rule_auto)).performScrollTo().performTouchInput { click() }; hold(1200)
-            compose.onNodeWithText(text(R.string.activity_save)).performTouchInput { click() }; hold(1800)
-            stopClip()
-
-            shell("cmd statusbar collapse"); shell("am start -W -n $fixture/.FirstActivity"); hold(1200)
-            startClip("third-party")
-            assertTrue(nativeClick("快捷声明入口"))
-            compose.waitUntil(15000) { exists(text(R.string.quick_rule_scope_app)) }
             hold(1800)
-            compose.onNodeWithText(text(R.string.quick_rule_scope_app)).performScrollTo().performTouchInput { click() }
-            compose.onNodeWithText(text(R.string.quick_rule_online)).performScrollTo().performTouchInput { click() }; hold(900)
-            compose.onNodeWithText(text(R.string.activity_save)).performTouchInput { click() }; hold(1100)
+            compose.onNodeWithText(text(R.string.quick_rule_scope_activity)).performScrollTo().performTouchInput { click() }; hold(2400)
+            compose.onNodeWithText(text(R.string.quick_rule_auto)).performScrollTo().performTouchInput { click() }; event("select-auto"); hold(2700)
+            compose.onNodeWithText(text(R.string.activity_save)).performTouchInput { click() }; event("quick-saved"); hold(2800)
             stopClip()
+            assertEquals(ActivityRuleMode.FollowApp.name, repo.observeDetails(fixture).first().rules.first { r -> r.activityName==second }.mode)
+            shell("cmd statusbar collapse")
+            openAppDetails("联网演示"); scroll(second).performTouchInput { click() }; hold(1000)
+            scroll(text(R.string.activity_follow_app)); startClip("quick-result"); hold(3600); stopClip()
 
-            dashboard(); startClip("apps")
-            click(R.string.app_scope)
-            val input=compose.onNodeWithText(text(R.string.search_app_name_or_package_name)).performScrollTo()
-            input.performTextClearance(); input.performTextInput("联网演示"); hold(1000); shell("input keyevent KEYCODE_BACK"); hold(700)
-            scroll("联网演示"); hold(1700)
-            compose.onNodeWithContentDescription(text(R.string.change_rule)).performTouchInput { click() }; hold(600)
-            compose.onNodeWithText(text(R.string.set_as_online)).performTouchInput { click() }; hold(1700)
-            stopClip(); dashboard()
-
-            startClip("diagnostics")
-            click(R.string.diagnostics_and_logs)
-            scroll(text(R.string.mobile_data_state)); hold(1700)
-            click(R.string.advanced_actions)
-            click(R.string.probe_current_control_state)
-            compose.onAllNodesWithText(text(R.string.probe_current_control_state)).onLast().performTouchInput { click() }; hold(1500)
-            scroll(text(R.string.recent_logs)); hold(2200)
-            stopClip(); dashboard()
-
-            startClip("appearance")
-            click(R.string.appearance); click(R.string.dark); hold(1500)
-            click(R.string.night_flight); hold(1000)
-            scroll(text(R.string.corner_style)); hold(1300)
+            dashboard(); click(R.string.automation_rules); click(R.string.app_exit_delay_in_seconds)
+            startClip("delay-change"); hold(1200)
+            compose.onAllNodesWithText("+").onFirst().performScrollTo().performTouchInput { click() }; event("delay-ten"); hold(3400)
             stopClip()
+            settings.updateSettings { s -> s.copy(appExitDelaySeconds=5) }
+            dashboard(); startClip("pause-flow"); hold(1300)
+            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+            compose.onAllNodes(isToggleable()).onFirst().performTouchInput { click() }; hold(2700)
+            assertTrue(exists(text(R.string.automation_paused))); stopClip()
+            settings.updateSettings { s -> s.withAutomationEnabled() }
+            dashboard(); click(R.string.diagnostics_and_logs); scroll(text(R.string.recent_logs))
+            startClip("logs-flow"); hold(3800); stopClip()
+            dashboard(); click(R.string.appearance)
+            startClip("appearance-flow"); hold(1800); click(R.string.dark); hold(2600); stopClip()
             settings.updateSettings { s -> s.copy(themeMode=ThemeMode.Light, themePalette=ThemePalette.WarmPaper) }
-            dashboard(); startClip("dashboard")
-            hold(1800)
-            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0); hold(900)
-            compose.onAllNodes(isToggleable()).onFirst().performTouchInput { click() }; hold(1800)
-            assertTrue(exists(text(R.string.automation_paused)))
-            stopClip()
-          } catch (failure: Throwable) { capture("failure"); throw failure }
+            dashboard(); startClip("dashboard-running"); hold(3000); stopClip()
+            sampling=false; sampler.join(3000)
+          } catch (failure: Throwable) { sampling=false; capture("failure"); throw failure }
         }
     }
 }

@@ -18,6 +18,9 @@ curl --fail --location --retry 3 --output "$out/shizuku.apk" https://github.com/
 unzip -p "$out/shizuku.apk" lib/x86_64/libshizuku.so > "$out/shizuku-starter"
 "$adb_bin" install -r "$out/shizuku.apk"
 "$adb_bin" install -r app/build/activity-fixtures/fixture-v1.apk
+curl --fail --location --retry 3 --output "$out/weather.apk" https://github.com/breezy-weather/breezy-weather/releases/download/v6.2.2/breezy-weather-v6.2.2_freenet.apk
+"$adb_bin" install -r "$out/weather.apk"
+"$adb_bin" shell cmd locale set-app-locales org.breezyweather --user current --locales zh-CN
 "$adb_bin" install -r app/build/outputs/apk/debug/app-x86_64-debug.apk
 "$adb_bin" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 "$adb_bin" shell am start -W -n moe.shizuku.privileged.api/moe.shizuku.manager.MainActivity
@@ -49,7 +52,7 @@ while True:
   if logs: logs.close()
   if name:
    logs=(out/(name+'-record.log')).open('w')
-   proc=subprocess.Popen([adb,'shell','screenrecord --size 410x502 --bit-rate 5000000 --time-limit 120 /sdcard/Download/smartflight-promo/'+name+'.mp4'],stdout=logs,stderr=logs)
+   proc=subprocess.Popen([adb,'shell','screenrecord --size 410x502 --bit-rate 5000000 --time-limit 180 /sdcard/Download/smartflight-promo/'+name+'.mp4'],stdout=logs,stderr=logs)
   last=name
  time.sleep(.15)
 PYWATCH

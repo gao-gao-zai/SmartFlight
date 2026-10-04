@@ -15,7 +15,7 @@ public class FixtureActivity extends Activity {
   boolean first=getClass().getSimpleName().equals("FirstActivity");
   TextView tag=new TextView(this); tag.setText("SMARTFLIGHT · 演示应用"); tag.setTextSize(12); tag.setTextColor(Color.rgb(120,130,140)); root.addView(tag);
   TextView title=new TextView(this); title.setText(first?"在线功能":"离线功能"); title.setTextSize(28); title.setTextColor(Color.rgb(35,40,48)); title.setPadding(0,12,0,10); root.addView(title);
-  TextView desc=new TextView(this); desc.setText(first?"需要联网时，让规则帮你开启移动数据。":"同一个应用，也能为不同 Activity 配置不同规则。"); desc.setTextSize(16); root.addView(desc);
+  TextView desc=new TextView(this); desc.setText(first?"需要联网时，让规则帮你开启移动数据。":"这里是本地功能，不需要访问网络。"); desc.setTextSize(16); root.addView(desc);
   state=new TextView(this); state.setTextSize(20); state.setPadding(0,20,0,14); root.addView(state);
   Button next=new Button(this); next.setText(first?"进入离线功能":"返回在线功能"); next.setOnClickListener(v->startActivity(new Intent(this,first?SecondActivity.class:FirstActivity.class))); root.addView(next);
   Button quick=new Button(this); quick.setText("快捷声明入口"); quick.setOnClickListener(v->startActivity(new Intent("com.gaozay.smartflight.action.QUICK_RULE").setPackage("com.gaozay.smartflight").putExtra("package_name",getPackageName()).putExtra("activity_name",getClass().getName()))); root.addView(quick);
