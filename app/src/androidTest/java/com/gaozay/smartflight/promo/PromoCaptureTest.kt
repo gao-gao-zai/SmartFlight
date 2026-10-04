@@ -57,8 +57,8 @@ class PromoCaptureTest {
     private fun dashboard() {
         main()
         repeat(5) {
-            if (exists(text(R.string.app_scope))) return
             if (compose.onAllNodesWithContentDescription(text(R.string.back)).fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()) back()
+            else { compose.onNode(hasScrollToIndexAction()).performScrollToIndex(0); return }
         }
     }
     private fun nativeClick(vararg names: String): Boolean {
@@ -76,12 +76,14 @@ class PromoCaptureTest {
     private fun startClip(name: String) {
         clip = name; clipStarted = SystemClock.elapsedRealtime()
         shell("mkdir -p /sdcard/Download/smartflight-promo")
-        shell("echo $name > /sdcard/Download/smartflight-promo/active-clip")
+        File(out, "active-clip").writeText(name)
+        shell("cp ${out.absolutePath}/active-clip /sdcard/Download/smartflight-promo/active-clip")
         hold(900); event("start")
     }
     private fun stopClip() {
         event("stop"); capture(clip)
-        shell("echo > /sdcard/Download/smartflight-promo/active-clip"); shell("pkill -2 screenrecord"); hold(1500)
+        File(out, "active-clip").writeText("")
+        shell("cp ${out.absolutePath}/active-clip /sdcard/Download/smartflight-promo/active-clip"); shell("pkill -2 screenrecord"); hold(1500)
     }
     private fun event(name: String) {
         val data = shell("settings get global mobile_data").trim()
@@ -154,6 +156,7 @@ class PromoCaptureTest {
             awaitData(true); hold(1400)
             event("leave-app"); shell("input keyevent KEYCODE_HOME")
             hold(5100); awaitData(false)
+            main(); click(R.string.diagnostics_and_logs); scroll(text(R.string.mobile_data_state)); hold(1700)
             stopClip()
 
             settings.updateSettings { s -> s.copy(appExitDisconnectEnabled=false, screenOffDisconnectEnabled=true) }
