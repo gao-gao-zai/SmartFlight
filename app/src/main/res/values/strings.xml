@@ -655,4 +655,5 @@
     <string name="quick_rule_failed">"未能保存或读取规则，请取消后重试。"</string>
     <string name="quick_rule_saved">"规则已保存"</string>
     <string name="quick_rule_saving">"保存中…"</string>
+    <string name="app_name_preview">"自动飞行（预览）"</string>
 </resources>

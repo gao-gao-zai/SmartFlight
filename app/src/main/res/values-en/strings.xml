@@ -665,4 +665,5 @@
     <string name="quick_rule_failed">"Could not save or load the rule. Cancel and try again."</string>
     <string name="quick_rule_saved">"Rule saved"</string>
     <string name="quick_rule_saving">"Saving…"</string>
+    <string name="app_name_preview">"SmartFlight Preview"</string>
 </resources>

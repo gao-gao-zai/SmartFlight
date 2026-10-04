@@ -10,6 +10,8 @@ plugins {
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 // CI emulators use x86_64; normal builds retain the release ABI list.
 val emulatorAbi = providers.gradleProperty("emulatorAbi").orNull
+// Opt-in, installable optimized preview; formal release signing is unchanged.
+val previewBuild = providers.gradleProperty("previewBuild").map { it.toBoolean() }.getOrElse(false)
 val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
@@ -20,11 +22,12 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.gaozay.smartflight"
+        applicationId = if (previewBuild) "com.gaozay.smartflight.preview" else "com.gaozay.smartflight"
+        manifestPlaceholders["appLabel"] = if (previewBuild) "@string/app_name_preview" else "@string/app_name"
         minSdk = 26
         targetSdk = 35
         versionCode = 16
-        versionName = "0.0.16"
+        versionName = if (previewBuild) "0.0.16-activity-preview" else "0.0.16"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -48,13 +51,15 @@ android {
             isEnable = true
             reset()
             include(*(emulatorAbi?.let { arrayOf(it) } ?: arrayOf("armeabi-v7a", "arm64-v8a")))
-            isUniversalApk = false
+            isUniversalApk = previewBuild
         }
     }
 
     buildTypes {
         release {
-            if (keystorePropertiesFile.exists()) {
+            if (previewBuild) {
+                signingConfig = signingConfigs.getByName("debug")
+            } else if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = true

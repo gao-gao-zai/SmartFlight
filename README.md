@@ -64,6 +64,14 @@ Windows:
 
 如果需要发布签名包，项目会在根目录存在 `keystore.properties` 时自动加载本地签名配置。
 
+CI 另提供可安装的 Release 预览包（`smartflight-release-preview-apks` artifact）：
+
+```bash
+./gradlew assembleRelease -PpreviewBuild=true
+```
+
+该构建开启代码压缩和资源裁剪，使用调试证书签名，但不启用调试功能；独立包名为 `com.gaozay.smartflight.preview`，应用名标为预览，可与正式版并存，配置与权限需要单独设置。它不用于覆盖正式版或商店发布。未添加此参数时仍使用原包名和原正式签名配置。第三方调用预览包时，将目标 package 改为 `com.gaozay.smartflight.preview`，action 和 Activity 完整类名保持相同。CI 会核对签名与非调试标志，并在 Android 15 上验证压缩后的主界面与快捷声明入口。
+
 ## 项目结构
 
 ```text
