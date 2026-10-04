@@ -19,5 +19,6 @@ assert 'application-debuggable' not in badging, 'The release preview must not be
 assert "sdkVersion:'26'" in badging, badging
 print('Verified signed, non-debuggable Release preview:',pathlib.Path(sys.argv[1]).name)
 PY
+    python3 scripts/verify_shizuku_release.py "$apk" "$build_tools/dexdump"
     sha256sum "$apk" >> "$report_dir/SHA256SUMS"
 done
