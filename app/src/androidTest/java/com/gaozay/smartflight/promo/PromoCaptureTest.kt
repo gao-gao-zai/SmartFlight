@@ -47,8 +47,9 @@ class PromoCaptureTest {
     private fun hold(ms: Long = 1000) { SystemClock.sleep(ms) }
     private fun exists(s: String) = compose.onAllNodesWithText(s).fetchSemanticsNodes(atLeastOneRootRequired = false).isNotEmpty()
     private fun scroll(s: String): SemanticsNodeInteraction {
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(s))
-        return compose.onNodeWithText(s).performScrollTo()
+        val match = hasText(s) and !hasSetTextAction()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(match)
+        return compose.onNode(match).performScrollTo()
     }
     private fun click(id: Int) { scroll(text(id)).performTouchInput { click() }; hold(650) }
     private fun back() { compose.onNodeWithContentDescription(text(R.string.back)).performTouchInput { click() }; hold(700) }
@@ -75,12 +76,12 @@ class PromoCaptureTest {
     private fun startClip(name: String) {
         clip = name; clipStarted = SystemClock.elapsedRealtime()
         shell("mkdir -p /sdcard/Download/smartflight-promo")
-        shell("screenrecord --size 410x502 --bit-rate 5000000 --time-limit 120 /sdcard/Download/smartflight-promo/$name.mp4 >/dev/null 2>&1 &")
+        shell("echo $name > /sdcard/Download/smartflight-promo/active-clip")
         hold(900); event("start")
     }
     private fun stopClip() {
         event("stop"); capture(clip)
-        shell("pkill -2 screenrecord"); hold(1500)
+        shell("echo > /sdcard/Download/smartflight-promo/active-clip"); shell("pkill -2 screenrecord"); hold(1500)
     }
     private fun event(name: String) {
         val data = shell("settings get global mobile_data").trim()
@@ -111,6 +112,7 @@ class PromoCaptureTest {
             appExitDelaySeconds=5, screenOffDelaySeconds=5, screenOffDisconnectEnabled=false,
             themeMode=ThemeMode.Light, themePalette=ThemePalette.WarmPaper) }
         ActivityScenario.launch(MainActivity::class.java).use {
+          try {
             hold(2500)
             startClip("access")
             click(R.string.request_shizuku_permission)
@@ -121,7 +123,8 @@ class PromoCaptureTest {
             click(R.string.try_automatic_permission_grants)
             hold(2000)
             for (label in listOf("关闭", "完成", "确定", "知道了")) if (exists(label)) compose.onAllNodesWithText(label).onLast().performTouchInput { click() }
-            compose.waitUntil(20000) { exists(text(R.string.app_scope)) }
+            compose.waitUntil(20000) { entry.accessRepository().accessGateState.value.canEnterApp }
+            scroll(text(R.string.app_scope))
             hold(1400); stopClip()
 
             val apps = entry.installedAppRepository()
@@ -166,7 +169,7 @@ class PromoCaptureTest {
             startClip("activity-editor")
             click(R.string.app_scope)
             val search = compose.onNodeWithText(text(R.string.search_app_name_or_package_name)).performScrollTo()
-            search.performTouchInput { click() }; search.performTextInput("联网演示"); hold(1100)
+            search.performTouchInput { click() }; search.performTextInput("联网演示"); hold(1100); shell("input keyevent KEYCODE_BACK"); hold(700)
             scroll("联网演示").performTouchInput { click() }; hold(1700)
             scroll(second).performTouchInput { click() }; hold(900)
             click(R.string.offline); click(R.string.activity_save); hold(1500)
@@ -209,7 +212,7 @@ class PromoCaptureTest {
             dashboard(); startClip("apps")
             click(R.string.app_scope)
             val input=compose.onNodeWithText(text(R.string.search_app_name_or_package_name)).performScrollTo()
-            input.performTextClearance(); input.performTextInput("联网演示"); hold(1000)
+            input.performTextClearance(); input.performTextInput("联网演示"); hold(1000); shell("input keyevent KEYCODE_BACK"); hold(700)
             scroll("联网演示"); hold(1700)
             compose.onNodeWithContentDescription(text(R.string.change_rule)).performTouchInput { click() }; hold(600)
             compose.onNodeWithText(text(R.string.set_as_online)).performTouchInput { click() }; hold(1700)
@@ -236,6 +239,7 @@ class PromoCaptureTest {
             compose.onAllNodes(isToggleable()).onFirst().performTouchInput { click() }; hold(1800)
             assertTrue(exists(text(R.string.automation_paused)))
             stopClip()
+          } catch (failure: Throwable) { capture("failure"); throw failure }
         }
     }
 }

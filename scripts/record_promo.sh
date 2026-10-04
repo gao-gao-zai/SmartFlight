@@ -3,7 +3,9 @@ set -euo pipefail
 adb_bin="${ANDROID_HOME:?}/platform-tools/adb"
 out=app/build/emulator-artifacts/promo
 mkdir -p "$out"
+watcher_pid=""
 cleanup() {
+  if [ -n "$watcher_pid" ]; then kill "$watcher_pid" || true; fi
   "$adb_bin" shell pkill -2 screenrecord || true
   "$adb_bin" pull /sdcard/Download/smartflight-promo "$out/recordings" || true
   "$adb_bin" logcat -d > "$out/logcat.txt" || true
@@ -33,6 +35,23 @@ apk_path=$("$adb_bin" shell pm path moe.shizuku.privileged.api | head -1 | sed '
 "$adb_bin" shell pm grant com.gaozay.smartflight android.permission.POST_NOTIFICATIONS
 "$adb_bin" shell dumpsys deviceidle whitelist +com.gaozay.smartflight
 "$adb_bin" shell svc wifi disable
+# Keep screenrecord's adb connection open on the runner; avoid shell-child teardown.
+python3 - "$adb_bin" "$out" <<'PYWATCH' &
+import subprocess,sys,time,pathlib
+adb,out=sys.argv[1],pathlib.Path(sys.argv[2]);last='';proc=None;logs=None
+while True:
+ name=subprocess.run([adb,'shell','cat /sdcard/Download/smartflight-promo/active-clip'],capture_output=True,text=True).stdout.strip()
+ if name!=last:
+  if proc and proc.poll() is None:
+   subprocess.run([adb,'shell','pkill -2 screenrecord'],capture_output=True);proc.wait(timeout=10)
+  if logs: logs.close()
+  if name:
+   logs=(out/(name+'-record.log')).open('w')
+   proc=subprocess.Popen([adb,'shell','screenrecord --size 410x502 --bit-rate 5000000 --time-limit 120 /sdcard/Download/smartflight-promo/'+name+'.mp4'],stdout=logs,stderr=logs)
+  last=name
+ time.sleep(.15)
+PYWATCH
+watcher_pid=$!
 "$adb_bin" shell am instrument -w -r -e class com.gaozay.smartflight.promo.PromoCaptureTest com.gaozay.smartflight.test/androidx.test.runner.AndroidJUnitRunner | tee "$out/instrumentation.txt"
 python3 - "$out/instrumentation.txt" <<'PY'
 import pathlib,sys
