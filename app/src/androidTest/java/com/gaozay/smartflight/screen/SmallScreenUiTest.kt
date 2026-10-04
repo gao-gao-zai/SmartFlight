@@ -136,10 +136,14 @@ class SmallScreenUiTest {
     private fun scrollTo(id: Int) = scrollTo(text(id))
     private fun scrollTo(label: String): SemanticsNodeInteraction {
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(label))
-        return compose.onNodeWithText(label)
+        // A LazyColumn item can contain an entire settings section taller than
+        // this viewport. Bring the specific descendant into view as well.
+        return compose.onNodeWithText(label).performScrollTo()
     }
     private fun capture(name: String) {
         compose.waitForIdle()
+        instrumentation.waitForIdleSync()
+        android.os.SystemClock.sleep(250) // Let the last rendered frame reach SurfaceFlinger.
         val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
         assertEquals(410, bitmap.width)
         assertEquals(502, bitmap.height)
