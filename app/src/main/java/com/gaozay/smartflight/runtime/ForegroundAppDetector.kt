@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.quickrule.isQuickRuleWindow
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
@@ -62,6 +63,7 @@ class ForegroundAppDetector @Inject constructor(
             val key = "${event.eventType}:${event.packageName}:${event.className}"
             if (!cursorKeys.add(key)) continue
             val pkg = event.packageName?.takeIf { it.isNotBlank() } ?: continue
+            if (isQuickRuleWindow(pkg, event.className, context.packageName)) continue
             // ACTIVITY_RESUMED has the same value as MOVE_TO_FOREGROUND on API 26-28.
             if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                 val name = resolver.resolve(pkg, event.className) ?: normalizeActivityName(pkg, event.className)

@@ -557,7 +557,7 @@
     <string name="sentence_separator">"。"</string>
 
     <!-- Activity-level app management -->
-    <string name="activity_follow_app">"跟随应用"</string>
+    <string name="activity_follow_app">"自动（跟随应用）"</string>
     <string name="activity_source_unknown">"来源未知"</string>
     <string name="activity_match_app_default">"跟随应用默认规则"</string>
     <string name="activity_match_override">"命中 Activity 独立规则"</string>
@@ -634,4 +634,25 @@
     <string name="activity_unknown">"Activity 未知"</string>
     <string name="activity_global_pause">"自动化已暂停，Activity 规则不会执行"</string>
     <string name="activity_runtime_verify">"该运行组件尚未在声明清单中核实，请重新扫描后再设置独立规则。"</string>
+    <string name="quick_rule_tile_label">"快捷声明"</string>
+    <string name="quick_rule_title">"声明联网规则"</string>
+    <string name="quick_rule_scope_label">"应用范围"</string>
+    <string name="quick_rule_scope_app">"整个应用"</string>
+    <string name="quick_rule_scope_activity">"这个 Activity"</string>
+    <string name="quick_rule_online">"联网"</string>
+    <string name="quick_rule_offline">"不联网"</string>
+    <string name="quick_rule_auto">"自动"</string>
+    <string name="quick_rule_supplied_target">"请确认以上目标后保存。"</string>
+    <string name="quick_rule_detected_target">"目标为打开选框前识别的应用，保存前请核对。"</string>
+    <string name="quick_rule_activity_unavailable">"无法确认有效的 Activity，可选择整个应用。"</string>
+    <string name="quick_rule_app_help">"自动：恢复应用的自动判断。已有 Activity 规则继续保留。"</string>
+    <string name="quick_rule_activity_help">"自动：跟随应用规则。联网或不联网：为这个 Activity 保存单独规则。"</string>
+    <string name="quick_rule_automation_paused">"自动化已暂停。规则会保存，恢复自动化后才会执行。"</string>
+    <string name="quick_rule_children_paused">"此应用的 Activity 规则已暂停。保存后仍需在应用详情中启用。"</string>
+    <string name="quick_rule_no_target">"无法识别目标应用。请先开启使用情况访问或无障碍监测，再回到目标应用触发；第三方也可指定包名。"</string>
+    <string name="quick_rule_app_missing">"目标应用已卸载或不可用，请返回目标应用后重试。"</string>
+    <string name="quick_rule_invalid_request">"调用参数无效。请提供有效包名；指定 Activity 时也必须提供包名。"</string>
+    <string name="quick_rule_failed">"未能保存或读取规则，请取消后重试。"</string>
+    <string name="quick_rule_saved">"规则已保存"</string>
+    <string name="quick_rule_saving">"保存中…"</string>
 </resources>

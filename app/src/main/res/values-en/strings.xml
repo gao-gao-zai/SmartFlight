@@ -567,7 +567,7 @@
     <string name="sentence_separator">". "</string>
 
     <!-- Activity-level app management -->
-    <string name="activity_follow_app">"Follow app"</string>
+    <string name="activity_follow_app">"Auto (follow app)"</string>
     <string name="activity_source_unknown">"Unknown source"</string>
     <string name="activity_match_app_default">"Using the app default rule"</string>
     <string name="activity_match_override">"Activity override matched"</string>
@@ -644,4 +644,25 @@
     <string name="activity_unknown">"Activity unknown"</string>
     <string name="activity_global_pause">"Automation paused; Activity rules will not execute"</string>
     <string name="activity_runtime_verify">"This runtime component has not been verified in the declared list. Rescan before setting an override."</string>
+    <string name="quick_rule_tile_label">"Quick rule"</string>
+    <string name="quick_rule_title">"Set network rule"</string>
+    <string name="quick_rule_scope_label">"Apply to"</string>
+    <string name="quick_rule_scope_app">"Entire app"</string>
+    <string name="quick_rule_scope_activity">"This Activity"</string>
+    <string name="quick_rule_online">"Online"</string>
+    <string name="quick_rule_offline">"Offline"</string>
+    <string name="quick_rule_auto">"Auto"</string>
+    <string name="quick_rule_supplied_target">"Check the target above before saving."</string>
+    <string name="quick_rule_detected_target">"This is the app detected before opening this dialog. Check it before saving."</string>
+    <string name="quick_rule_activity_unavailable">"A valid Activity could not be confirmed. You can select the entire app."</string>
+    <string name="quick_rule_app_help">"Auto: restore automatic app detection. Existing Activity rules are kept."</string>
+    <string name="quick_rule_activity_help">"Auto: follow the app rule. Online or Offline: save a separate rule for this Activity."</string>
+    <string name="quick_rule_automation_paused">"Automation is paused. The rule will be saved and applied when automation resumes."</string>
+    <string name="quick_rule_children_paused">"Activity rules for this app are paused. Enable them in app details to apply the saved rule."</string>
+    <string name="quick_rule_no_target">"No target app could be detected. Enable usage access or accessibility monitoring, return to the target app, then try again. Third-party callers can also supply a package name."</string>
+    <string name="quick_rule_app_missing">"The target app is uninstalled or unavailable. Return to the target app and try again."</string>
+    <string name="quick_rule_invalid_request">"Invalid request. Supply a valid package name, including when specifying an Activity."</string>
+    <string name="quick_rule_failed">"Could not save or load the rule. Cancel and try again."</string>
+    <string name="quick_rule_saved">"Rule saved"</string>
+    <string name="quick_rule_saving">"Saving…"</string>
 </resources>

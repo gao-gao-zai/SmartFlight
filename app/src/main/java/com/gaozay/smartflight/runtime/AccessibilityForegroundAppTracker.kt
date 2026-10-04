@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import com.gaozay.smartflight.quickrule.isQuickRuleWindow
 import android.content.Context
 import com.gaozay.smartflight.activities.DeclaredActivityResolver
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -26,6 +27,7 @@ class AccessibilityForegroundAppTracker @Inject constructor(
 
     @Synchronized
     fun recordPackage(packageName: String, eventTimestampMillis: Long, className: String? = null): AccessibilityForegroundAppUpdate? {
+        if (isQuickRuleWindow(packageName, className, context.packageName)) return null
         if (packageName.isBlank() || eventTimestampMillis < (latestForegroundApp?.eventTimestampMillis ?: 0)) return null
         val activity = resolver.resolve(packageName, className)
         // Ignore unconfirmed dialog/widget events within the same app, including WINDOWS_CHANGED.

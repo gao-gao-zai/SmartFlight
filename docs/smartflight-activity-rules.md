@@ -42,3 +42,48 @@ JVM 回归覆盖精确匹配、默认语义、黑名单覆盖、暂停/失效/�
 模拟器测试验证真实扫描、安装更新通知触发失效、UsageEvents 同包切换、原始恢复时间、真实无障碍服务的窗口切换与原生 Dialog 排除，以及从记录到编辑保存、备注保留、未保存返回提示的流程。Compose 测试生成中英文及 240dp/大字体布局截图。并发 DataStore 写入测试检查前台身份与其他运行字段不会互相覆盖。
 
 仍需真机复核：各厂商无障碍事件与后台限制、锁屏/解锁、分屏/画中画、快捷设置/通知遮罩、权限中途撤销及恢复、无启动入口应用、实际小屏/圆屏设备，以及 Root/Shizuku/ADB 下真实联网动作和延迟。模拟器 UI 和识别测试不能证明 OEM 后台行为或执行器在用户设备上的表现。
+
+## 快捷声明磁贴与第三方接口
+
+在系统快捷设置编辑页添加 **快捷声明** 磁贴。停留在目标应用时点击磁贴，选框会显示目标应用和可确认的完整 Activity 名称。选择 **整个应用** 或 **这个 Activity**，然后选择 **联网 / 不联网 / 自动**，点击保存。取消、返回或点击选框外部都不会改变规则。
+
+- 整个应用的自动：清除应用手动声明，恢复原有的联网自动判断；不清除该应用已有的 Activity 子规则。
+- Activity 的自动：恢复跟随应用。原 Activity 编辑界面显示为 **自动（跟随应用）**，已有备注继续保留。
+- 无法验证 Activity、组件停用或扫描失败时，禁用 Activity 范围，仍可修改整个应用。
+- 保存会核对安装状态与组件有效性；全局自动化暂停或应用子规则暂停不会被这个入口解除，选框会提示。
+- 选框是短暂的透明 Activity，不需要悬浮窗权限；前台监测忽略它，不会因打开选框把目标应用误判为离开。
+- 磁贴在锁屏时先请求解锁。第三方不能通过这个入口在锁屏上修改规则。
+
+第三方（例如 Tasker、快捷方式工具）通过 **启动 Activity** 调用。支持显式组件或下面的 action；不接受静默写规则的参数。调用后必须由用户在选框中选择并保存。
+
+| 参数 | 值 / 含义 |
+| --- | --- |
+| Action | `com.gaozay.smartflight.action.QUICK_RULE` |
+| Package | `com.gaozay.smartflight` |
+| Class | `com.gaozay.smartflight.quickrule.QuickRuleActivity` |
+| `package_name`（String，可选） | 指定已安装应用的包名。未指定则识别打开选框前的前台应用 |
+| `activity_name`（String，可选） | Activity 完整类名，也接受相对类名；必须同时提供包名。组件需要通过声明和启用状态验证 |
+
+调用示例（只打开选框，仍需点击保存）：
+
+```sh
+# 针对当前前台应用
+adb shell am start -a com.gaozay.smartflight.action.QUICK_RULE -p com.gaozay.smartflight
+
+# 针对调用者指定的应用 / Activity
+adb shell am start -n com.gaozay.smartflight/.quickrule.QuickRuleActivity \
+  --es package_name com.example.app \
+  --es activity_name com.example.app.MainActivity
+```
+
+Android 调用：
+
+```kotlin
+val intent = Intent("com.gaozay.smartflight.action.QUICK_RULE")
+    .setPackage("com.gaozay.smartflight")
+    .putExtra("package_name", "com.example.app")
+    .putExtra("activity_name", "com.example.app.MainActivity")
+startActivity(intent) // 从非 Activity Context 发起时添加 FLAG_ACTIVITY_NEW_TASK
+```
+
+Android 后台启动限制仍适用，建议从用户点击的按钮、快捷方式或通知启动。若使用 Activity Result，保存成功返回 `RESULT_OK`，取消或未保存返回 `RESULT_CANCELED`。未指定目标时遵循用户配置的监测模式；只有无障碍模式不会调用 UsageStats。双窗口或画中画的当前焦点、MIUI 磁贴解锁和面板收起效果仍需真机复核。
