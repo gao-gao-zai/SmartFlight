@@ -139,6 +139,7 @@ class PromoCaptureTest {
     private fun openAppDetails(name: String) {
         dashboard(); click(R.string.app_scope)
         val input = compose.onNodeWithText(text(R.string.search_app_name_or_package_name)).performScrollTo()
+        input.performTouchInput { click() }; hold(300)
         input.performTextClearance(); input.performTextInput(name)
         shell("input keyevent KEYCODE_BACK"); hold(900)
         scroll(name).performTouchInput { click() }; hold(1400)

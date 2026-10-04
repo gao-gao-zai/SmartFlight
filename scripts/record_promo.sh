@@ -37,6 +37,7 @@ unzip -p "$out/shizuku.apk" lib/x86_64/libshizuku.so > "$out/shizuku-starter"
 "$adb_bin" install -r app/build/activity-fixtures/fixture-v1.apk
 curl --fail --location --retry 3 --output "$out/weather.apk" https://github.com/breezy-weather/breezy-weather/releases/download/v6.2.2/breezy-weather-v6.2.2_freenet.apk
 "$adb_bin" install -r "$out/weather.apk"
+"$adb_bin" shell pm grant org.breezyweather android.permission.POST_NOTIFICATIONS
 "$adb_bin" shell cmd locale set-app-locales org.breezyweather --user current --locales zh-CN
 "$adb_bin" install -r app/build/outputs/apk/debug/app-x86_64-debug.apk
 "$adb_bin" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
