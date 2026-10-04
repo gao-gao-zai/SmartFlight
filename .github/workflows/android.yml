@@ -30,6 +30,7 @@ jobs:
       - name: Verify Release preview APKs
         run: bash scripts/verify_release_preview.sh
       - name: Upload Release preview APKs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: smartflight-release-preview-apks

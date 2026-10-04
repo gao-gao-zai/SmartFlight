@@ -12,11 +12,11 @@ for apk in "${apks[@]}"; do
     "$build_tools/apksigner" verify --verbose --print-certs "$apk" > "$report_dir/$name.signing.txt"
     "$build_tools/aapt2" dump badging "$apk" > "$report_dir/$name.badging.txt"
     python3 - "$report_dir/$name.badging.txt" <<'PY'
-import pathlib,sys
+import pathlib,sys,re
 badging=pathlib.Path(sys.argv[1]).read_text()
 assert "package: name='com.gaozay.smartflight.preview'" in badging, badging
 assert 'application-debuggable' not in badging, 'The release preview must not be debuggable'
-assert "sdkVersion:'26'" in badging, badging
+assert re.search(r"(?:minSdkVersion|sdkVersion):'26'", badging), badging
 print('Verified signed, non-debuggable Release preview:',pathlib.Path(sys.argv[1]).name)
 PY
     python3 scripts/verify_shizuku_release.py "$apk" "$build_tools/dexdump"
