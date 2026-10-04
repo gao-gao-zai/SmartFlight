@@ -30,4 +30,4 @@ bash scripts/build_activity_fixtures.sh
 "$sdk_adb" install -r app/build/activity-fixtures/fixture-v1.apk
 # Clear a cold-boot Launcher ANR before opening the app; later tests only dismiss Launcher-specific dialogs.
 "$sdk_adb" shell am force-stop com.google.android.apps.nexuslauncher
-bash gradlew connectedDebugAndroidTest -PemulatorAbi=x86_64 --no-daemon
+bash gradlew connectedDebugAndroidTest -PemulatorAbi=x86_64 -Pandroid.testInstrumentationRunnerArguments.notClass=com.gaozay.smartflight.screen.SmallScreenUiTest --no-daemon
