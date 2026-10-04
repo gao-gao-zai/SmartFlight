@@ -26,6 +26,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Before
 import org.junit.After
+import org.junit.rules.TestName
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -33,6 +34,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SmallScreenUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val testName = TestName()
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val entry get() = EntryPointAccessors.fromApplication(context, AppSyncTestEntryPoint::class.java)
@@ -46,7 +48,7 @@ class SmallScreenUiTest {
         context.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(arguments.getString("screenLocale", "en"))
         compose.waitForIdle()
     }
-    @After fun captureFinalWindow() { capture("final-window") }
+    @After fun captureFinalWindow() { capture("final-${testName.methodName}") }
 
     @Test fun setupCanScrollToLastAction() {
         // MainActivity's real cold-start access gate (no root on the emulator).
