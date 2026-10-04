@@ -160,7 +160,7 @@ class PromoCaptureTest {
             stopClip()
 
             settings.updateSettings { s -> s.copy(appExitDisconnectEnabled=false, screenOffDisconnectEnabled=true) }
-            main(); shell("am start -W -n $fixture/.FirstActivity"); awaitData(true)
+            dashboard(); shell("am start -W -n $fixture/.FirstActivity"); awaitData(true)
             startClip("screen-off")
             hold(1600); event("screen-off"); shell("input keyevent KEYCODE_SLEEP")
             hold(5600); awaitData(false); event("off-while-asleep")
