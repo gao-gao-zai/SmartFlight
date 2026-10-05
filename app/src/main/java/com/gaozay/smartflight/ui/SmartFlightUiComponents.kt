@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.i18n.ResourceLabel
@@ -61,11 +63,26 @@ internal fun SwitchRow(title: String, description: String, checked: Boolean, onC
 
 @Composable
 internal fun NumberRow(title: String, value: Int, onValueChange: (Int) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-        OutlinedButton(onClick = { onValueChange(value - 5) }) { Text("-") }
-        Text(pluralStringResource(R.plurals.seconds, (value).toInt(), value), modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
-        OutlinedButton(onClick = { onValueChange(value + 5) }) { Text("+") }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < 300.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { onValueChange(value - 5) }) { Text("-") }
+                    Text(pluralStringResource(R.plurals.seconds, value, value),
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+                    OutlinedButton(onClick = { onValueChange(value + 5) }) { Text("+") }
+                }
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                OutlinedButton(onClick = { onValueChange(value - 5) }) { Text("-") }
+                Text(pluralStringResource(R.plurals.seconds, value, value), modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodyLarge)
+                OutlinedButton(onClick = { onValueChange(value + 5) }) { Text("+") }
+            }
+        }
     }
 }
 

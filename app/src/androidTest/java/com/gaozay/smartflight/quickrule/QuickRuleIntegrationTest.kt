@@ -56,9 +56,9 @@ class QuickRuleIntegrationTest {
             ActivityScenario.launch<QuickRuleActivity>(intent(".EntryAlias")).use { scenario ->
                 waitForDialog()
                 compose.onNodeWithText(first).assertExists()
-                compose.onNodeWithText(text(R.string.quick_rule_scope_activity)).performClick()
+                compose.onNodeWithText(text(R.string.quick_rule_scope_activity)).performScrollTo().performClick()
                 compose.onNodeWithText(text(R.string.quick_rule_children_paused)).assertExists()
-                compose.onNodeWithText(text(R.string.quick_rule_offline)).performClick()
+                compose.onNodeWithText(text(R.string.quick_rule_offline)).performScrollTo().performClick()
                 capture("quick-rule-activity-en.png")
                 scenario.recreate()
                 waitForDialog()
@@ -76,8 +76,8 @@ class QuickRuleIntegrationTest {
             assertTrue(apps.getApp(ACTIVITY_FIXTURE)!!.isInBlacklist)
             ActivityScenario.launch<QuickRuleActivity>(intent(first)).use {
                 waitForDialog()
-                compose.onNodeWithText(text(R.string.quick_rule_scope_activity)).performClick()
-                compose.onNodeWithText(text(R.string.quick_rule_auto)).performClick()
+                compose.onNodeWithText(text(R.string.quick_rule_scope_activity)).performScrollTo().performClick()
+                compose.onNodeWithText(text(R.string.quick_rule_auto)).performScrollTo().performClick()
                 save()
                 awaitActivityCondition("Activity auto did not restore inheritance") {
                     runBlocking { repo.observeDetails(ACTIVITY_FIXTURE).first().rules.any { it.activityName == first && it.mode == ActivityRuleMode.FollowApp.name && it.note == "Keep my note" } }
@@ -105,14 +105,14 @@ class QuickRuleIntegrationTest {
             ActivityScenario.launch<QuickRuleActivity>(intent("android.widget.FrameLayout")).use {
                 waitForDialog()
                 compose.onNodeWithText(text(R.string.quick_rule_scope_activity)).assertIsNotEnabled()
-                compose.onNodeWithText(text(R.string.quick_rule_online)).performClick()
+                compose.onNodeWithText(text(R.string.quick_rule_online)).performScrollTo().performClick()
                 compose.onNodeWithText(text(R.string.cancel)).performClick()
             }
             assertFalse(apps.getApp(ACTIVITY_FIXTURE)!!.isInWhitelist)
             for (mode in QuickRuleMode.entries) {
                 ActivityScenario.launch<QuickRuleActivity>(intent()).use {
                     waitForDialog()
-                    compose.onNodeWithText(text(mode.labelRes)).performClick()
+                    compose.onNodeWithText(text(mode.labelRes)).performScrollTo().performClick()
                     save()
                     awaitActivityCondition("App quick rule $mode was not saved") { runBlocking { QuickRuleMode.forApp(apps.getApp(ACTIVITY_FIXTURE)!!) == mode } }
                 }
@@ -173,7 +173,7 @@ class QuickRuleIntegrationTest {
             assertNull(standaloneTracker.recordPackage(context.packageName, now + 1, QuickRuleContract.ACTIVITY_CLASS))
             assertNull(standaloneTracker.recordPackage(context.packageName, now + 2, "android.app.Dialog"))
             assertEquals(second, standaloneTracker.latest()?.activityName)
-            compose.onNodeWithText(text(R.string.quick_rule_online)).performClick()
+            compose.onNodeWithText(text(R.string.quick_rule_online)).performScrollTo().performClick()
             capture("quick-rule-tile-en.png")
             save()
             awaitActivityCondition("Tile app rule not saved") { runBlocking { apps.getApp(ACTIVITY_FIXTURE)?.isInWhitelist == true } }
