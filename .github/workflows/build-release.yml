@@ -1,0 +1,84 @@
+name: Build Release APKs for local signing
+on:
+  push:
+    branches: ['build/release-87a0603-20261007']
+    paths: ['.github/workflows/build-release.yml']
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 87a0603166035b055442dcf802b8d5ecd33b20af
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Verify pinned source and signing state
+        run: |
+          test "$(git rev-parse HEAD)" = 87a0603166035b055442dcf802b8d5ecd33b20af
+          test ! -e keystore.properties
+          python3 scripts/check_localization.py
+      - name: Compile original-package optimized Release
+        run: bash gradlew assembleRelease lintRelease --no-daemon
+      - name: Verify package, architecture, release flags and reflective entry points
+        run: |
+          set -euo pipefail
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          out=app/build/formal-release
+          mkdir -p "$out"
+          for abi in arm64-v8a armeabi-v7a; do
+            src="app/build/outputs/apk/release/app-$abi-release-unsigned.apk"
+            test -f "$src"
+            apk="$out/SmartFlight-0.0.16-master-87a0603-$abi-UNSIGNED.apk"
+            cp "$src" "$apk"
+            "$tools/aapt2" dump badging "$apk" > "$apk.badging.txt"
+            python3 - "$apk" "$abi" <<'PY'
+          import pathlib,sys,re,zipfile
+          apk=pathlib.Path(sys.argv[1]);abi=sys.argv[2]
+          text=pathlib.Path(str(apk)+'.badging.txt').read_text()
+          assert "package: name='com.gaozay.smartflight'" in text,text
+          assert "versionCode='16'" in text and "versionName='0.0.16'" in text
+          assert 'application-debuggable' not in text
+          assert re.search(r"(?:minSdkVersion|sdkVersion):'26'",text),text
+          assert "targetSdkVersion:'35'" in text,text
+          with zipfile.ZipFile(apk) as z:
+              assert z.testzip() is None
+              assert {n.split('/')[1] for n in z.namelist() if n.startswith('lib/')}=={abi}
+              assert not any(n.startswith('META-INF/') and n.endswith(('.RSA','.DSA','.EC','.SF')) for n in z.namelist())
+          print('Verified original-package unsigned Release:',apk.name)
+          PY
+            python3 scripts/verify_shizuku_release.py "$apk" "$tools/dexdump"
+            if "$tools/apksigner" verify --verbose --print-certs "$apk" > "$apk.signature.txt" 2>&1; then
+              echo 'Unexpected signature in an unsigned build' >&2
+              exit 1
+            fi
+            sha256sum "$apk" >> "$out/SHA256SUMS"
+          done
+          mkdir -p "$out/signing-tools"
+          cp "$tools/lib/apksigner.jar" "$out/signing-tools/apksigner.jar"
+          cp "$tools/zipalign" "$out/signing-tools/zipalign"
+          if test -f "$tools/lib64/libc++.so"; then cp "$tools/lib64/libc++.so" "$out/signing-tools/libc++.so"; fi
+          curl --fail --location --retry 3 --output /tmp/smartflight-published-arm64.apk https://github.com/gao-gao-zai/SmartFlight/releases/download/v0.0.16/app-arm64-v8a-release.apk
+          "$tools/apksigner" verify --verbose --print-certs /tmp/smartflight-published-arm64.apk > "$out/published-v0.0.16-signature.txt"
+          sha256sum /tmp/smartflight-published-arm64.apk > "$out/published-v0.0.16-SHA256.txt"
+          cp app/build/outputs/mapping/release/mapping.txt "$out/R8-mapping.txt"
+          cp app/build/reports/lint-results-release.html "$out/lint-results-release.html"
+          python3 - "$out" <<'PY'
+          import pathlib,sys,json,hashlib,os
+          out=pathlib.Path(sys.argv[1])
+          info={'source_branch':'master','source_commit':'87a0603166035b055442dcf802b8d5ecd33b20af','version_name':'0.0.16','version_code':16,'application_id':'com.gaozay.smartflight','build_type':'release','minified':True,'resources_shrunk':True,'debuggable':False,'signed':False,'signing_requirement':'Existing release keystore is required before installation or distribution.','workflow_run_id':os.environ['GITHUB_RUN_ID'],'artifacts':[{'name':p.name,'size':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(out.glob('*.apk'))]}
+          (out/'build-info.json').write_text(json.dumps(info,ensure_ascii=False,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smartflight-release-for-local-signing-87a0603
+          path: app/build/formal-release
+          retention-days: 14
