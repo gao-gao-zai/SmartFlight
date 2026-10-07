@@ -26,8 +26,8 @@ android {
         manifestPlaceholders["appLabel"] = if (previewBuild) "@string/app_name_preview" else "@string/app_name"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = if (previewBuild) "0.0.16-activity-preview" else "0.0.16"
+        versionCode = 17
+        versionName = if (previewBuild) "0.0.17-activity-preview" else "0.0.17"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
