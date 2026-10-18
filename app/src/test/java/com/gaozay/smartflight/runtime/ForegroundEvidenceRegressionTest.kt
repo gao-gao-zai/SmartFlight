@@ -2,6 +2,8 @@ package com.gaozay.smartflight.runtime
 
 import com.gaozay.smartflight.i18n.LocalizedStringsTest
 import com.gaozay.smartflight.settings.ForegroundMonitorMode
+import com.gaozay.smartflight.quickrule.QuickRuleContract
+import com.gaozay.smartflight.quickrule.QuickRuleOverlayState
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -102,6 +104,54 @@ class ForegroundEvidenceRegressionTest : LocalizedStringsTest() {
         assertNull(f.hybrid.detect())
         f.resume("offline", "offline.Main", f.now + 2)
         assertEquals("offline", f.hybrid.detect()!!.packageName)
+    }
+
+    @Test fun quickEditorRestoresOnlyImmediatelyPausedUnderlyingActivityAcrossQueries() {
+        val f = Evidence()
+        f.resume("online", "online.Main", 100)
+        assertNotNull(f.usage.detect())
+        f.events = listOf(ForegroundUsageEvent("online", "online.Main", 101, 2))
+        assertNull(f.usage.detect())
+        f.events = listOf(ForegroundUsageEvent("self", QuickRuleContract.ACTIVITY_CLASS, 102, 1),
+            ForegroundUsageEvent("self", QuickRuleContract.ACTIVITY_CLASS, 103, 2),
+            ForegroundUsageEvent("self", QuickRuleContract.ACTIVITY_CLASS, 104, 23))
+        assertEquals("online.Main", f.usage.detect()!!.activityName)
+        f.events = emptyList()
+        assertEquals("online", f.usage.detect()!!.packageName)
+        f.resume("offline", "offline.Main", 105)
+        assertEquals("offline", f.usage.detect()!!.packageName)
+    }
+
+    @Test fun quickEditorCannotReviveStoppedOrPermissionInvalidatedEvidence() {
+        val f = Evidence()
+        f.events = listOf(ForegroundUsageEvent("online", "online.Main", 100, 1),
+            ForegroundUsageEvent("online", "online.Main", 101, 2),
+            ForegroundUsageEvent("online", "online.Main", 102, 23),
+            ForegroundUsageEvent("self", QuickRuleContract.ACTIVITY_CLASS, 103, 1))
+        assertNull(f.usage.detect())
+        f.resume("online", "online.Main", 104)
+        assertNotNull(f.usage.detect())
+        f.events = listOf(ForegroundUsageEvent("online", "online.Main", 105, 2))
+        assertNull(f.usage.detect())
+        f.allowed = false
+        assertNull(f.usage.detect())
+        f.allowed = true
+        f.events = listOf(ForegroundUsageEvent("self", QuickRuleContract.ACTIVITY_CLASS, 106, 1))
+        assertNull(f.usage.detect())
+    }
+
+    @Test fun quickEditorDoesNotHideRealHostActivityOrUnderlyingStop() {
+        val f = Evidence()
+        f.events = listOf(ForegroundUsageEvent("online", "online.Main", 100, 1),
+            ForegroundUsageEvent("online", "online.Main", 101, 2),
+            ForegroundUsageEvent("self", QuickRuleContract.ACTIVITY_CLASS, 102, 1),
+            ForegroundUsageEvent("online", "online.Main", 103, 23))
+        assertNull(f.usage.detect())
+        QuickRuleOverlayState.entered()
+        try {
+            f.resume("self", "self.Main", 104)
+            assertEquals("self.Main", f.usage.detect()!!.activityName)
+        } finally { QuickRuleOverlayState.left() }
     }
 
     @Test fun duplicateQueriesAndClockRollbackDoNotRevivePreviousEpoch() {

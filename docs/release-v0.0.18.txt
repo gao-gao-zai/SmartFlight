@@ -9,6 +9,7 @@ SmartFlight 0.0.18（待正式签名发行）
 发行说明草稿
 - 修复前台应用检测把非 Activity 覆盖窗口、未知状态和源断连当成应用离开的风险。
   联网应用长留不会仅因证据过期触发断网；真实离开仍按规则和完整倒计时判断。
+- 修复快捷规则透明编辑器暂停底层 Activity 后丢失前台证据的问题；真实切换、停止或权限失效仍清除证据。
 - 修复旧 probe / 到期事件影响新计时、快速返回再离开沿用旧截止时间、重复启动重置计时等竞态。
 - 修复旧网络回调跨注册生效、被动读回覆盖新动作快照，以及取消后恢复记忆或 UI 状态不准确的问题。
 - 强化 Root / Shizuku 阻塞等待、取消和输出边界；增加 Wi-Fi 下移动数据设置变化的观察入口。
@@ -16,7 +17,8 @@ SmartFlight 0.0.18（待正式签名发行）
 验证与边界
 - 修复提交 2078e48946d7f28d09505549d8841323a89e0078：221/221 JVM tests，lint 0 error / 18 warnings，
   636 对中英文资源检查通过；Debug / androidTest APK 构建及调试签名核验通过。
-- 版本更新后再次运行完整 JVM / lint / Debug / androidTest APK 构建；以 PR 和 master 的
+- Android 15 CI 揭示的透明编辑器回归修复后：224/224 JVM tests、完整 lint / Debug / androidTest APK 构建通过。
+  以 PR 和 master 的
   GitHub Actions 结果为最终 CI 证据。完整回归范围见 cloud-runtime-regression-report.txt。
 - 真实 Root / Shizuku 授权、Binder、Doze、OEM 覆盖窗口及双卡移动数据仍需目标设备复核。
   JVM 模拟或 Android 模拟器通过不代表真实设备全部已验证，不承诺没有隐藏 bug。

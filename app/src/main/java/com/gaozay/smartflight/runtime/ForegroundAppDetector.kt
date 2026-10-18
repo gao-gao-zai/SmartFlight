@@ -1,6 +1,6 @@
 package com.gaozay.smartflight.runtime
 
-import com.gaozay.smartflight.quickrule.isQuickRuleWindow
+import com.gaozay.smartflight.quickrule.isQuickRuleOverlay
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
@@ -58,6 +58,8 @@ class ForegroundAppDetector internal constructor(
     private var cursorMillis = (clock() - INITIAL_LOOKBACK_MILLIS).coerceAtLeast(0)
     private val cursorKeys = mutableSetOf<String>()
     private var lastKnown: ForegroundAppInfo? = null
+    private var pausedForeground: ForegroundAppInfo? = null
+    private var quickRuleCovering = false
     private var lastQueryMillis = 0L
     private var permissionLost = false
     @Volatile var latestLifecycleTimestampMillis: Long = 0L
@@ -66,7 +68,10 @@ class ForegroundAppDetector internal constructor(
     fun hasPermission(): Boolean = runCatching(permission).getOrDefault(false)
 
     @Synchronized
-    fun invalidateActivityConfirmation() { lastKnown = lastKnown?.withoutActivityConfirmation() }
+    fun invalidateActivityConfirmation() {
+        lastKnown = lastKnown?.withoutActivityConfirmation()
+        pausedForeground = pausedForeground?.withoutActivityConfirmation()
+    }
 
     @Synchronized
     override fun detect(): ForegroundAppInfo? {
@@ -77,6 +82,8 @@ class ForegroundAppDetector internal constructor(
             // system service may disappear. Neither failure proves an app exit.
             permissionLost = true
             lastKnown = null
+            pausedForeground = null
+            quickRuleCovering = false
             latestLifecycleTimestampMillis = 0L
             null
         }
@@ -87,6 +94,8 @@ class ForegroundAppDetector internal constructor(
         if (!hasPermission()) {
             permissionLost = true
             lastKnown = null
+            pausedForeground = null
+            quickRuleCovering = false
             latestLifecycleTimestampMillis = 0L
             return null
         }
@@ -96,6 +105,8 @@ class ForegroundAppDetector internal constructor(
             cursorMillis = (now - INITIAL_LOOKBACK_MILLIS).coerceAtLeast(0)
             cursorKeys.clear()
             lastKnown = null
+            pausedForeground = null
+            quickRuleCovering = false
             latestLifecycleTimestampMillis = 0L
             permissionLost = false
         }
@@ -107,24 +118,46 @@ class ForegroundAppDetector internal constructor(
             val key = "${event.eventType}:${event.packageName}:${event.className}"
             if (!cursorKeys.add(key)) continue
             val pkg = event.packageName?.takeIf { it.isNotBlank() } ?: continue
-            if (isQuickRuleWindow(pkg, event.className, selfPackageName)) continue
+            if (isQuickRuleOverlay(pkg, event.className, selfPackageName)) {
+                if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                    // Our translucent editor can pause the underlying Activity.
+                    // Restore only the immediately paused, not stopped, candidate.
+                    lastKnown = lastKnown ?: pausedForeground
+                    pausedForeground = null
+                    quickRuleCovering = true
+                } else if (event.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
+                    event.eventType == UsageEvents.Event.ACTIVITY_STOPPED) {
+                    quickRuleCovering = false
+                }
+                continue
+            }
             // ACTIVITY_RESUMED has the same value as MOVE_TO_FOREGROUND on API 26-28.
             if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
                 val name = resolve(pkg, event.className) ?: normalizeActivityName(pkg, event.className)
                 val info = ForegroundAppInfo(pkg, label(pkg), event.timeStamp, name,
                     ForegroundInfoSource.UsageStats, name != null, now)
                 lastKnown = info
+                pausedForeground = null
+                quickRuleCovering = false
                 latestLifecycleTimestampMillis = event.timeStamp
                 observations.publishEntry(info)
-            } else if ((event.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
-                    event.eventType == UsageEvents.Event.ACTIVITY_STOPPED) &&
-                lastKnown?.packageName == pkg &&
-                (lastKnown?.activityName == null || event.className.isNullOrBlank() ||
-                    normalizeActivityName(pkg, event.className) == lastKnown?.activityName ||
-                    resolve(pkg, event.className) == lastKnown?.activityName)
-            ) {
-                lastKnown = null
-                latestLifecycleTimestampMillis = event.timeStamp
+            } else if (event.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
+                event.eventType == UsageEvents.Event.ACTIVITY_STOPPED) {
+                val candidate = lastKnown ?: pausedForeground
+                if (candidate?.packageName == pkg &&
+                    (candidate.activityName == null || event.className.isNullOrBlank() ||
+                        normalizeActivityName(pkg, event.className) == candidate.activityName ||
+                        resolve(pkg, event.className) == candidate.activityName)) {
+                    if (event.eventType == UsageEvents.Event.ACTIVITY_PAUSED) {
+                        pausedForeground = candidate
+                        lastKnown = candidate.takeIf { quickRuleCovering }
+                    } else {
+                        lastKnown = null
+                        pausedForeground = null
+                        quickRuleCovering = false
+                    }
+                    latestLifecycleTimestampMillis = event.timeStamp
+                }
             }
         }
         return lastKnown?.copy(verifiedAtMillis = now).also { lastKnown = it }
