@@ -151,9 +151,30 @@ class DisconnectAutomationHandlerTest : LocalizedStringsTest() {
         assertFalse(fixture.scheduler.isScreenOffDisconnectActive)
     }
 
+    @Test
+    fun wallClockMovementBetweenReadsCannotShortenANewExitCountdown() = runTest {
+        var wallMillis = 1_000L
+        val fixture = fixture(this, RuntimeSnapshot(isAirplaneModeEnabled = false),
+            wallTimeMillis = { wallMillis.also { wallMillis += 5_000L } })
+        val state = RuntimeState(settings = UserSettings(automationEnabled = true),
+            lastTargetAppActive = false,
+            lastKnownForegroundApp = ForegroundAppInfo("offline.app", "Offline", 1_000L))
+        fixture.appExitHandler.schedule(state, fixture.scheduler, "fresh exit", 30)
+        runCurrent()
+        advanceTimeBy(29_999L); runCurrent()
+        assertTrue("A new decision must retain the full monotonic delay", fixture.events.isEmpty())
+        wallMillis = Long.MAX_VALUE / 2
+        advanceTimeBy(1L); runCurrent()
+        assertEquals(1, fixture.events.size)
+        fixture.appExitHandler.handleDue(state, fixture.scheduler,
+            fixture.events.single() as RuntimeEvent.AppExitDisconnectDue)
+        assertEquals(listOf(true), fixture.accessRepository.disconnectedRequests)
+    }
+
     private fun fixture(
         scope: TestScope,
         snapshot: RuntimeSnapshot,
+        wallTimeMillis: () -> Long = System::currentTimeMillis,
     ): Fixture {
         val runtimeStatusRepository = FakeRuntimeStatusRepository(snapshot)
         val reporter = RuntimeSnapshotReporter(runtimeStatusRepository)
@@ -171,11 +192,13 @@ class DisconnectAutomationHandlerTest : LocalizedStringsTest() {
             promptNotifier = NoOpRuntimePromptNotifier(),
             expectedNetworkChangeTracker = RuntimeExpectedNetworkChangeTracker(),
         )
+        val appExitHandler = AppExitDisconnectHandler(accessRepository, reporter, networkExecutor, wallTimeMillis)
         return Fixture(
             runtimeStatusRepository = runtimeStatusRepository,
             accessRepository = accessRepository,
             scheduler = scheduler,
             events = events,
+            appExitHandler = appExitHandler,
             handler = DisconnectAutomationHandler(
                 screenOffDisconnectHandler = ScreenOffDisconnectHandler(
                     accessRepository = accessRepository,
@@ -183,11 +206,7 @@ class DisconnectAutomationHandlerTest : LocalizedStringsTest() {
                     reporter = reporter,
                     networkChangeExecutor = networkExecutor,
                 ),
-                appExitDisconnectHandler = AppExitDisconnectHandler(
-                    accessRepository = accessRepository,
-                    reporter = reporter,
-                    networkChangeExecutor = networkExecutor,
-                ),
+                appExitDisconnectHandler = appExitHandler,
             ),
         )
     }
@@ -197,6 +216,7 @@ class DisconnectAutomationHandlerTest : LocalizedStringsTest() {
         val accessRepository: FakeAccessRepository,
         val scheduler: RuntimeTaskScheduler,
         val events: MutableList<RuntimeEvent>,
+        val appExitHandler: AppExitDisconnectHandler,
         val handler: DisconnectAutomationHandler,
     )
 }

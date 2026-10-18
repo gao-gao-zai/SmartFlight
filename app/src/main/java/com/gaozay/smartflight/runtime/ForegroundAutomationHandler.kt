@@ -181,9 +181,6 @@ class ForegroundAutomationHandler @Inject constructor(
                     scheduler = scheduler,
                     reason = action.reason,
                     delaySeconds = action.delaySeconds,
-                    // Rule edits can change online status without a new resume.
-                    // Start the delay when that change is actually observed.
-                    baseTimestampMillis = System.currentTimeMillis(),
                 )
             }
             is ForegroundAction.CancelScheduledDisconnect -> {
