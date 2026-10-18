@@ -11,17 +11,23 @@ import com.gaozay.smartflight.settings.isAutomationEffectivelyEnabled
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 
-class AppExitDisconnectHandler @Inject constructor(
+class AppExitDisconnectHandler internal constructor(
     private val accessRepository: AccessRepository,
     private val reporter: RuntimeSnapshotReporter,
     private val networkChangeExecutor: RuntimeNetworkChangeExecutor,
+    private val wallTimeMillis: () -> Long,
 ) {
+    @Inject constructor(
+        accessRepository: AccessRepository,
+        reporter: RuntimeSnapshotReporter,
+        networkChangeExecutor: RuntimeNetworkChangeExecutor,
+    ) : this(accessRepository, reporter, networkChangeExecutor, System::currentTimeMillis)
+
     suspend fun schedule(
         state: RuntimeState,
         scheduler: RuntimeTaskScheduler,
         reason: String,
         delaySeconds: Int,
-        baseTimestampMillis: Long = System.currentTimeMillis(),
     ) {
         val runtimeSnapshot = reporter.snapshot.first()
         val currentSettings = state.settings
@@ -34,12 +40,12 @@ class AppExitDisconnectHandler @Inject constructor(
             Log.d(LOG_TAG, "skip app-exit schedule: job already active")
             return
         }
-        val delayMillis = DisconnectDelayCalculator.remainingDelayMillis(
-            delaySeconds = delaySeconds,
-            baseTimestampMillis = baseTimestampMillis,
-            nowMillis = System.currentTimeMillis(),
-        )
-        val executeAtMillis = System.currentTimeMillis() + delayMillis
+        // Every accepted exit/rule edit starts a fresh full countdown. Wall time
+        // is only a display timestamp; elapsed time and clock corrections must
+        // not shorten the monotonic task's duration.
+        val delayMillis = delaySeconds.coerceAtLeast(0) * 1_000L
+        val nowMillis = wallTimeMillis()
+        val executeAtMillis = nowMillis + delayMillis
         reporter.update { snapshot ->
             snapshot.copy(
                 isAppExitDisconnectScheduled = true,
@@ -47,12 +53,12 @@ class AppExitDisconnectHandler @Inject constructor(
                 lastAction = ExecutionAction.ScheduleAppExitDisconnect,
                 lastTriggerSource = TriggerSource.AppForegroundChanged,
                 lastActionResult = ExecutionResult.Pending,
-                updatedAtMillis = System.currentTimeMillis(),
+                updatedAtMillis = nowMillis,
             )
         }
         Log.d(
             LOG_TAG,
-            "scheduled app-exit disconnect delay=${delaySeconds}s base=$baseTimestampMillis now=${System.currentTimeMillis()} remainingMs=$delayMillis executeAt=$executeAtMillis reason=$reason",
+            "scheduled app-exit disconnect delay=${delaySeconds}s now=$nowMillis remainingMs=$delayMillis executeAt=$executeAtMillis reason=$reason",
         )
         scheduler.scheduleAppExitDisconnect(delayMillis)
     }

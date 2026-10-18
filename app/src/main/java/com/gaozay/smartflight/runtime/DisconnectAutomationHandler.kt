@@ -26,14 +26,12 @@ class DisconnectAutomationHandler @Inject constructor(
         scheduler: RuntimeTaskScheduler,
         reason: String,
         delaySeconds: Int,
-        baseTimestampMillis: Long = System.currentTimeMillis(),
     ) {
         appExitDisconnectHandler.schedule(
             state = state,
             scheduler = scheduler,
             reason = reason,
             delaySeconds = delaySeconds,
-            baseTimestampMillis = baseTimestampMillis,
         )
     }
 

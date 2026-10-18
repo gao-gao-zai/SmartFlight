@@ -1,0 +1,28 @@
+SmartFlight 合并后 CI 的完整计时补充修复（2026-10-18 UTC）
+
+PR #7 已通过 224 JVM tests、Android 15 的 22 项 instrumentation 和优化 Preview smoke，
+并正常 squash 合入 master 91014554b71e1b4e5dc5d5ceddc1d91b2a190e64。
+PR CI: https://github.com/gao-gao-zai/SmartFlight/actions/runs/39100538332
+该 master 的 CI 39101182261 中 emulator 成功，但 android job 的
+RuntimeEventLoopRegressionTest.exitDelayEditRestartsFullCountdownAndDisablingCancelsIt 失败。
+
+原因和修复
+- 新离开决定/延迟修改已按策略开始完整计时，但 AppExitDisconnectHandler 仍从完整时长
+  扣除调用方采集墙上时钟到读取网络快照后的墙上时钟差值。两次读取间隔会让精确边界测试
+  不稳定；系统校时或较慢读取也可能显著扣短实际等待。
+- 删除这条路径的旧 baseTimestamp 参数；直接将配置的非负完整时长交给单调时钟 Scheduler。
+  墙上时钟只生成 UI 的预计执行时间，使用一次采样。
+- 注入仅用于测试的时钟边界，保留 Hilt 的原有三依赖构造器。
+
+验证
+- 新增生产 Handler 测试：时钟读取每次前进 5 秒；30 秒新计时在 29,999ms 前不得发 Due，
+  30,000ms 才执行；随后墙上时钟大幅跳变也不改变到期条件。
+- 保留原先计时扣减逻辑并加入可控时钟时，该测试稳定失败；应用修复后通过。
+  没有调整原失败事件循环测试的断言、容差或延迟来隐藏失败。
+- 完整本地 testDebugUnitTest / lintDebug / lintRelease / assembleDebug /
+  assembleDebugAndroidTest / assembleRelease 成功，150 tasks（44 executed / 106 up-to-date），1m23s。
+- 35 suites，225 tests，0 failures / errors / skipped；两种 lint 各 0 errors / 18 warnings。
+- 最终远端结果须跟踪本补充 PR 及合并后 master 的完整 CI；旧 master 的失败不能记为通过。
+
+没有设备安装、正式签名、tag 或 Release。新上传签名文件的使用授权已经收到，
+但指定构建云端尚未取得可读文件；传输缺项见 release-v0.0.18.txt。

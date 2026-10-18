@@ -11,6 +11,7 @@ SmartFlight 0.0.18（待正式签名发行）
   联网应用长留不会仅因证据过期触发断网；真实离开仍按规则和完整倒计时判断。
 - 修复快捷规则透明编辑器暂停底层 Activity 后丢失前台证据的问题；真实切换、停止或权限失效仍清除证据。
 - 修复旧 probe / 到期事件影响新计时、快速返回再离开沿用旧截止时间、重复启动重置计时等竞态。
+- 新离开决定和延迟修改使用完整单调计时，墙上时钟读取间隔或校时不再扣短等待时间。
 - 修复旧网络回调跨注册生效、被动读回覆盖新动作快照，以及取消后恢复记忆或 UI 状态不准确的问题。
 - 强化 Root / Shizuku 阻塞等待、取消和输出边界；增加 Wi-Fi 下移动数据设置变化的观察入口。
 
@@ -18,8 +19,8 @@ SmartFlight 0.0.18（待正式签名发行）
 - 修复提交 2078e48946d7f28d09505549d8841323a89e0078：221/221 JVM tests，lint 0 error / 18 warnings，
   636 对中英文资源检查通过；Debug / androidTest APK 构建及调试签名核验通过。
 - Android 15 CI 揭示的透明编辑器回归修复后：224/224 JVM tests、完整 lint / Debug / androidTest APK 构建通过。
-  以 PR 和 master 的
-  GitHub Actions 结果为最终 CI 证据。完整回归范围见 cloud-runtime-regression-report.txt。
+  合并后 CI 又发现墙上时钟读数间隔会扣短新计时；可控时钟回归先失败再修复，
+  修复后 225/225 JVM tests 通过。以最终 PR 和 master 的 GitHub Actions 结果为最终 CI 证据。完整回归范围见 cloud-runtime-regression-report.txt。
 - 真实 Root / Shizuku 授权、Binder、Doze、OEM 覆盖窗口及双卡移动数据仍需目标设备复核。
   JVM 模拟或 Android 模拟器通过不代表真实设备全部已验证，不承诺没有隐藏 bug。
 
@@ -29,6 +30,8 @@ SmartFlight 0.0.18（待正式签名发行）
 - 历史 build/release-v0.0.17-20261007 上的 build-release.yml 明确构建 UNSIGNED APK，
   并声明现有 release keystore 必须在本地签名；它不是受保护正式签名工作流。
 - 本云端无 keystore.properties，未读取、下载或复制任何历史聊天签名秘密，也未生成替代正式密钥。
+- 用户已授权本轮新上传的两份文件仅用于本次云端签名；当前下载通道返回代理 CONNECT 403，
+  默认文件工具给出的宿主路径在指定构建云端不存在。缺项是文件传输，授权无需重复确认。
 - 应使用已有正式密钥的受保护签名流程完成两种 ABI 签名，然后核对已公开 v0.0.17 的
   包名、证书、版本升级条件。没有通过这些核验前，不创建 tag、不发布 GitHub Release，
   不把 Debug / Preview / UNSIGNED APK 当作正式安装包。
