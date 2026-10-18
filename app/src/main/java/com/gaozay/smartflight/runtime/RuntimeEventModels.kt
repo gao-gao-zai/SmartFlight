@@ -18,7 +18,7 @@ sealed interface RuntimeEvent {
     data object ScreenOff : RuntimeEvent
     data object ScreenOn : RuntimeEvent
     data object UserUnlocked : RuntimeEvent
-    data object ForegroundProbeTick : RuntimeEvent
+    data class ForegroundProbeTick(val generation: Long) : RuntimeEvent
     data class ForegroundAppChanged(val foregroundApp: ForegroundAppInfo) : RuntimeEvent
     data object ForegroundEventSourceChanged : RuntimeEvent
     data class SettingsChanged(val settings: UserSettings) : RuntimeEvent
@@ -27,7 +27,7 @@ sealed interface RuntimeEvent {
     ) : RuntimeEvent
     data class ActivityRulesChanged(val rules: List<ActivityRuntimeRule>) : RuntimeEvent
     data object NetworkChanged : RuntimeEvent
-    data object TemporaryDisableExpired : RuntimeEvent
+    data class TemporaryDisableExpired(val generation: Long) : RuntimeEvent
     data class ScreenOffDisconnectDue(val task: DisconnectTaskToken) : RuntimeEvent
     data class AppExitDisconnectDue(val task: DisconnectTaskToken) : RuntimeEvent
 }
@@ -38,14 +38,14 @@ fun RuntimeEvent.nameForLog(): String = when (this) {
     RuntimeEvent.ScreenOff -> "ScreenOff"
     RuntimeEvent.ScreenOn -> "ScreenOn"
     RuntimeEvent.UserUnlocked -> "UserUnlocked"
-    RuntimeEvent.ForegroundProbeTick -> "ForegroundProbeTick"
+    is RuntimeEvent.ForegroundProbeTick -> "ForegroundProbeTick"
     is RuntimeEvent.ForegroundAppChanged -> "ForegroundAppChanged"
     RuntimeEvent.ForegroundEventSourceChanged -> "ForegroundEventSourceChanged"
     is RuntimeEvent.SettingsChanged -> "SettingsChanged"
     is RuntimeEvent.AppsChanged -> "AppsChanged"
     is RuntimeEvent.ActivityRulesChanged -> "ActivityRulesChanged"
     RuntimeEvent.NetworkChanged -> "NetworkChanged"
-    RuntimeEvent.TemporaryDisableExpired -> "TemporaryDisableExpired"
+    is RuntimeEvent.TemporaryDisableExpired -> "TemporaryDisableExpired"
     is RuntimeEvent.ScreenOffDisconnectDue -> "ScreenOffDisconnectDue"
     is RuntimeEvent.AppExitDisconnectDue -> "AppExitDisconnectDue"
 }
@@ -77,3 +77,10 @@ fun List<InstalledAppEntity>.toRuntimeRuleMap(): Map<String, AppRuntimeRuleInfo>
             sourceTag = app.sourceTag(),
         )
     }
+
+/** Changes accepted while a Due waits must be evaluated before destructive work. */
+internal fun RuntimeEvent.affectsDisconnectDecision(): Boolean = when (this) {
+    is RuntimeEvent.Started, is RuntimeEvent.Stopped,
+    is RuntimeEvent.AppExitDisconnectDue, is RuntimeEvent.ScreenOffDisconnectDue -> false
+    else -> true
+}

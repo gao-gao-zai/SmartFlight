@@ -11,6 +11,7 @@ import rikka.shizuku.Shizuku
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Singleton
 class ShizukuServiceManager @Inject constructor(
@@ -35,11 +36,14 @@ class ShizukuServiceManager @Inject constructor(
             .processNameSuffix("smartflight_shizuku")
 
         return suspendCancellableCoroutine { continuation ->
+            val delivered = AtomicBoolean(false)
             val connection = object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                     val binder = IShizukuCommandService.Stub.asInterface(service)
-                    commandService = binder
-                    continuation.resume(binder)
+                    if (delivered.compareAndSet(false, true)) {
+                        commandService = binder
+                        continuation.resume(binder)
+                    }
                 }
 
                 override fun onServiceDisconnected(name: ComponentName?) {
@@ -47,10 +51,14 @@ class ShizukuServiceManager @Inject constructor(
                 }
             }
 
+            continuation.invokeOnCancellation {
+                delivered.set(true)
+                runCatching { Shizuku.unbindUserService(args, connection, false) }
+            }
             runCatching {
                 Shizuku.bindUserService(args, connection)
             }.onFailure {
-                continuation.resume(null)
+                if (delivered.compareAndSet(false, true)) continuation.resume(null)
             }
         }
     }

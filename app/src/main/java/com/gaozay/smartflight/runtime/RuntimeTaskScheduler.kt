@@ -20,6 +20,10 @@ class RuntimeTaskScheduler(
     private var screenOffDisconnectJob: Job? = null
     private var appExitDisconnectJob: Job? = null
     private var temporaryDisableExpiryJob: Job? = null
+    private var foregroundGeneration = 0L
+    private var foregroundTask: Long? = null
+    private var expiryGeneration = 0L
+    private var expiryTask: Long? = null
     private var disconnectGeneration = 0L
     private var appExitTask: DisconnectTaskToken? = null
     private var screenOffTask: DisconnectTaskToken? = null
@@ -48,31 +52,43 @@ class RuntimeTaskScheduler(
             return
         }
         val delayMillis = if (immediate) 0L else foregroundProbeIntervalMillis(state.screenState)
-        foregroundProbeJob = schedule(delayMillis, RuntimeEvent.ForegroundProbeTick)
+        val generation = ++foregroundGeneration
+        foregroundTask = generation
+        foregroundProbeJob = schedule(delayMillis, RuntimeEvent.ForegroundProbeTick(generation))
     }
 
-    fun markForegroundProbeConsumed() {
+    fun markForegroundProbeConsumed(event: RuntimeEvent.ForegroundProbeTick): Boolean {
+        if (foregroundTask != event.generation) return false
+        foregroundTask = null
         foregroundProbeJob = null
+        return true
     }
 
     fun cancelForegroundProbe() {
+        foregroundTask = null
         foregroundProbeJob?.cancel()
         foregroundProbeJob = null
     }
 
     fun scheduleTemporaryDisableExpiry(untilMillis: Long) {
-        temporaryDisableExpiryJob?.cancel()
+        cancelTemporaryDisableExpiry()
+        val generation = ++expiryGeneration
+        expiryTask = generation
         temporaryDisableExpiryJob = schedule(
             delayMillis = (untilMillis - System.currentTimeMillis()).coerceAtLeast(0L),
-            event = RuntimeEvent.TemporaryDisableExpired,
+            event = RuntimeEvent.TemporaryDisableExpired(generation),
         )
     }
 
-    fun markTemporaryDisableExpiryConsumed() {
+    fun markTemporaryDisableExpiryConsumed(event: RuntimeEvent.TemporaryDisableExpired): Boolean {
+        if (expiryTask != event.generation) return false
+        expiryTask = null
         temporaryDisableExpiryJob = null
+        return true
     }
 
     fun cancelTemporaryDisableExpiry() {
+        expiryTask = null
         temporaryDisableExpiryJob?.cancel()
         temporaryDisableExpiryJob = null
     }

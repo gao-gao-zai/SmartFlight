@@ -7,6 +7,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -18,11 +22,17 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
+interface RuntimeEnvironmentSource {
+    suspend fun refreshSnapshot()
+    fun register(onNetworkChanged: () -> Unit)
+    fun unregister()
+}
+
 @Singleton
 class RuntimeEnvironmentMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
     private val runtimeStatusRepository: RuntimeStatusRepository,
-) {
+) : RuntimeEnvironmentSource {
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -33,56 +43,81 @@ class RuntimeEnvironmentMonitor @Inject constructor(
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile
     private var radioReceiver: BroadcastReceiver? = null
-    @Volatile
-    private var changeListener: (() -> Unit)? = null
+    private val callbackGate = RuntimeCallbackGate()
+    private var mobileDataObserver: ContentObserver? = null
 
-    suspend fun refreshSnapshot() {
+    override suspend fun refreshSnapshot() {
         applySnapshot()
     }
 
-    fun register(onNetworkChanged: () -> Unit) {
-        changeListener = onNetworkChanged
+    @Synchronized
+    override fun register(onNetworkChanged: () -> Unit) {
+        unregister()
+        val registration = callbackGate.register(onNetworkChanged)
         if (networkCallback == null) {
             val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    notifyChanged(this)
+                    callbackGate.dispatch(registration)
                 }
 
                 override fun onLost(network: Network) {
-                    notifyChanged(this)
+                    callbackGate.dispatch(registration)
                 }
 
                 override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                    notifyChanged(this)
+                    callbackGate.dispatch(registration)
                 }
             }
             networkCallback = callback
-            connectivityManager.registerDefaultNetworkCallback(callback)
+            try {
+                connectivityManager.registerDefaultNetworkCallback(callback)
+            } catch (error: RuntimeException) {
+                unregister()
+                throw error
+            }
         }
         if (radioReceiver == null) {
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
-                    if (radioReceiver === this) {
-                        changeListener?.invoke()
-                    }
+                    callbackGate.dispatch(registration)
                 }
             }
             radioReceiver = receiver
-            ContextCompat.registerReceiver(
-                context,
-                receiver,
-                IntentFilter().apply {
-                    addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
-                    addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
-                    addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
-                },
-                ContextCompat.RECEIVER_NOT_EXPORTED,
-            )
+            try {
+                ContextCompat.registerReceiver(
+                    context,
+                    receiver,
+                    IntentFilter().apply {
+                        addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
+                        addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+                        addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
+                    },
+                    ContextCompat.RECEIVER_NOT_EXPORTED,
+                )
+            } catch (error: RuntimeException) {
+                unregister()
+                throw error
+            }
+        }
+
+        // Mobile data can change while Wi-Fi remains the default network.
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) { callbackGate.dispatch(registration) }
+        }
+        mobileDataObserver = observer
+        try {
+            context.contentResolver.registerContentObserver(Settings.Global.getUriFor("mobile_data"), false, observer)
+        } catch (error: RuntimeException) {
+            mobileDataObserver = null
+            Log.w("SmartFlightRuntime", "Mobile-data state observer unavailable", error)
         }
     }
 
-    fun unregister() {
-        changeListener = null
+    @Synchronized
+    override fun unregister() {
+        callbackGate.clear()
+        mobileDataObserver?.let { runCatching { context.contentResolver.unregisterContentObserver(it) } }
+        mobileDataObserver = null
         val previousCallback = networkCallback
         val previousReceiver = radioReceiver
         networkCallback = null
@@ -91,14 +126,7 @@ class RuntimeEnvironmentMonitor @Inject constructor(
         previousReceiver?.let { runCatching { context.unregisterReceiver(it) } }
     }
 
-    // Callbacks only enqueue work. Updating here would erase the coordinator's
-    // previous snapshot before it can check for an unexpected external change.
-    private fun notifyChanged(callback: ConnectivityManager.NetworkCallback) {
-        if (networkCallback === callback) {
-            changeListener?.invoke()
-        }
-    }
-
+    // Callbacks enqueue work; only the coordinator refreshes the snapshot.
     private suspend fun applySnapshot() {
         val airplaneModeEnabled = Settings.Global.getInt(
             context.contentResolver,

@@ -25,13 +25,37 @@ data class ForegroundAppInfo(
 
 interface ForegroundAppSource { fun detect(): ForegroundAppInfo? }
 
+internal data class ForegroundUsageEvent(val packageName: String?, val className: String?, val timeStamp: Long, val eventType: Int)
+
 @Singleton
-class ForegroundAppDetector @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val resolver: DeclaredActivityResolver,
+class ForegroundAppDetector internal constructor(
+    private val selfPackageName: String,
+    private val resolve: (String, String?) -> String?,
     private val observations: ForegroundObservationStore,
+    private val permission: () -> Boolean,
+    private val query: (Long, Long) -> Sequence<ForegroundUsageEvent>?,
+    private val label: (String) -> String,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : ForegroundAppSource {
-    private var cursorMillis = (System.currentTimeMillis() - INITIAL_LOOKBACK_MILLIS).coerceAtLeast(0)
+    @Inject constructor(
+        @ApplicationContext context: Context,
+        resolver: DeclaredActivityResolver,
+        observations: ForegroundObservationStore,
+    ) : this(context.packageName, resolver::resolve, observations, { usagePermission(context) },
+        { from, to ->
+            val manager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            manager.queryEvents(from, to)?.let { events -> sequence {
+                val event = UsageEvents.Event()
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    yield(ForegroundUsageEvent(event.packageName, event.className, event.timeStamp, event.eventType))
+                }
+            } }
+        }, { pkg -> kotlin.runCatching {
+            @Suppress("DEPRECATION")
+            context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0)).toString()
+        }.getOrDefault(pkg) })
+    private var cursorMillis = (clock() - INITIAL_LOOKBACK_MILLIS).coerceAtLeast(0)
     private val cursorKeys = mutableSetOf<String>()
     private var lastKnown: ForegroundAppInfo? = null
     private var lastQueryMillis = 0L
@@ -39,15 +63,7 @@ class ForegroundAppDetector @Inject constructor(
     @Volatile var latestLifecycleTimestampMillis: Long = 0L
         private set
 
-    fun hasPermission(): Boolean = try {
-        val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = if (Build.VERSION.SDK_INT >= 29) ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-        else {
-            @Suppress("DEPRECATION")
-            ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-        }
-        mode == AppOpsManager.MODE_ALLOWED
-    } catch (_: RuntimeException) { false }
+    fun hasPermission(): Boolean = runCatching(permission).getOrDefault(false)
 
     @Synchronized
     fun invalidateActivityConfirmation() { lastKnown = lastKnown?.withoutActivityConfirmation() }
@@ -67,7 +83,7 @@ class ForegroundAppDetector @Inject constructor(
     }
 
     private fun detectAvailableForeground(): ForegroundAppInfo? {
-        val now = System.currentTimeMillis()
+        val now = clock()
         if (!hasPermission()) {
             permissionLost = true
             lastKnown = null
@@ -84,20 +100,17 @@ class ForegroundAppDetector @Inject constructor(
             permissionLost = false
         }
         lastQueryMillis = now
-        val manager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val events = manager.queryEvents(cursorMillis.coerceAtMost(now), now) ?: return null
-        val event = UsageEvents.Event()
-        while (events.hasNextEvent()) {
-            events.getNextEvent(event)
+        val events = query(cursorMillis.coerceAtMost(now), now) ?: return null
+        for (event in events) {
             if (event.timeStamp < cursorMillis) continue
             if (event.timeStamp > cursorMillis) { cursorMillis = event.timeStamp; cursorKeys.clear() }
             val key = "${event.eventType}:${event.packageName}:${event.className}"
             if (!cursorKeys.add(key)) continue
             val pkg = event.packageName?.takeIf { it.isNotBlank() } ?: continue
-            if (isQuickRuleWindow(pkg, event.className, context.packageName)) continue
+            if (isQuickRuleWindow(pkg, event.className, selfPackageName)) continue
             // ACTIVITY_RESUMED has the same value as MOVE_TO_FOREGROUND on API 26-28.
             if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                val name = resolver.resolve(pkg, event.className) ?: normalizeActivityName(pkg, event.className)
+                val name = resolve(pkg, event.className) ?: normalizeActivityName(pkg, event.className)
                 val info = ForegroundAppInfo(pkg, label(pkg), event.timeStamp, name,
                     ForegroundInfoSource.UsageStats, name != null, now)
                 lastKnown = info
@@ -108,7 +121,7 @@ class ForegroundAppDetector @Inject constructor(
                 lastKnown?.packageName == pkg &&
                 (lastKnown?.activityName == null || event.className.isNullOrBlank() ||
                     normalizeActivityName(pkg, event.className) == lastKnown?.activityName ||
-                    resolver.resolve(pkg, event.className) == lastKnown?.activityName)
+                    resolve(pkg, event.className) == lastKnown?.activityName)
             ) {
                 lastKnown = null
                 latestLifecycleTimestampMillis = event.timeStamp
@@ -117,12 +130,17 @@ class ForegroundAppDetector @Inject constructor(
         return lastKnown?.copy(verifiedAtMillis = now).also { lastKnown = it }
     }
 
-    private fun label(pkg: String): String = runCatching {
-        @Suppress("DEPRECATION")
-        context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0)).toString()
-    }.getOrDefault(pkg)
-
     private companion object {
+        fun usagePermission(context: Context): Boolean = try {
+            val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+            val mode = if (Build.VERSION.SDK_INT >= 29) ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
+            else {
+                @Suppress("DEPRECATION")
+                ops.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
+            }
+            mode == AppOpsManager.MODE_ALLOWED
+        } catch (_: RuntimeException) { false }
+
         const val INITIAL_LOOKBACK_MILLIS = 24 * 60 * 60 * 1_000L
     }
 }

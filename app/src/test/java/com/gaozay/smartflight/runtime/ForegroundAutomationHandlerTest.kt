@@ -258,6 +258,20 @@ class ForegroundAutomationHandlerTest : LocalizedStringsTest() {
         fixture.scheduler.cancelForegroundProbe()
     }
 
+    @Test
+    fun queuedOfflineEventCannotImmediatelyCutOffCurrentlyOnlineApp() = runTest {
+        val online = ForegroundAppInfo("online", "Online", 3)
+        val fixture = fixture(online, RuntimeSnapshot(isAirplaneModeEnabled = false))
+        val state = RuntimeState(settings = UserSettings(automationEnabled = true,
+            appExitDisconnectEnabled = true, appExitDelaySeconds = 0, reconnectOnTargetAppLaunch = false),
+            lastTargetAppActive = true,
+            appRulesByPackageName = mapOf("online" to AppRuntimeRuleInfo(true, false, AppOnlineSourceTag.Manual)))
+        val updated = fixture.handler.automationTick(state, fixture.scheduler,
+            foregroundAppOverride = ForegroundAppInfo("offline", "Offline", 2))
+        assertEquals(true, updated.lastTargetAppActive)
+        assertTrue(fixture.accessRepository.disconnectedRequests.isEmpty())
+    }
+
     private fun fixture(
         foregroundApp: ForegroundAppInfo?,
         snapshot: RuntimeSnapshot,

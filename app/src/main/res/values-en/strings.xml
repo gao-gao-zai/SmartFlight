@@ -667,4 +667,5 @@
     <string name="quick_rule_saved">"Rule saved"</string>
     <string name="quick_rule_saving">"Saving…"</string>
     <string name="app_name_preview">"SmartFlight Preview"</string>
+    <string name="network_action_cancelled_state_unknown">Network action cancelled; actual state needs verification</string>
 </resources>

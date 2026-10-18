@@ -34,7 +34,8 @@ class RuntimeTaskSchedulerTest : LocalizedStringsTest() {
         )
         runCurrent()
 
-        assertEquals(listOf(RuntimeEvent.ForegroundProbeTick), events)
+        assertEquals(1, events.size)
+        assertTrue(events.single() is RuntimeEvent.ForegroundProbeTick)
     }
 
     @Test
@@ -62,7 +63,8 @@ class RuntimeTaskSchedulerTest : LocalizedStringsTest() {
         )
         runCurrent()
 
-        assertEquals(listOf(RuntimeEvent.ForegroundProbeTick), events)
+        assertEquals(1, events.size)
+        assertTrue(events.single() is RuntimeEvent.ForegroundProbeTick)
     }
 
     @Test
@@ -220,6 +222,35 @@ class RuntimeTaskSchedulerTest : LocalizedStringsTest() {
                 nowMillis = 2_500L,
             ),
         )
+    }
+
+    @Test
+    fun queuedProbeAndExpiryCannotConsumeReplacementOrSurviveCancelAll() = runTest {
+        val events = mutableListOf<RuntimeEvent>()
+        val scheduler = scheduler(this, events)
+        val state = RuntimeState(settings = com.gaozay.smartflight.settings.UserSettings(automationEnabled = true))
+        val engine = AutomationRuleEngine(ForegroundRuleEvaluator())
+        scheduler.scheduleForegroundProbe(state, engine, true)
+        scheduler.scheduleTemporaryDisableExpiry(0)
+        runCurrent()
+        val oldProbe = events[0] as RuntimeEvent.ForegroundProbeTick
+        val oldExpiry = events[1] as RuntimeEvent.TemporaryDisableExpired
+        scheduler.scheduleForegroundProbe(state, engine, true)
+        scheduler.scheduleTemporaryDisableExpiry(0)
+        assertFalse(scheduler.markForegroundProbeConsumed(oldProbe))
+        assertFalse(scheduler.markTemporaryDisableExpiryConsumed(oldExpiry))
+        runCurrent()
+        val probe = events[2] as RuntimeEvent.ForegroundProbeTick
+        val expiry = events[3] as RuntimeEvent.TemporaryDisableExpired
+        assertTrue(scheduler.markForegroundProbeConsumed(probe))
+        assertFalse(scheduler.markForegroundProbeConsumed(probe))
+        assertTrue(scheduler.markTemporaryDisableExpiryConsumed(expiry))
+        scheduler.scheduleForegroundProbe(state, engine, true)
+        scheduler.scheduleTemporaryDisableExpiry(0)
+        runCurrent()
+        scheduler.cancelAll()
+        assertFalse(scheduler.markForegroundProbeConsumed(events[4] as RuntimeEvent.ForegroundProbeTick))
+        assertFalse(scheduler.markTemporaryDisableExpiryConsumed(events[5] as RuntimeEvent.TemporaryDisableExpired))
     }
 
     private fun scheduler(

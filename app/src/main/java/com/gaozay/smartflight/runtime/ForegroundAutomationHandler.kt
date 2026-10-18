@@ -47,7 +47,8 @@ class ForegroundAutomationHandler @Inject constructor(
             reporter.markForegroundApp(null, currentState.screenState)
             return currentState.copy(lastKnownForegroundApp = null, appExitAwaitingForegroundConfirmation = awaitingConfirmation)
         }
-        val foregroundApp = chooseForegroundUpdate(currentState.lastKnownForegroundApp, candidate)
+        val foregroundApp = if (foregroundAppOverride != null) candidate
+            else chooseForegroundUpdate(currentState.lastKnownForegroundApp, candidate)
         currentState = currentState.copy(lastKnownForegroundApp = foregroundApp ?: currentState.lastKnownForegroundApp)
         reporter.markForegroundApp(foregroundApp, currentState.screenState)
 
@@ -127,7 +128,13 @@ class ForegroundAutomationHandler @Inject constructor(
                 append(decision.reason)
             },
         )
-        currentState = currentState.copy(lastTargetAppActive = decision.targetAppActive, appExitAwaitingForegroundConfirmation = false)
+        currentState = currentState.copy(
+            lastTargetAppActive = decision.targetAppActive,
+            appExitAwaitingForegroundConfirmation = decision.action is ForegroundAction.PauseAutomation &&
+                effectiveSettings.appExitDisconnectEnabled && !decision.targetAppActive &&
+                (currentState.lastTargetAppActive == true || currentState.appExitAwaitingForegroundConfirmation ||
+                    scheduler.isAppExitDisconnectActive),
+        )
 
         when (val action = decision.action) {
             is ForegroundAction.None -> {
@@ -147,6 +154,17 @@ class ForegroundAutomationHandler @Inject constructor(
                 )
             }
             is ForegroundAction.Disconnect -> {
+                if (foregroundAppOverride != null) {
+                    // Queued history can reset an exit delay, but an immediate
+                    // destructive action requires the source's current evidence.
+                    return automationTick(
+                        state = currentState.copy(appExitAwaitingForegroundConfirmation =
+                            "AppExitDisconnect" in decision.matchedRules),
+                        scheduler = scheduler,
+                        triggerSource = triggerSource,
+                        requireForegroundConfirmation = true,
+                    )
+                }
                 scheduler.cancelAppExitDisconnect(reporter, updateRuntimeState = false)
                 networkChangeExecutor.executeNetworkChange(
                     scheduler = scheduler,

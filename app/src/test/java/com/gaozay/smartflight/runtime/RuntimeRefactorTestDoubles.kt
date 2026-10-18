@@ -54,6 +54,8 @@ internal class FakeAccessRepository(
     override val accessGateState: StateFlow<AccessGateState> = mutableAccessGateState
     val disconnectedRequests = mutableListOf<Boolean>()
 
+    fun setAccess(state: AccessGateState) { mutableAccessGateState.value = state }
+
     override suspend fun refresh() = Unit
     override suspend fun setAdbBootstrapped(bootstrapped: Boolean) = Unit
     override suspend fun probeRootAccess() = Unit

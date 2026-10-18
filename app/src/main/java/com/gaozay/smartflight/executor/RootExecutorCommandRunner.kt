@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -50,10 +51,11 @@ class RootExecutorCommandRunner @Inject constructor() : ExecutorCommandRunner {
                 )
             }
             runCatching {
-                activeSession.execute(command)
+                cancellableBlockingCall(onCancel = activeSession::close) { activeSession.execute(command) }
             }.getOrElse {
                 activeSession.close()
                 session = null
+                if (it is CancellationException) throw it
                 ExecutorCommandResult(
                     executorType = ExecutorType.Root,
                     executed = false,
@@ -107,8 +109,9 @@ internal class RootSession(
         writer.flush()
 
         val outputLines = mutableListOf<String>()
+        var outputChars = 0
         while (true) {
-            val line = reader.readLine() ?: break
+            val line = readBoundedLine() ?: break
             if (line.startsWith("$marker:")) {
                 val exitCode = line.substringAfter(':').toIntOrNull()
                 val stdout = outputLines.joinToString("\n").trim()
@@ -124,7 +127,11 @@ internal class RootSession(
                     },
                 )
             }
-            if (outputLines.sumOf { it.length } < 64 * 1024) outputLines += line.take(2048)
+            if (outputChars < 64 * 1024) {
+                val retained = line.take((64 * 1024 - outputChars - 1).coerceAtLeast(0))
+                outputLines += retained
+                outputChars += retained.length + 1
+            }
         }
 
         close()
@@ -134,6 +141,19 @@ internal class RootSession(
             stdout = outputLines.joinToString("\n").trim(),
             summary = AppStrings.get(R.string.root_command_not_executed_su_session_closed),
         )
+    }
+
+    // readLine() can allocate without bound if a command never emits a newline.
+    private fun readBoundedLine(): String? {
+        val line = StringBuilder()
+        var readAny = false
+        while (true) {
+            val value = reader.read()
+            if (value < 0) return if (readAny) line.toString() else null
+            readAny = true
+            if (value == '\n'.code) return line.toString().trimEnd('\r')
+            if (line.length < 2048) line.append(value.toChar())
+        }
     }
 
     fun close() {

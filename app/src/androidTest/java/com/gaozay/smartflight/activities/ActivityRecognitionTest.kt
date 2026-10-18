@@ -79,7 +79,7 @@ class ActivityRecognitionTest {
             assertEquals(ForegroundInfoSource.UsageStats, secondInfo!!.source)
             assertEquals(secondInfo!!.eventTimestampMillis, detector.detect()!!.eventTimestampMillis)
             activityShell("appops set ${context.packageName} GET_USAGE_STATS deny")
-            assertFalse(detector.detect()!!.activityConfirmed)
+            assertNull(detector.detect())
         } finally {
             activityShell("appops set ${context.packageName} GET_USAGE_STATS default")
             activityShell("am force-stop $ACTIVITY_FIXTURE")

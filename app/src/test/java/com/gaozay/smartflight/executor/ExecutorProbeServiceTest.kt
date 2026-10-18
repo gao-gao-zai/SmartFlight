@@ -1,6 +1,7 @@
 package com.gaozay.smartflight.executor
 
 import com.gaozay.smartflight.domain.model.ExecutionResult
+import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.domain.model.NetworkControlMode
 import com.gaozay.smartflight.i18n.LocalizedStringsTest
@@ -17,6 +18,10 @@ import com.gaozay.smartflight.domain.model.UnifiedNetworkState
 import com.gaozay.smartflight.runtime.RuntimeSnapshot
 import com.gaozay.smartflight.settings.UserSettings
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -164,6 +169,50 @@ class ExecutorProbeServiceTest : LocalizedStringsTest() {
         assertEquals(2, logs.logs.size)
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun cancellationAfterAirplaneWriteKeepsRestoreMemoryAndMarksUiUnknown() = runTest {
+        val f = Fixture()
+        val status = FakeRuntimeStatusRepository(RuntimeSnapshot(isAirplaneModeEnabled = false,
+            isMobileDataEnabled = true, lastActionResult = ExecutionResult.Success))
+        f.runner.onWrite = { awaitCancellation() }
+        val action = f.action(status)
+        val pending = launch { action.setDisconnectedState(true, TriggerSource.Manual, "test") }
+        runCurrent()
+        assertTrue(f.runner.airplane)
+        pending.cancelAndJoin()
+        assertNull(status.currentSnapshot.isAirplaneModeEnabled)
+        assertEquals(ExecutionResult.Failed, status.currentSnapshot.lastActionResult)
+        assertEquals(true, status.currentSnapshot.rememberedMobileDataEnabledBeforeAirplaneMode)
+        assertEquals(ExecutionAction.DisconnectNow, status.currentSnapshot.lastAction)
+        assertEquals(TriggerSource.Manual, status.currentSnapshot.lastTriggerSource)
+        AccessRuntimeSnapshotUpdater(status, formatter).updatePassiveAccessSummary(
+            com.gaozay.smartflight.permission.AdvancedAccessState(selectedExecutorType = ExecutorType.Root))
+        assertEquals(ExecutionResult.Failed, status.currentSnapshot.lastActionResult)
+        f.runner.onWrite = null
+        action.setDisconnectedState(false, TriggerSource.Manual, "retry")
+        assertEquals(false, status.currentSnapshot.isAirplaneModeEnabled)
+        assertNull(status.currentSnapshot.rememberedMobileDataEnabledBeforeAirplaneMode)
+    }
+
+    @Test fun alreadyEnabledAirplaneWithoutMemoryDoesNotInventPreviousMobileData() = runTest {
+        val f = Fixture()
+        f.runner.airplane = true
+        f.runner.mobile = false
+        val status = FakeRuntimeStatusRepository(RuntimeSnapshot(isAirplaneModeEnabled = true))
+        f.action(status).setDisconnectedState(true, TriggerSource.Manual, "test")
+        assertNull(status.currentSnapshot.rememberedMobileDataEnabledBeforeAirplaneMode)
+    }
+
+    @Test fun failedMobileWriteDisplaysRequestedActionAndObservedState() = runTest {
+        val f = Fixture(NetworkControlMode.MobileData)
+        f.runner.mutate = false
+        val status = FakeRuntimeStatusRepository(RuntimeSnapshot(isMobileDataEnabled = true))
+        f.action(status).setDisconnectedState(true, TriggerSource.Manual, "test")
+        assertEquals(true, status.currentSnapshot.isMobileDataEnabled)
+        assertEquals(ExecutionAction.DisconnectNow, status.currentSnapshot.lastAction)
+        assertEquals(ExecutionResult.Failed, status.currentSnapshot.lastActionResult)
+    }
+
     private class Fixture(mode: NetworkControlMode = NetworkControlMode.AirplaneMode) {
         val runner = Runner()
         val settings = FakeSettingsRepository(UserSettings(networkControlMode = mode))
@@ -187,6 +236,7 @@ class ExecutorProbeServiceTest : LocalizedStringsTest() {
         var unknownMobileAfterWrite = false
         private var mobileWrote = false
         var waitMillis = 0L
+        var onWrite: (suspend () -> Unit)? = null
         var onRead: (suspend () -> Unit)? = null
         var readsBeforeApply = 0
         private var pendingAirplane: Boolean? = null
@@ -224,6 +274,7 @@ class ExecutorProbeServiceTest : LocalizedStringsTest() {
                             if (readsBeforeApply > 0) pendingAirplane = enabled else airplane = enabled
                         }
                     }
+                    onWrite?.invoke()
                     ""
                 }
             }
