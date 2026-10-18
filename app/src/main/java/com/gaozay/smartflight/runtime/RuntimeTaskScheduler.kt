@@ -1,5 +1,6 @@
 package com.gaozay.smartflight.runtime
 
+import android.os.SystemClock
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
 import com.gaozay.smartflight.domain.model.ScreenState
@@ -13,17 +14,26 @@ class RuntimeTaskScheduler(
     private val scope: CoroutineScope,
     private val send: (RuntimeEvent) -> Unit,
     private val reporter: RuntimeSnapshotReporter,
+    private val monotonicTimeMillis: () -> Long = SystemClock::elapsedRealtime,
 ) {
     private var foregroundProbeJob: Job? = null
     private var screenOffDisconnectJob: Job? = null
     private var appExitDisconnectJob: Job? = null
     private var temporaryDisableExpiryJob: Job? = null
+    private var foregroundGeneration = 0L
+    private var foregroundTask: Long? = null
+    private var expiryGeneration = 0L
+    private var expiryTask: Long? = null
+    private var disconnectGeneration = 0L
+    private var appExitTask: DisconnectTaskToken? = null
+    private var screenOffTask: DisconnectTaskToken? = null
 
+    // A task remains pending while its Due event waits in the serialized event queue.
     val isAppExitDisconnectActive: Boolean
-        get() = appExitDisconnectJob?.isActive == true
+        get() = appExitTask != null
 
     val isScreenOffDisconnectActive: Boolean
-        get() = screenOffDisconnectJob?.isActive == true
+        get() = screenOffTask != null
 
     fun scheduleForegroundProbe(
         state: RuntimeState,
@@ -42,70 +52,103 @@ class RuntimeTaskScheduler(
             return
         }
         val delayMillis = if (immediate) 0L else foregroundProbeIntervalMillis(state.screenState)
-        foregroundProbeJob = schedule(delayMillis, RuntimeEvent.ForegroundProbeTick)
+        val generation = ++foregroundGeneration
+        foregroundTask = generation
+        foregroundProbeJob = schedule(delayMillis, RuntimeEvent.ForegroundProbeTick(generation))
     }
 
-    fun markForegroundProbeConsumed() {
+    fun markForegroundProbeConsumed(event: RuntimeEvent.ForegroundProbeTick): Boolean {
+        if (foregroundTask != event.generation) return false
+        foregroundTask = null
         foregroundProbeJob = null
+        return true
     }
 
     fun cancelForegroundProbe() {
+        foregroundTask = null
         foregroundProbeJob?.cancel()
         foregroundProbeJob = null
     }
 
     fun scheduleTemporaryDisableExpiry(untilMillis: Long) {
-        temporaryDisableExpiryJob?.cancel()
+        cancelTemporaryDisableExpiry()
+        val generation = ++expiryGeneration
+        expiryTask = generation
         temporaryDisableExpiryJob = schedule(
             delayMillis = (untilMillis - System.currentTimeMillis()).coerceAtLeast(0L),
-            event = RuntimeEvent.TemporaryDisableExpired,
+            event = RuntimeEvent.TemporaryDisableExpired(generation),
         )
     }
 
-    fun markTemporaryDisableExpiryConsumed() {
+    fun markTemporaryDisableExpiryConsumed(event: RuntimeEvent.TemporaryDisableExpired): Boolean {
+        if (expiryTask != event.generation) return false
+        expiryTask = null
         temporaryDisableExpiryJob = null
+        return true
     }
 
     fun cancelTemporaryDisableExpiry() {
+        expiryTask = null
         temporaryDisableExpiryJob?.cancel()
         temporaryDisableExpiryJob = null
     }
 
     fun scheduleScreenOffDisconnect(delayMillis: Long) {
-        screenOffDisconnectJob = schedule(delayMillis, RuntimeEvent.ScreenOffDisconnectDue)
+        cancelScreenOffDisconnect()
+        val task = newDisconnectTask(delayMillis)
+        screenOffTask = task
+        screenOffDisconnectJob = schedule(delayMillis, RuntimeEvent.ScreenOffDisconnectDue(task))
     }
 
-    fun markScreenOffDisconnectConsumed() {
+    fun isScreenOffDisconnectDueCurrent(event: RuntimeEvent.ScreenOffDisconnectDue): Boolean =
+        screenOffTask == event.task && monotonicTimeMillis() >= event.task.deadlineMillis
+
+    fun markScreenOffDisconnectConsumed(event: RuntimeEvent.ScreenOffDisconnectDue): Boolean {
+        if (!isScreenOffDisconnectDueCurrent(event)) return false
+        screenOffTask = null
         screenOffDisconnectJob = null
+        return true
     }
 
     fun cancelScreenOffDisconnect(): Boolean {
-        val wasScheduled = screenOffDisconnectJob?.isActive == true
+        val wasScheduled = screenOffTask != null
         screenOffDisconnectJob?.cancel()
         screenOffDisconnectJob = null
+        screenOffTask = null
         return wasScheduled
     }
 
     fun scheduleAppExitDisconnect(delayMillis: Long) {
-        appExitDisconnectJob = schedule(delayMillis, RuntimeEvent.AppExitDisconnectDue)
+        cancelAppExitDisconnect()
+        val task = newDisconnectTask(delayMillis)
+        appExitTask = task
+        appExitDisconnectJob = schedule(delayMillis, RuntimeEvent.AppExitDisconnectDue(task))
     }
 
-    fun markAppExitDisconnectConsumed() {
+    fun isAppExitDisconnectDueCurrent(event: RuntimeEvent.AppExitDisconnectDue): Boolean =
+        appExitTask == event.task && monotonicTimeMillis() >= event.task.deadlineMillis
+
+    fun markAppExitDisconnectConsumed(event: RuntimeEvent.AppExitDisconnectDue): Boolean {
+        if (!isAppExitDisconnectDueCurrent(event)) return false
+        appExitTask = null
         appExitDisconnectJob = null
+        return true
     }
 
     fun cancelAppExitDisconnect(): Boolean {
-        val wasScheduled = appExitDisconnectJob?.isActive == true
+        val wasScheduled = appExitTask != null
         appExitDisconnectJob?.cancel()
         appExitDisconnectJob = null
+        appExitTask = null
         return wasScheduled
     }
 
+    private fun newDisconnectTask(delayMillis: Long): DisconnectTaskToken =
+        DisconnectTaskToken(++disconnectGeneration, monotonicTimeMillis() + delayMillis.coerceAtLeast(0L))
+
     suspend fun clearPendingDisconnects() {
-        screenOffDisconnectJob?.cancel()
-        screenOffDisconnectJob = null
-        appExitDisconnectJob?.cancel()
-        appExitDisconnectJob = null
+        cancelScreenOffDisconnect()
+        cancelAppExitDisconnect()
         reporter.update { snapshot ->
             snapshot.copy(
                 isScreenOffDisconnectScheduled = false,

@@ -16,11 +16,44 @@ class HybridForegroundAppSourceTest : LocalizedStringsTest() {
     }
 
     @Test
-    fun noActivityRulesPreserveTheLowCostAccessibilityPath() {
+    fun autoModeChecksUsageEvenWithoutActivityRulesToRecoverMissedEvents() {
         var calls = 0
         val accessibility = ForegroundAppInfo("same.app", "Same", 1000)
         assertEquals(accessibility, detectHybridForegroundApp(ForegroundMonitorMode.Auto, true, { accessibility }, { calls++; null }))
-        assertEquals(0, calls)
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun autoModeRecoversARealPackageSwitchMissedByAccessibility() {
+        val accessibility = ForegroundAppInfo("online.app", "Online", 1000,
+            "online.app.Main", ForegroundInfoSource.Accessibility, true, 1000)
+        val usage = ForegroundAppInfo("other.app", "Other", 2000,
+            "other.app.Main", ForegroundInfoSource.UsageStats, true, 5000)
+        assertEquals(usage, detectHybridForegroundApp(ForegroundMonitorMode.Auto, true, { accessibility }, { usage }))
+        assertEquals(accessibility, detectHybridForegroundApp(ForegroundMonitorMode.Auto, true,
+            { accessibility }, { usage.copy(eventTimestampMillis = 900) }))
+    }
+
+    @Test
+    fun selectedUsageSourceReplacesNewerEventFromPreviouslySelectedAccessibilitySource() {
+        val accessibility = ForegroundAppInfo("overlay.app", "Overlay", 2000,
+            source = ForegroundInfoSource.Accessibility)
+        val usage = ForegroundAppInfo("online.app", "Online", 1000,
+            source = ForegroundInfoSource.UsageStats, verifiedAtMillis = 5000)
+        val store = ForegroundObservationStore()
+        store.accept(accessibility)
+        val selected = detectHybridForegroundApp(ForegroundMonitorMode.UsageStats, true, { accessibility }, { usage })
+        assertEquals(usage, store.accept(selected))
+    }
+
+    @Test
+    fun usagePauseInvalidatesOlderAccessibilityEvidenceButUnavailableUsageDoesNot() {
+        val accessibility = ForegroundAppInfo("online.app", "Online", 1000,
+            "online.app.Main", ForegroundInfoSource.Accessibility, true, 1000)
+        assertNull(detectHybridForegroundApp(ForegroundMonitorMode.Auto, true, { accessibility }, { null },
+            usageStatsLastTransition = { 2000L }))
+        assertEquals(accessibility, detectHybridForegroundApp(ForegroundMonitorMode.Auto, true, { accessibility }, { null },
+            usageStatsLastTransition = { 0L }))
     }
 
     @Test

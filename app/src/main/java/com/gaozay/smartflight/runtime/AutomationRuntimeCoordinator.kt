@@ -1,6 +1,10 @@
 package com.gaozay.smartflight.runtime
 
 import com.gaozay.smartflight.activities.ActivityRepository
+import com.gaozay.smartflight.activities.ActivityRuntimeRule
+import android.os.SystemClock
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.flow.Flow
 import android.util.Log
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.apps.InstalledAppRepository
@@ -27,27 +31,48 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Singleton
-class AutomationRuntimeCoordinator @Inject constructor(
+class AutomationRuntimeCoordinator internal constructor(
     private val settingsRepository: SettingsRepository,
     private val installedAppRepository: InstalledAppRepository,
-    private val activityRepository: ActivityRepository,
+    private val activityRules: () -> Flow<List<ActivityRuntimeRule>>,
     private val accessRepository: AccessRepository,
     private val automationRuleEngine: AutomationRuleEngine,
-    private val runtimeEnvironmentMonitor: RuntimeEnvironmentMonitor,
-    private val accessibilityForegroundAppTracker: AccessibilityForegroundAppTracker,
-    private val hybridForegroundAppSource: HybridForegroundAppSource,
+    private val runtimeEnvironmentMonitor: RuntimeEnvironmentSource,
+    private val hybridForegroundAppSource: RuntimeForegroundSource,
     private val reporter: RuntimeSnapshotReporter,
     private val foregroundAutomationHandler: ForegroundAutomationHandler,
     private val disconnectAutomationHandler: DisconnectAutomationHandler,
     private val temporaryDisableHandler: TemporaryDisableHandler,
     private val unexpectedNetworkChangeGuard: UnexpectedNetworkChangeGuard,
+    private val scope: CoroutineScope,
+    monotonicTimeMillis: () -> Long = SystemClock::elapsedRealtime,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val events = Channel<RuntimeEvent>(Channel.UNLIMITED)
+    @Inject constructor(
+        settingsRepository: SettingsRepository,
+        installedAppRepository: InstalledAppRepository,
+        activityRepository: ActivityRepository,
+        accessRepository: AccessRepository,
+        automationRuleEngine: AutomationRuleEngine,
+        runtimeEnvironmentMonitor: RuntimeEnvironmentMonitor,
+        hybridForegroundAppSource: HybridForegroundAppSource,
+        reporter: RuntimeSnapshotReporter,
+        foregroundAutomationHandler: ForegroundAutomationHandler,
+        disconnectAutomationHandler: DisconnectAutomationHandler,
+        temporaryDisableHandler: TemporaryDisableHandler,
+        unexpectedNetworkChangeGuard: UnexpectedNetworkChangeGuard,
+    ) : this(settingsRepository, installedAppRepository, activityRepository::observeRuntimeRules,
+        accessRepository, automationRuleEngine, runtimeEnvironmentMonitor, hybridForegroundAppSource,
+        reporter, foregroundAutomationHandler, disconnectAutomationHandler, temporaryDisableHandler,
+        unexpectedNetworkChangeGuard, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+    private data class QueuedEvent(val generation: Long, val event: RuntimeEvent)
+    private val events = Channel<QueuedEvent>(Channel.UNLIMITED)
+    private val pendingDecisionEvents = AtomicInteger()
+    @Volatile private var lifecycleGeneration = 0L
     private val scheduler = RuntimeTaskScheduler(
         scope = scope,
         send = ::send,
         reporter = reporter,
+        monotonicTimeMillis = monotonicTimeMillis,
     )
 
     private var eventLoopJob: Job? = null
@@ -58,15 +83,26 @@ class AutomationRuntimeCoordinator @Inject constructor(
     @Volatile
     private var runtimeActive = false
 
+    @Synchronized
     fun start(initialScreenState: ScreenState) {
+        if (runtimeActive) return
+        lifecycleGeneration++
         if (eventLoopJob?.isActive != true) {
             eventLoopJob = scope.launch {
-                for (event in events) {
-                    runCatching {
-                        handleEvent(event)
-                    }.onFailure { throwable ->
-                        Log.e(LOG_TAG, "runtime event failed event=${event.nameForLog()}", throwable)
-                        reporter.reportEventFailure(throwable)
+                for ((generation, event) in events) {
+                    try {
+                        if (generation != lifecycleGeneration) {
+                            (event as? RuntimeEvent.Stopped)?.ack?.complete(Unit)
+                            continue
+                        }
+                        runCatching {
+                            handleEvent(event)
+                        }.onFailure { throwable ->
+                            Log.e(LOG_TAG, "runtime event failed event=${event.nameForLog()}", throwable)
+                            reporter.reportEventFailure(throwable)
+                        }
+                    } finally {
+                        if (event.affectsDisconnectDecision()) pendingDecisionEvents.decrementAndGet()
                     }
                 }
             }
@@ -111,6 +147,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
         }
     }
 
+    @Synchronized
     fun requestStop(finalScreenState: ScreenState) {
         if (eventLoopJob?.isActive != true) {
             return
@@ -124,13 +161,17 @@ class AutomationRuntimeCoordinator @Inject constructor(
             return
         }
         val ack = CompletableDeferred<Unit>()
-        runtimeActive = false
-        send(RuntimeEvent.Stopped(finalScreenState, ack))
+        synchronized(this) {
+            runtimeActive = false
+            send(RuntimeEvent.Stopped(finalScreenState, ack))
+        }
         ack.await()
     }
 
-    private fun send(event: RuntimeEvent) {
-        if (events.trySend(event).isFailure) {
+    private fun send(event: RuntimeEvent, generation: Long = lifecycleGeneration) {
+        if (event.affectsDisconnectDecision()) pendingDecisionEvents.incrementAndGet()
+        if (events.trySend(QueuedEvent(generation, event)).isFailure) {
+            if (event.affectsDisconnectDecision()) pendingDecisionEvents.decrementAndGet()
             Log.w(LOG_TAG, "runtime event dropped event=${event.nameForLog()}")
         }
     }
@@ -139,9 +180,14 @@ class AutomationRuntimeCoordinator @Inject constructor(
         runtimeActive && eventLoopJob?.isActive == true
 
     private suspend fun handleEvent(event: RuntimeEvent) {
+        if (!runtimeActive && event !is RuntimeEvent.Started && event !is RuntimeEvent.Stopped) return
         when (event) {
             is RuntimeEvent.Started -> handleStarted(event.initialScreenState)
-            is RuntimeEvent.Stopped -> handleStopped(event.finalScreenState, event.ack)
+            is RuntimeEvent.Stopped -> try {
+                handleStopped(event.finalScreenState)
+            } finally {
+                event.ack?.complete(Unit)
+            }
             RuntimeEvent.ScreenOff -> handleScreenOff()
             RuntimeEvent.ScreenOn -> handleScreenWake(
                 screenState = ScreenState.ScreenOn,
@@ -151,7 +197,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
                 screenState = ScreenState.Unlocked,
                 triggerSource = TriggerSource.UserUnlocked,
             )
-            RuntimeEvent.ForegroundProbeTick -> handleForegroundProbeTick()
+            is RuntimeEvent.ForegroundProbeTick -> handleForegroundProbeTick(event)
             is RuntimeEvent.ForegroundAppChanged -> handleForegroundAppChanged(event.foregroundApp)
             RuntimeEvent.ForegroundEventSourceChanged -> handleForegroundEventSourceChanged()
             is RuntimeEvent.SettingsChanged -> handleSettingsChanged(event.settings)
@@ -167,61 +213,74 @@ class AutomationRuntimeCoordinator @Inject constructor(
                 if (changed && state.lastTargetAppActive != null) scheduleForegroundObservation(immediate = true)
             }
             RuntimeEvent.NetworkChanged -> handleNetworkChanged()
-            RuntimeEvent.TemporaryDisableExpired -> handleTemporaryDisableExpired()
-            RuntimeEvent.ScreenOffDisconnectDue -> {
-                disconnectAutomationHandler.handleScreenOffDisconnectDue(state, scheduler)
+            is RuntimeEvent.TemporaryDisableExpired -> handleTemporaryDisableExpired(event)
+            is RuntimeEvent.ScreenOffDisconnectDue -> {
+                if (!scheduler.isScreenOffDisconnectDueCurrent(event)) return
+                if (pendingDecisionEvents.get() > 0) {
+                    send(event)
+                    return
+                }
+                disconnectAutomationHandler.handleScreenOffDisconnectDue(state, scheduler, event)
             }
-            RuntimeEvent.AppExitDisconnectDue -> {
-                if (state.activityRules.isNotEmpty()) state = foregroundAutomationHandler.automationTick(state, scheduler)
-                disconnectAutomationHandler.handleAppExitDisconnectDue(state, scheduler)
+            is RuntimeEvent.AppExitDisconnectDue -> {
+                if (!scheduler.isAppExitDisconnectDueCurrent(event)) return
+                // Process already queued rule, screen, source and network changes
+                // before deciding whether this countdown may still cut off.
+                if (pendingDecisionEvents.get() > 0) {
+                    send(event)
+                    return
+                }
+                state = foregroundAutomationHandler.automationTick(state, scheduler, requireForegroundConfirmation = true)
+                disconnectAutomationHandler.handleAppExitDisconnectDue(state, scheduler, event)
             }
         }
     }
 
     private suspend fun handleStarted(initialScreenState: ScreenState) {
-        runtimeActive = true
+        val generation = lifecycleGeneration
+        scheduler.cancelAll()
         state = state.copy(
             settings = settingsRepository.settings.first(),
             screenState = initialScreenState,
             appRulesByPackageName = installedAppRepository.observeApps().first().toRuntimeRuleMap(),
-            activityRules = activityRepository.observeRuntimeRules().first(),
+            activityRules = activityRules().first(),
+            lastTargetAppActive = null,
+            lastKnownForegroundApp = null,
+            appExitAwaitingForegroundConfirmation = false,
         )
         hybridForegroundAppSource.monitorMode = state.settings.foregroundMonitorMode
         hybridForegroundAppSource.confirmActivity = state.activityRules.any { it.rulesEnabled && it.isValid }
-        startCollectors()
-        runtimeEnvironmentMonitor.register(scope)
+        startCollectors(generation)
+        runtimeEnvironmentMonitor.register { if (runtimeActive) send(RuntimeEvent.NetworkChanged, generation) }
         accessRepository.refresh()
         accessRepository.syncCurrentNetworkControlState()
         runtimeEnvironmentMonitor.refreshSnapshot()
         reporter.markServiceStarted(initialScreenState)
+        disconnectAutomationHandler.scheduleScreenOffDisconnectIfNeeded(state, scheduler)
         scheduleForegroundObservation(immediate = true)
     }
 
-    private fun startCollectors() {
-        if (activityRulesJob?.isActive != true) {
-            activityRulesJob = scope.launch { activityRepository.observeRuntimeRules().collect { send(RuntimeEvent.ActivityRulesChanged(it)) } }
+    private fun startCollectors(generation: Long) {
+        settingsJob?.cancel()
+        appsJob?.cancel()
+        activityRulesJob?.cancel()
+        settingsJob = null
+        appsJob = null
+        activityRulesJob = null
+        activityRulesJob = scope.launch {
+            activityRules().collect { send(RuntimeEvent.ActivityRulesChanged(it), generation) }
         }
-        if (settingsJob?.isActive != true) {
-            settingsJob = scope.launch {
-                settingsRepository.settings.collect { settings ->
-                    send(RuntimeEvent.SettingsChanged(settings))
-                }
-            }
+        settingsJob = scope.launch {
+            settingsRepository.settings.collect { send(RuntimeEvent.SettingsChanged(it), generation) }
         }
-        if (appsJob?.isActive != true) {
-            appsJob = scope.launch {
-                installedAppRepository.observeApps().collect { apps ->
-                    send(RuntimeEvent.AppsChanged(apps.toRuntimeRuleMap()))
-                }
-            }
+        appsJob = scope.launch {
+            installedAppRepository.observeApps().collect { send(RuntimeEvent.AppsChanged(it.toRuntimeRuleMap()), generation) }
         }
     }
 
     private suspend fun handleStopped(
         finalScreenState: ScreenState,
-        ack: CompletableDeferred<Unit>?,
     ) {
-        runtimeActive = false
         scheduler.cancelAll()
         settingsJob?.cancel()
         appsJob?.cancel()
@@ -231,12 +290,27 @@ class AutomationRuntimeCoordinator @Inject constructor(
         activityRulesJob = null
         runtimeEnvironmentMonitor.unregister()
         reporter.markServiceStopped(finalScreenState)
-        ack?.complete(Unit)
     }
 
     private suspend fun handleSettingsChanged(settings: UserSettings) {
         val previous = state.settings
         state = state.copy(settings = settings)
+        val appExitPolicyChanged = previous.appExitDelaySeconds != settings.appExitDelaySeconds ||
+            previous.appExitDisconnectEnabled != settings.appExitDisconnectEnabled ||
+            previous.automationEnabled != settings.automationEnabled ||
+            previous.temporaryDisableMode != settings.temporaryDisableMode ||
+            previous.temporaryDisableUntilMillis != settings.temporaryDisableUntilMillis
+        if (appExitPolicyChanged) {
+            val wasPending = scheduler.isAppExitDisconnectActive
+            scheduler.cancelAppExitDisconnect(reporter, updateRuntimeState = false)
+            state = state.copy(
+                appExitAwaitingForegroundConfirmation = state.appExitAwaitingForegroundConfirmation || wasPending,
+            )
+        }
+        // A changed delay starts a fresh full countdown; repeated unchanged settings preserve it.
+        if (previous.screenOffDelaySeconds != settings.screenOffDelaySeconds) {
+            scheduler.cancelScreenOffDisconnect(state, reporter, updateRuntimeState = false)
+        }
         if (previous.foregroundMonitorMode != settings.foregroundMonitorMode) {
             state = state.copy(lastKnownForegroundApp = state.lastKnownForegroundApp?.withoutActivityConfirmation())
         }
@@ -258,10 +332,13 @@ class AutomationRuntimeCoordinator @Inject constructor(
             scheduler.cancelTemporaryDisableExpiry()
         }
 
+        disconnectAutomationHandler.scheduleScreenOffDisconnectIfNeeded(state, scheduler)
+
         if (previous.monitorForegroundWhenScreenOff != settings.monitorForegroundWhenScreenOff ||
             previous.automationEnabled != settings.automationEnabled ||
             previous.temporaryDisableMode != settings.temporaryDisableMode ||
-            previous.foregroundMonitorMode != settings.foregroundMonitorMode
+            previous.foregroundMonitorMode != settings.foregroundMonitorMode ||
+            appExitPolicyChanged
         ) {
             scheduler.cancelForegroundProbe()
             scheduleForegroundObservation(immediate = true)
@@ -295,6 +372,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
             previousSnapshot = previousSnapshot,
             updatedSnapshot = updatedSnapshot,
         )
+        disconnectAutomationHandler.scheduleScreenOffDisconnectIfNeeded(state, scheduler)
     }
 
     private suspend fun handleScreenWake(
@@ -335,8 +413,8 @@ class AutomationRuntimeCoordinator @Inject constructor(
         scheduleForegroundObservation(immediate = false)
     }
 
-    private suspend fun handleForegroundProbeTick() {
-        scheduler.markForegroundProbeConsumed()
+    private suspend fun handleForegroundProbeTick(event: RuntimeEvent.ForegroundProbeTick) {
+        if (!scheduler.markForegroundProbeConsumed(event)) return
         if (!state.settings.automationEnabled) {
             return
         }
@@ -371,7 +449,7 @@ class AutomationRuntimeCoordinator @Inject constructor(
         state = foregroundAutomationHandler.automationTick(
             state = state,
             scheduler = scheduler,
-            foregroundAppOverride = if (hybridForegroundAppSource.confirmActivity) hybridForegroundAppSource.detect() ?: foregroundApp else foregroundApp,
+            foregroundAppOverride = hybridForegroundAppSource.detectForEvent(foregroundApp),
         )
         scheduleForegroundObservation(immediate = false)
     }
@@ -395,20 +473,20 @@ class AutomationRuntimeCoordinator @Inject constructor(
 
     private fun shouldUseForegroundEvents(): Boolean =
         when (state.settings.foregroundMonitorMode) {
-            ForegroundMonitorMode.Auto -> accessibilityForegroundAppTracker.isServiceConnected
-            ForegroundMonitorMode.Accessibility -> accessibilityForegroundAppTracker.isServiceConnected
+            ForegroundMonitorMode.Auto -> hybridForegroundAppSource.accessibilityConnected
+            ForegroundMonitorMode.Accessibility -> hybridForegroundAppSource.accessibilityConnected
             ForegroundMonitorMode.UsageStats -> false
         }
 
     private fun shouldSuppressPeriodicForegroundProbe(): Boolean =
         when (state.settings.foregroundMonitorMode) {
-            ForegroundMonitorMode.Auto -> accessibilityForegroundAppTracker.isServiceConnected && !hybridForegroundAppSource.confirmActivity
+            ForegroundMonitorMode.Auto -> false
             ForegroundMonitorMode.Accessibility -> true
             ForegroundMonitorMode.UsageStats -> false
         }
 
-    private suspend fun handleTemporaryDisableExpired() {
-        scheduler.markTemporaryDisableExpiryConsumed()
+    private suspend fun handleTemporaryDisableExpired(event: RuntimeEvent.TemporaryDisableExpired) {
+        if (!scheduler.markTemporaryDisableExpiryConsumed(event)) return
         if (state.settings.shouldClearExpiredTemporaryDisable()) {
             state = temporaryDisableHandler.clearTemporaryDisable(
                 state = state,

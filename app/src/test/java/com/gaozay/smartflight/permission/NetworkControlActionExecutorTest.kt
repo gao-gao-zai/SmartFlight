@@ -29,7 +29,7 @@ class NetworkControlActionExecutorTest : LocalizedStringsTest() {
             reason = "手动关闭移动数据",
         )
 
-        assertEquals(listOf(true), fixture.probe.setDisconnectedRequests)
+        assertEquals(listOf(NetworkControlMode.MobileData to false), fixture.probe.setNetworkControlEnabledRequests)
         assertEquals(false, fixture.runtimeStatusRepository.currentSnapshot.isMobileDataEnabled)
         assertEquals(1, fixture.executionLogRepository.logs.size)
     }
@@ -40,6 +40,7 @@ class NetworkControlActionExecutorTest : LocalizedStringsTest() {
             settings = UserSettings(networkControlMode = NetworkControlMode.AirplaneMode),
             snapshot = RuntimeSnapshot(isAirplaneModeEnabled = false, isMobileDataEnabled = true),
         )
+        fixture.probe.networkProbeResults[NetworkControlMode.MobileData] = ArrayDeque(listOf(executorResult(controlMode = NetworkControlMode.MobileData, controlledEnabled = true)))
         fixture.probe.setNetworkControlResults.add(
             executorResult(
                 controlMode = NetworkControlMode.AirplaneMode,
@@ -93,6 +94,8 @@ class NetworkControlActionExecutorTest : LocalizedStringsTest() {
 
         assertEquals(ExecutionResult.PartialSuccess, fixture.runtimeStatusRepository.currentSnapshot.lastActionResult)
         assertEquals(2, fixture.probe.setNetworkControlEnabledRequests.size)
+        assertEquals(null, fixture.runtimeStatusRepository.currentSnapshot.isMobileDataEnabled)
+        assertEquals(true, fixture.runtimeStatusRepository.currentSnapshot.rememberedMobileDataEnabledBeforeAirplaneMode)
     }
 
     @Test

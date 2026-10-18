@@ -5,6 +5,7 @@ import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutorType
 import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.shizuku.ShizukuServiceManager
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 import rikka.shizuku.Shizuku
@@ -42,8 +43,9 @@ class ShizukuExecutorCommandRunner @Inject constructor(
             )
 
         val rawResult = runCatching {
-            service.runCommand(command.rawCommand)
+            cancellableBlockingCall { service.runCommand(command.rawCommand) }
         }.getOrElse { throwable ->
+            if (throwable is CancellationException) throw throwable
             return ExecutorCommandResult(
                 executorType = ExecutorType.Shizuku,
                 executed = false,

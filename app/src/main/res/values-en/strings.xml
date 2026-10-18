@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="executor_command_timeout">Command timed out: %1$s</string>
     <string name="app_name">"SmartFlight"</string>
     <string name="automation_notification_title">"SmartFlight is running"</string>
     <string name="automation_notification_text">"Monitoring allowlisted apps in the foreground"</string>
@@ -666,4 +667,5 @@
     <string name="quick_rule_saved">"Rule saved"</string>
     <string name="quick_rule_saving">"Saving…"</string>
     <string name="app_name_preview">"SmartFlight Preview"</string>
+    <string name="network_action_cancelled_state_unknown">Network action cancelled; actual state needs verification</string>
 </resources>

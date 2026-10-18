@@ -8,152 +8,153 @@ import com.gaozay.smartflight.settings.SettingsRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.delay
 
 @Singleton
-class ExecutorProbeService @Inject constructor(
+class ExecutorProbeService internal constructor(
     private val settingsRepository: SettingsRepository,
-    private val executorRunnerSelector: ExecutorRunnerSelector,
+    private val selectRunner: suspend () -> SelectedExecutorRunner,
     private val commandMapper: NetworkControlCommandMapper,
     private val mobileDataSupportChecker: MobileDataSupportChecker,
 ) {
+    @Inject
+    constructor(
+        settingsRepository: SettingsRepository,
+        executorRunnerSelector: ExecutorRunnerSelector,
+        commandMapper: NetworkControlCommandMapper,
+        mobileDataSupportChecker: MobileDataSupportChecker,
+    ) : this(settingsRepository, executorRunnerSelector::currentRunner, commandMapper, mobileDataSupportChecker)
+
+    private val changeMutex = Mutex()
+
     private suspend fun currentMode(): NetworkControlMode = settingsRepository.settings.first().networkControlMode
 
     suspend fun runCommand(command: ExecutorCommand): ExecutorCommandResult {
-        val selected = executorRunnerSelector.currentRunner()
-        val executorType = selected.executorType
-        val runner = selected.runner
-        return runner?.run(command) ?: ExecutorCommandResult(
-            executorType = executorType,
+        val selected = selectRunner()
+        return selected.runner?.let { runBounded(selected.executorType, it, command) } ?: ExecutorCommandResult(
+            executorType = selected.executorType,
             executed = false,
             summary = AppStrings.get(R.string.no_executor_available_for, command.purpose),
         )
     }
 
     suspend fun probeNetworkControlState(mode: NetworkControlMode): ExecutorCommandResult {
-        val selected = executorRunnerSelector.currentRunner()
-        val executorType = selected.executorType
+        val selected = selectRunner()
         val runner = selected.runner
         if (mode == NetworkControlMode.MobileData && runner != null) {
-            mobileDataSupportChecker.unsupportedResultOrNull(executorType, runner)?.let { return it }
+            mobileDataSupportChecker.unsupportedResultOrNull(selected.executorType, boundedRunner(selected.executorType, runner))?.let { return it }
         }
-        return (runner?.run(commandMapper.readCommandFor(mode)) ?: ExecutorCommandResult(
-            executorType = executorType,
+        val result = runner?.let { runBounded(selected.executorType, it, commandMapper.readCommandFor(mode)) } ?: ExecutorCommandResult(
+            executorType = selected.executorType,
             executed = false,
             summary = commandMapper.noReadExecutorSummary(mode),
-        )).let { result ->
-            if (runner == null) {
-                commandMapper.withMode(mode, result, commandMapper.noReadExecutorSummary(mode))
-            } else {
-                commandMapper.withMode(mode, result)
-            }
-        }
+        )
+        return observedState(mode, result)
     }
 
     suspend fun probeCurrentNetworkControlState(): ExecutorCommandResult = probeNetworkControlState(currentMode())
 
+    // Snapshot hints have no freshness guarantee. Always read inside the change lock.
+    @Suppress("UNUSED_PARAMETER")
     suspend fun setNetworkControlEnabled(
         mode: NetworkControlMode,
         enabled: Boolean,
         knownCurrentEnabled: Boolean? = null,
-    ): ExecutorCommandResult {
-        val selected = executorRunnerSelector.currentRunner()
-        val executorType = selected.executorType
-        val runner = selected.runner
-        if (runner == null) {
-            return ExecutorCommandResult(
-                executorType = ExecutorType.Unavailable,
-                controlMode = mode,
-                executed = false,
-                summary = commandMapper.noToggleExecutorSummary(mode),
-            )
-        }
-        if (mode == NetworkControlMode.MobileData) {
-            mobileDataSupportChecker.unsupportedResultOrNull(executorType, runner)?.let { return it }
-        }
-
-        val currentEnabled = knownCurrentEnabled ?: commandMapper.withMode(
-            mode,
-            runner.run(commandMapper.readCommandFor(mode)),
-        ).controlledEnabled
-        if (currentEnabled == null) {
-            return ExecutorCommandResult(
-                executorType = executorType,
-                controlMode = mode,
-                executed = false,
-                summary = commandMapper.unresolvedSetSummary(mode),
-            )
-        }
-
-        if (currentEnabled == enabled) {
-            return ExecutorCommandResult(
-                executorType = executorType,
-                controlMode = mode,
-                controlledEnabled = enabled,
-                executed = false,
-                summary = commandMapper.alreadyInStateSummary(mode, enabled),
-                alreadyInRequestedState = true,
-            )
-        }
-
-        val writeResult = commandMapper.withMode(mode, runner.run(commandMapper.writeCommandFor(mode, enabled)))
-        if (!writeResult.executed || writeResult.exitCode != 0) {
-            val probedResult = commandMapper.withMode(mode, runner.run(commandMapper.readCommandFor(mode)))
-            if (probedResult.controlledEnabled == enabled) {
-                return writeResult.copy(
-                    controlledEnabled = enabled,
-                    summary = commandMapper.enabledChangedSummary(mode, enabled),
-                )
-            }
-            return writeResult.copy(
-                summary = commandMapper.writeFailedSummary(mode),
-            )
-        }
-
-        return writeResult.copy(
-            controlledEnabled = enabled,
-            summary = commandMapper.enabledChangedSummary(mode, enabled),
-        )
+    ): ExecutorCommandResult = changeMutex.withLock {
+        changeNetworkControl(mode) { enabled }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     suspend fun toggleCurrentNetworkControlState(
         knownControlledEnabled: Boolean? = null,
-    ): ExecutorCommandResult {
-        val mode = currentMode()
-        val currentEnabled = knownControlledEnabled ?: probeNetworkControlState(mode).controlledEnabled
-        if (currentEnabled == null) {
-            return ExecutorCommandResult(
-                executorType = executorRunnerSelector.currentRunner().executorType,
-                controlMode = mode,
-                executed = false,
-                summary = commandMapper.unresolvedToggleSummary(mode),
-            )
-        }
-        return setNetworkControlEnabled(
-            mode = mode,
-            enabled = !currentEnabled,
-            knownCurrentEnabled = currentEnabled,
-        )
+    ): ExecutorCommandResult = changeMutex.withLock {
+        changeNetworkControl(currentMode()) { !it }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     suspend fun setDisconnectedState(
         disconnected: Boolean,
         knownDisconnected: Boolean? = null,
-    ): ExecutorCommandResult {
+    ): ExecutorCommandResult = changeMutex.withLock {
         val mode = currentMode()
-        val targetEnabled = when (mode) {
-            NetworkControlMode.AirplaneMode -> disconnected
-            NetworkControlMode.MobileData -> !disconnected
+        changeNetworkControl(mode) {
+            if (mode == NetworkControlMode.AirplaneMode) disconnected else !disconnected
         }
-        val knownCurrentEnabled = knownDisconnected?.let {
-            when (mode) {
-                NetworkControlMode.AirplaneMode -> it
-                NetworkControlMode.MobileData -> !it
+    }
+
+    private suspend fun changeNetworkControl(
+        mode: NetworkControlMode,
+        target: (Boolean) -> Boolean,
+    ): ExecutorCommandResult {
+        val selected = selectRunner()
+        val runner = selected.runner?.let { boundedRunner(selected.executorType, it) } ?: return ExecutorCommandResult(
+            executorType = ExecutorType.Unavailable,
+            controlMode = mode,
+            executed = false,
+            summary = commandMapper.noToggleExecutorSummary(mode),
+        )
+        if (mode == NetworkControlMode.MobileData) {
+            mobileDataSupportChecker.unsupportedResultOrNull(selected.executorType, runner)?.let { return it }
+        }
+        val initial = observedState(mode, runner.run(commandMapper.readCommandFor(mode)))
+        val currentEnabled = initial.controlledEnabled ?: return initial.copy(
+            executed = false,
+            summary = commandMapper.unresolvedSetSummary(mode),
+        )
+        val enabled = target(currentEnabled)
+        if (currentEnabled == enabled) {
+            return initial.copy(
+                executed = false,
+                summary = commandMapper.alreadyInStateSummary(mode, enabled),
+                alreadyInRequestedState = true,
+                requestedEnabled = enabled,
+            )
+        }
+
+        val writeResult = runner.run(commandMapper.writeCommandFor(mode, enabled))
+        // Exit status describes the shell. Only a fresh read describes the resulting state.
+        var readback: ExecutorCommandResult? = null
+        // Android may apply a radio setting asynchronously. Confirm for a short, bounded window.
+        withTimeoutOrNull(1_000) {
+            repeat(4) { attempt ->
+                readback = observedState(mode, runner.run(commandMapper.readCommandFor(mode)))
+                if (readback?.controlledEnabled == enabled) return@withTimeoutOrNull
+                if (attempt < 3) delay(150)
             }
         }
-        return setNetworkControlEnabled(
-            mode = mode,
-            enabled = targetEnabled,
-            knownCurrentEnabled = knownCurrentEnabled,
+        return writeResult.copy(
+            controlMode = mode,
+            controlledEnabled = readback?.controlledEnabled,
+            requestedEnabled = enabled,
+            stderr = listOf(writeResult.stderr, readback?.stderr.orEmpty()).filter { it.isNotBlank() }.joinToString("\n"),
+            summary = if (readback?.controlledEnabled == enabled) {
+                commandMapper.enabledChangedSummary(mode, enabled)
+            } else {
+                commandMapper.writeFailedSummary(mode)
+            },
         )
     }
+
+    private fun observedState(mode: NetworkControlMode, result: ExecutorCommandResult): ExecutorCommandResult =
+        commandMapper.withMode(mode, result).let {
+            if (result.executed && result.exitCode == 0) it else it.copy(controlledEnabled = null)
+        }
+
+    private fun boundedRunner(type: ExecutorType, runner: ExecutorCommandRunner): ExecutorCommandRunner =
+        object : ExecutorCommandRunner {
+            override suspend fun run(command: ExecutorCommand): ExecutorCommandResult = runBounded(type, runner, command)
+        }
+
+    private suspend fun runBounded(
+        type: ExecutorType,
+        runner: ExecutorCommandRunner,
+        command: ExecutorCommand,
+    ): ExecutorCommandResult = withTimeoutOrNull(6_000) { runner.run(command) } ?: ExecutorCommandResult(
+        executorType = type,
+        executed = false,
+        summary = AppStrings.get(R.string.executor_command_timeout, command.purpose),
+    )
 }

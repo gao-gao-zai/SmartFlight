@@ -73,6 +73,8 @@ data class ExecutorCommandResult(
     val stderr: String = "",
     val summary: String,
     val alreadyInRequestedState: Boolean = false,
+    // Set only for a requested change; controlledEnabled is the observed readback.
+    val requestedEnabled: Boolean? = null,
 )
 
 fun parseBinaryToggleState(stdout: String): Boolean? = when (stdout.trim()) {

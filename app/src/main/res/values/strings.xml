@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="executor_command_timeout">执行“%1$s”超时</string>
     <string name="app_name">"自动飞行"</string>
     <string name="automation_notification_title">"自动飞行正在运行"</string>
     <string name="automation_notification_text">"正在监控白名单应用前台状态"</string>
@@ -656,4 +657,5 @@
     <string name="quick_rule_saved">"规则已保存"</string>
     <string name="quick_rule_saving">"保存中…"</string>
     <string name="app_name_preview">"自动飞行（预览）"</string>
+    <string name="network_action_cancelled_state_unknown">网络操作已取消，实际状态待重新确认</string>
 </resources>

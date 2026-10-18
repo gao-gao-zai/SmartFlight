@@ -60,14 +60,16 @@ class AppExitDisconnectHandler @Inject constructor(
     suspend fun handleDue(
         state: RuntimeState,
         scheduler: RuntimeTaskScheduler,
+        event: RuntimeEvent.AppExitDisconnectDue,
     ) {
-        scheduler.markAppExitDisconnectConsumed()
+        if (!scheduler.markAppExitDisconnectConsumed(event)) return
         val latestSettings = state.settings
         val latestRuntimeSnapshot = reporter.snapshot.first()
         val latestExecutorAvailable = accessRepository.accessGateState.value.advancedAccess.isAvailable
         val shouldDisconnect = latestSettings.isAutomationEffectivelyEnabled() &&
             latestSettings.appExitDisconnectEnabled &&
             state.lastTargetAppActive == false &&
+            state.lastKnownForegroundApp != null &&
             latestExecutorAvailable &&
             latestRuntimeSnapshot.isDisconnected(latestSettings.networkControlMode) != true &&
             !(latestRuntimeSnapshot.isWifiConnected && latestSettings.skipDisconnectOnWifi)

@@ -12,8 +12,9 @@ class NetworkControlStateSyncer @Inject constructor(
     private val formatter: AccessResultFormatter,
     private val snapshotUpdater: AccessRuntimeSnapshotUpdater,
     private val logWriter: AccessExecutionLogWriter,
+    private val transaction: NetworkControlTransaction = NetworkControlTransaction(),
 ) {
-    suspend fun syncCurrentNetworkControlState() {
+    suspend fun syncCurrentNetworkControlState() = transaction.run {
         val result = networkControlProbe.probeCurrentNetworkControlState()
         Log.d(
             LOG_TAG,
@@ -26,7 +27,7 @@ class NetworkControlStateSyncer @Inject constructor(
         )
     }
 
-    suspend fun probeCurrentNetworkControlState() {
+    suspend fun probeCurrentNetworkControlState() = transaction.run {
         val result = networkControlProbe.probeCurrentNetworkControlState()
         Log.d(
             LOG_TAG,

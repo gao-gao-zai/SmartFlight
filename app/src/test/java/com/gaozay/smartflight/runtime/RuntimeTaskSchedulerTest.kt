@@ -34,7 +34,8 @@ class RuntimeTaskSchedulerTest : LocalizedStringsTest() {
         )
         runCurrent()
 
-        assertEquals(listOf(RuntimeEvent.ForegroundProbeTick), events)
+        assertEquals(1, events.size)
+        assertTrue(events.single() is RuntimeEvent.ForegroundProbeTick)
     }
 
     @Test
@@ -62,7 +63,8 @@ class RuntimeTaskSchedulerTest : LocalizedStringsTest() {
         )
         runCurrent()
 
-        assertEquals(listOf(RuntimeEvent.ForegroundProbeTick), events)
+        assertEquals(1, events.size)
+        assertTrue(events.single() is RuntimeEvent.ForegroundProbeTick)
     }
 
     @Test
@@ -92,9 +94,114 @@ class RuntimeTaskSchedulerTest : LocalizedStringsTest() {
         advanceTimeBy(1L)
         runCurrent()
 
-        assertEquals(listOf(RuntimeEvent.AppExitDisconnectDue), events)
-        scheduler.markAppExitDisconnectConsumed()
+        val event = events.single() as RuntimeEvent.AppExitDisconnectDue
+        assertTrue(scheduler.isAppExitDisconnectActive)
+        assertTrue(scheduler.markAppExitDisconnectConsumed(event))
         assertFalse(scheduler.isAppExitDisconnectActive)
+    }
+
+    @Test
+    fun staleQueuedAppExitCannotConsumeReplacementOrRunBeforeItsDeadline() = runTest {
+        val events = mutableListOf<RuntimeEvent>()
+        val scheduler = scheduler(this, events)
+        scheduler.scheduleAppExitDisconnect(30_000L)
+        runCurrent()
+        advanceTimeBy(30_000L)
+        runCurrent()
+        val stale = events.single() as RuntimeEvent.AppExitDisconnectDue
+        assertTrue(scheduler.isAppExitDisconnectDueCurrent(stale))
+
+        scheduler.cancelAppExitDisconnect()
+        scheduler.scheduleAppExitDisconnect(30_000L)
+        runCurrent()
+        assertFalse(scheduler.markAppExitDisconnectConsumed(stale))
+        assertTrue(scheduler.isAppExitDisconnectActive)
+        advanceTimeBy(29_999L)
+        runCurrent()
+        assertEquals(1, events.size)
+        advanceTimeBy(1L)
+        runCurrent()
+        val replacement = events.last() as RuntimeEvent.AppExitDisconnectDue
+        assertFalse(scheduler.markAppExitDisconnectConsumed(stale))
+        assertTrue(scheduler.markAppExitDisconnectConsumed(replacement))
+        assertFalse(scheduler.markAppExitDisconnectConsumed(replacement))
+    }
+
+    @Test
+    fun matchingTokenStillRequiresMonotonicDeadline() = runTest {
+        val events = mutableListOf<RuntimeEvent>()
+        var now = 1_000L
+        val scheduler = RuntimeTaskScheduler(
+            scope = backgroundScope,
+            send = { events += it },
+            reporter = RuntimeSnapshotReporter(FakeRuntimeStatusRepository()),
+            monotonicTimeMillis = { now },
+        )
+        scheduler.scheduleAppExitDisconnect(30_000L)
+        runCurrent()
+        advanceTimeBy(30_000L)
+        runCurrent()
+        val event = events.single() as RuntimeEvent.AppExitDisconnectDue
+        assertFalse(scheduler.markAppExitDisconnectConsumed(event))
+        assertTrue(scheduler.isAppExitDisconnectActive)
+        now = 30_999L
+        assertFalse(scheduler.markAppExitDisconnectConsumed(event))
+        now = 31_000L
+        assertTrue(scheduler.markAppExitDisconnectConsumed(event))
+    }
+
+    @Test
+    fun staleQueuedScreenOffCannotConsumeReplacementAndStopInvalidatesBothKinds() = runTest {
+        val events = mutableListOf<RuntimeEvent>()
+        val scheduler = scheduler(this, events)
+        scheduler.scheduleScreenOffDisconnect(60_000L)
+        runCurrent()
+        advanceTimeBy(60_000L)
+        runCurrent()
+        val stale = events.single() as RuntimeEvent.ScreenOffDisconnectDue
+        scheduler.cancelScreenOffDisconnect()
+        scheduler.scheduleScreenOffDisconnect(60_000L)
+        runCurrent()
+        assertFalse(scheduler.markScreenOffDisconnectConsumed(stale))
+        assertTrue(scheduler.isScreenOffDisconnectActive)
+        advanceTimeBy(60_000L)
+        runCurrent()
+        val replacement = events.last() as RuntimeEvent.ScreenOffDisconnectDue
+        scheduler.scheduleAppExitDisconnect(0L)
+        runCurrent()
+        val appExit = events.last() as RuntimeEvent.AppExitDisconnectDue
+        scheduler.cancelAll()
+        assertFalse(scheduler.markScreenOffDisconnectConsumed(replacement))
+        assertFalse(scheduler.markAppExitDisconnectConsumed(appExit))
+        assertFalse(scheduler.isScreenOffDisconnectActive)
+        assertFalse(scheduler.isAppExitDisconnectActive)
+    }
+
+    @Test
+    fun repeatedRapidTransitionsOnlyLeaveLatestTaskValid() = runTest {
+        val events = mutableListOf<RuntimeEvent>()
+        val scheduler = scheduler(this, events)
+        repeat(20) {
+            scheduler.scheduleAppExitDisconnect(0L)
+            scheduler.scheduleScreenOffDisconnect(0L)
+            runCurrent()
+            scheduler.cancelAppExitDisconnect()
+            scheduler.cancelScreenOffDisconnect()
+        }
+        scheduler.scheduleAppExitDisconnect(1_000L)
+        scheduler.scheduleScreenOffDisconnect(1_000L)
+        runCurrent()
+        events.forEach {
+            when (it) {
+                is RuntimeEvent.AppExitDisconnectDue -> assertFalse(scheduler.markAppExitDisconnectConsumed(it))
+                is RuntimeEvent.ScreenOffDisconnectDue -> assertFalse(scheduler.markScreenOffDisconnectConsumed(it))
+                else -> error("Unexpected event")
+            }
+        }
+        advanceTimeBy(1_000L)
+        runCurrent()
+        assertTrue(scheduler.markAppExitDisconnectConsumed(events[events.size - 2] as RuntimeEvent.AppExitDisconnectDue))
+        assertTrue(scheduler.markScreenOffDisconnectConsumed(events.last() as RuntimeEvent.ScreenOffDisconnectDue))
     }
 
     @Test
@@ -117,6 +224,35 @@ class RuntimeTaskSchedulerTest : LocalizedStringsTest() {
         )
     }
 
+    @Test
+    fun queuedProbeAndExpiryCannotConsumeReplacementOrSurviveCancelAll() = runTest {
+        val events = mutableListOf<RuntimeEvent>()
+        val scheduler = scheduler(this, events)
+        val state = RuntimeState(settings = com.gaozay.smartflight.settings.UserSettings(automationEnabled = true))
+        val engine = AutomationRuleEngine(ForegroundRuleEvaluator())
+        scheduler.scheduleForegroundProbe(state, engine, true)
+        scheduler.scheduleTemporaryDisableExpiry(0)
+        runCurrent()
+        val oldProbe = events[0] as RuntimeEvent.ForegroundProbeTick
+        val oldExpiry = events[1] as RuntimeEvent.TemporaryDisableExpired
+        scheduler.scheduleForegroundProbe(state, engine, true)
+        scheduler.scheduleTemporaryDisableExpiry(0)
+        assertFalse(scheduler.markForegroundProbeConsumed(oldProbe))
+        assertFalse(scheduler.markTemporaryDisableExpiryConsumed(oldExpiry))
+        runCurrent()
+        val probe = events[2] as RuntimeEvent.ForegroundProbeTick
+        val expiry = events[3] as RuntimeEvent.TemporaryDisableExpired
+        assertTrue(scheduler.markForegroundProbeConsumed(probe))
+        assertFalse(scheduler.markForegroundProbeConsumed(probe))
+        assertTrue(scheduler.markTemporaryDisableExpiryConsumed(expiry))
+        scheduler.scheduleForegroundProbe(state, engine, true)
+        scheduler.scheduleTemporaryDisableExpiry(0)
+        runCurrent()
+        scheduler.cancelAll()
+        assertFalse(scheduler.markForegroundProbeConsumed(events[4] as RuntimeEvent.ForegroundProbeTick))
+        assertFalse(scheduler.markTemporaryDisableExpiryConsumed(events[5] as RuntimeEvent.TemporaryDisableExpired))
+    }
+
     private fun scheduler(
         scope: TestScope,
         events: MutableList<RuntimeEvent>,
@@ -126,6 +262,7 @@ class RuntimeTaskSchedulerTest : LocalizedStringsTest() {
             scope = TestScope(StandardTestDispatcher(scope.testScheduler)),
             send = { events += it },
             reporter = RuntimeSnapshotReporter(runtimeStatusRepository),
+            monotonicTimeMillis = { scope.testScheduler.currentTime },
         )
     }
 }

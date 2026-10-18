@@ -87,6 +87,8 @@ class AccessResultFormatter @Inject constructor() {
 
     fun executionResultFor(result: ExecutorCommandResult): ExecutionResult = when {
         result.alreadyInRequestedState -> ExecutionResult.Skipped
+        result.requestedEnabled != null && result.controlledEnabled != null ->
+            if (result.controlledEnabled == result.requestedEnabled) ExecutionResult.Success else ExecutionResult.Failed
         result.executed && result.exitCode == 0 && result.controlledEnabled != null -> ExecutionResult.Success
         result.executed && result.exitCode == 0 -> ExecutionResult.PartialSuccess
         else -> ExecutionResult.Failed
@@ -106,7 +108,8 @@ class AccessResultFormatter @Inject constructor() {
         }
         val restoreExecution = executionResultFor(restoreMobileDataResult)
         return when {
-            restoreExecution == ExecutionResult.Failed -> ExecutionResult.PartialSuccess
+            restoreExecution == ExecutionResult.Failed || restoreExecution == ExecutionResult.PartialSuccess ||
+                airplaneExecution == ExecutionResult.PartialSuccess -> ExecutionResult.PartialSuccess
             airplaneExecution == ExecutionResult.Skipped && restoreExecution == ExecutionResult.Skipped -> ExecutionResult.Skipped
             else -> ExecutionResult.Success
         }

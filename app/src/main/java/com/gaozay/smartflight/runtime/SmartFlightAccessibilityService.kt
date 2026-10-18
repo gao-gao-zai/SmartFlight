@@ -37,6 +37,7 @@ class SmartFlightAccessibilityService : AccessibilityService() {
         windows.close()
         scope.cancel()
         foregroundAppTracker.markServiceDisconnected()
+        runtimeCoordinator.onForegroundEventSourceChanged()
         super.onDestroy()
     }
 

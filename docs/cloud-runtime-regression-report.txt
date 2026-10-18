@@ -1,0 +1,116 @@
+SmartFlight 云端断网修复与回归报告
+日期：2026-10-18（UTC）
+
+范围和起点
+- 仓库：gao-gao-zai/SmartFlight。
+- 固定起点：a740130c63359f541815bf668d4e9c8d9b38f33b。
+- 工作分支：codex/cloud-runtime-regression，直接承接已有 WIP，没有回退 master。
+- 恢复时工作区干净。已阅读 docs/cloud-handoff-runtime-stability.txt；
+  仓库和所选环境没有可读取的 AGENTS.md 或本地 .agents/skills。
+- 仅在保存的云端环境操作。没有使用用户电脑、安装设备、推送、合并或发布。
+- 没有使用正式签名秘密。仅复用云端隔离的 JDK17 / SDK35 / Gradle8.7，
+  SDK/代理 CA 配置未扩大到系统全局，TLS 校验未关闭。
+
+复查结论与最终修复
+这些是修复类别；测试中的覆盖变体不计为独立 bug。
+
+1. 事件队列、计时和服务生命周期
+- ForegroundProbeTick、TemporaryDisableExpired 也携带代次，旧事件不能清空新任务引用。
+  离开/息屏 Due 继续使用 WIP 的令牌和单调时钟截止时间。
+- Due 在执行前先让已经排队的前台、规则、设置、屏幕和网络变化得到处理。
+  覆盖到期事件先入队、短暂返回联网应用再离开的场景；旧倒计时不能沿用。
+- 已接受的前台切换历史可以取消/重建计时，不再被更新的轮询缓存抹掉。
+  零延迟或黑名单立即断网仍须重新读取当前前台证据。
+- 重复 start 不再反复重置计时。生命周期代次隔离旧 collector 和环境监听器，
+  快速 stop/start 不会由旧 Stopped 把新运行状态置为停止。
+- stop 的 acknowledgement 在清理失败时也能完成。
+- 执行器不可用导致离开动作暂停时，保留待确认的离开意图，恢复确认后可重建计时。
+
+2. 前台证据和未知状态
+- 复查并保留 WIP 的源缓存隔离、声明 Activity 校验、UsageStats 生命周期和未知语义。
+- 检测器增加可注入的系统查询/时钟边界；JVM 测试运行生产检测代码，
+  不以平行实现的自制状态机代替生产路径。
+- 覆盖联网应用长留、Dialog/IME/SystemUI 候选、真实应用切换、同包 Activity 切换、
+  pause/stop、权限撤销、空查询、SecurityException、时钟回拨和源模式切换。
+- 未知不被当成离开：取消待执行的离开计时并保留规则历史。
+  后续确认仍处于非联网应用，会重新开始完整倒计时；确认回到联网应用则取消。
+  未知不是永久联网规则；没有有效前台证据时也不能安全地凭空推断已离开。
+- 修正原 androidTest 的过时断言：UsageStats 权限丢失应返回 null。
+
+3. callback 隔离和网络读回
+- 回调持有不可变的注册身份和自己的监听器；旧 callback/receiver 不能调用新监听器。
+  重注册会清理旧注册，注册失败清理已建立的部分注册。
+- callback 只排队，不提前覆盖快照；实际 Coordinator 测试验证外部变化比较仍拿得到旧快照。
+- 增加 mobile_data 全局设置观察入口，弥补 Wi-Fi 为默认网络时可能没有默认网络回调的问题。
+  OEM/双卡设置键或平台拒绝注册的情况仍需真机确认；失败会记录警告。
+- 被动读回与完整网络动作共享事务，包含读、写、恢复、快照发布和日志；
+  旧被动读结果不能在较新动作后覆盖 UI。
+
+4. 超时、取消、恢复记忆和 UI
+- Root/Binder 阻塞调用放入可取消等待的守护任务。取消不会等待一个卡住的同步调用返回，
+  迟到结果不能恢复已取消的调用；Root 取消同时关闭会话。
+- Shizuku 绑定取消会解绑，迟到或重复连接回调不能重复恢复 continuation。
+- Root 输出的单行长度和总输出（含换行）都有上限，避免 readLine/空短行突破输出上限。
+- 开启飞行模式前先持久化移动数据恢复记忆，取消发生在写后、读回前也不会丢失。
+  已经处于飞行模式且没有记忆时，不把当前移动数据状态冒充为切换前状态。
+- 取消将实际状态置为未知，并保留失败动作和触发来源；被动权限刷新不能把它改成成功。
+- 移动数据写失败时 UI/日志显示请求的动作，状态字段仍显示实际读回值。
+- 保留并验证 WIP 的写后有界重试读回、未知/失败恢复不报成功、保留恢复记忆等逻辑。
+
+回归覆盖证据
+- ForegroundEvidenceRegressionTest：直接运行 Accessibility/UsageStats/Hybrid 生产检测器；
+  Android 查询、PackageManager 声明解析和时钟使用可控输入。这是 JVM 模拟，不是真机窗口事件。
+- RuntimeEventLoopRegressionTest：使用实际 Coordinator 事件循环、实际 Handler/Scheduler，
+  以虚拟时间和可暂停的环境边界制造 Due 排队、快返再离开、亮屏、设置取消、源丢失、
+  权限/执行器恢复、规则跟随、服务重启和外部网络变化。未替换事件循环本身。
+- RuntimeTaskSchedulerTest：陈旧 probe/expiry/Due、取消、替换、单调截止时间和快速切换。
+- NetworkControlTransactionTest：暂停旧被动读，确认完整动作须等它发布后执行。
+- ExecutorProbeServiceTest：实际 action/probe/snapshot 链路的延迟读回、失败、未知、取消、
+  恢复记忆和并发动作。执行器仍是 JVM 假实现，不能证明真实 Root/Shizuku 权限和 Binder 行为。
+- BoundedProcessExecutionTest：假进程以及真实云端 sh 的输出/退出、继承管道截止时间，
+  Root 会话输出上限和不可协作阻塞任务的取消。云端 sh 不等于 Android su。
+
+最终验证
+- clean 后完整运行过：
+  bash gradlew clean :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --offline --console=plain
+  成功，93 tasks executed，1m58s。
+- 最后 UI/输出上限复查改动后再次完整运行（没有 --tests 过滤）：
+  bash gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --offline --console=plain
+  成功，92 actionable tasks（27 executed、65 up-to-date），36s。
+- 最终 JVM：35 suites，221 tests，0 failures，0 errors，0 skipped。
+  189/189 是准备阶段起点；最终修复验证使用以上 221 结果，没有用旧 154 基线充当修复验证。
+- lintDebug：0 error/fatal，18 warnings。
+  警告类别：InlinedApi 1、UnusedAttribute 1、AppBundleLocaleChanges 1、BatteryLife 1、
+  PrivateResource 2、ChromeOsAbiSupport 1、ObsoleteSdkInt 3、UnusedResources 6、
+  IconLauncherShape 1、IconLocation 1。未通过降低 lint 检查级别隐藏问题。
+- python3 scripts/check_localization.py：636 对中英文资源通过。
+- git diff --check：通过。
+- Debug APK（arm64-v8a、armeabi-v7a）和 androidTest APK 均构建成功。
+- 两份 Debug APK 的 apksigner verify --verbose 均通过（v2，单签名者）。
+- aapt：com.gaozay.smartflight，versionCode 17，versionName 0.0.17，minSdk 26，targetSdk 35。
+- 编译还报告了原有未使用参数、androidTest recycle 弃用和原生库未 strip 提示；
+  这些编译提示不等同于 lint 的 18 项 warnings。
+
+安装文件和 SHA-256（仅云端 debug 签名）
+SmartFlight-runtime-arm64-v8a-debug.apk
+  19416513 bytes
+  85a95b800c24e93ff911caee334905ad8fe05145a3e8c5c95582bc4cd121cca2
+SmartFlight-runtime-armeabi-v7a-debug.apk
+  19413821 bytes
+  91f56077f35f7bd1583a7d50f90cc373bf764d24265668e54f8265934f6c6573
+按设备 ABI 选择一份。debug 签名与已有正式安装签名可能不同；本次没有在设备安装。
+
+仍需真机复核 / 环境缺口
+- 本环境没有 Android 模拟器和 /dev/kvm。ADB 查询因云端 /home/agent/.android 不可写而失败；
+  未扩大目录权限、未安装系统镜像或连接设备。Instrumentation 执行数量为 0，APK 构建不代表通过。
+- 在目标手表/OEM 上确认长时间联网应用、原生/跨包 Dialog、输入法、通知栏、锁屏和真实切换；
+  声明 Activity 与覆盖窗口的系统上报形式不能仅凭 JVM 候选断言保证。
+- 确认 Auto / Accessibility / UsageStats 三种模式在无障碍解绑重连、权限撤销恢复、
+  UsageEvents 空值/漏事件/多窗口下的行为和耗电。
+- 确认快返再离开、零延迟、修改/取消延迟、息屏亮屏、Doze、服务和进程重启。
+  当前策略：修改待执行延迟、恢复未知后的离开、息屏服务重启，均开始新的完整倒计时。
+- 确认 Root 授权弹窗、拒绝/撤销、超时和输出；Shizuku Binder 死亡、延迟绑定、拒绝和取消。
+  同步 Binder 等待可取消不等于撤销已在远端开始执行的物理操作；需要后续真实读回确认。
+- 确认移动数据/飞行模式异步应用、失败恢复、手动外部变化、Wi-Fi 下移动数据变化、
+  双卡/OEM mobile_data 键、读回状态与 Dashboard/日志一致。
+- 自动化测试不能证明没有隐藏 bug；本次不作无隐藏问题或全部 OEM 已验证的承诺。

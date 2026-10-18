@@ -16,8 +16,9 @@ class DisconnectAutomationHandler @Inject constructor(
     suspend fun handleScreenOffDisconnectDue(
         state: RuntimeState,
         scheduler: RuntimeTaskScheduler,
+        event: RuntimeEvent.ScreenOffDisconnectDue,
     ) {
-        screenOffDisconnectHandler.handleDue(state, scheduler)
+        screenOffDisconnectHandler.handleDue(state, scheduler, event)
     }
 
     suspend fun scheduleAppExitDisconnect(
@@ -39,8 +40,9 @@ class DisconnectAutomationHandler @Inject constructor(
     suspend fun handleAppExitDisconnectDue(
         state: RuntimeState,
         scheduler: RuntimeTaskScheduler,
+        event: RuntimeEvent.AppExitDisconnectDue,
     ) {
-        appExitDisconnectHandler.handleDue(state, scheduler)
+        appExitDisconnectHandler.handleDue(state, scheduler, event)
     }
 
     companion object {

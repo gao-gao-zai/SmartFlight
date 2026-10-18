@@ -4,31 +4,46 @@ import com.gaozay.smartflight.settings.ForegroundMonitorMode
 import javax.inject.Inject
 import javax.inject.Singleton
 
+interface RuntimeForegroundSource : ForegroundAppSource {
+    var monitorMode: ForegroundMonitorMode
+    var confirmActivity: Boolean
+    val accessibilityConnected: Boolean
+    fun detectForEvent(event: ForegroundAppInfo): ForegroundAppInfo?
+}
+
 @Singleton
 class HybridForegroundAppSource @Inject constructor(
     private val accessibilityForegroundAppTracker: AccessibilityForegroundAppTracker,
     private val usageStatsForegroundAppDetector: ForegroundAppDetector,
     private val observations: ForegroundObservationStore,
-) : ForegroundAppSource {
-    @Volatile var monitorMode: ForegroundMonitorMode = ForegroundMonitorMode.Auto
+) : RuntimeForegroundSource {
+    @Volatile override var monitorMode: ForegroundMonitorMode = ForegroundMonitorMode.Auto
         set(value) {
             if (field != value) {
-                usageStatsForegroundAppDetector.invalidateActivityConfirmation()
-                accessibilityForegroundAppTracker.invalidateActivityConfirmation()
                 observations.clear()
             }
             field = value
         }
-    @Volatile var confirmActivity: Boolean = false
+    @Volatile override var confirmActivity: Boolean = false
     fun canMonitor(mode: ForegroundMonitorMode): Boolean = when (mode) {
         ForegroundMonitorMode.Auto -> accessibilityForegroundAppTracker.isServiceConnected || usageStatsForegroundAppDetector.hasPermission()
         ForegroundMonitorMode.Accessibility -> accessibilityForegroundAppTracker.isServiceConnected
         ForegroundMonitorMode.UsageStats -> usageStatsForegroundAppDetector.hasPermission()
     }
+    override val accessibilityConnected: Boolean get() = accessibilityForegroundAppTracker.isServiceConnected
     override fun detect(): ForegroundAppInfo? = detect(monitorMode, confirmActivity)
+    override fun detectForEvent(event: ForegroundAppInfo): ForegroundAppInfo? {
+        if (monitorMode == ForegroundMonitorMode.UsageStats) return detect()
+        // Preserve the accepted Accessibility transition queued by the service.
+        // Reading a newer source cache here can erase a brief online return and
+        // leave the previous app-exit countdown active across the next exit.
+        observations.accept(event)
+        return event
+    }
     fun detect(mode: ForegroundMonitorMode, confirm: Boolean): ForegroundAppInfo? = observations.accept(
         detectHybridForegroundApp(mode, accessibilityForegroundAppTracker.isServiceConnected,
-            accessibilityForegroundAppTracker::latest, usageStatsForegroundAppDetector::detect, confirm),
+            accessibilityForegroundAppTracker::latest, usageStatsForegroundAppDetector::detect, confirm,
+            { usageStatsForegroundAppDetector.latestLifecycleTimestampMillis }),
     )
 }
 
@@ -38,14 +53,17 @@ internal fun detectHybridForegroundApp(
     accessibilityLatest: () -> ForegroundAppInfo?,
     usageStatsDetect: () -> ForegroundAppInfo?,
     confirmActivity: Boolean = false,
+    usageStatsLastTransition: () -> Long = { 0L },
 ): ForegroundAppInfo? = when (monitorMode) {
     ForegroundMonitorMode.Auto -> {
         val accessibility = if (accessibilityConnected) accessibilityLatest() else null
         if (accessibility == null) usageStatsDetect()
-        else if (!confirmActivity) accessibility
         else {
             val usage = usageStatsDetect()
             when {
+                // A newer pause/stop invalidates an older Accessibility cache.
+                // This is unknown foreground, not evidence of a different app.
+                usage == null && usageStatsLastTransition() > accessibility.eventTimestampMillis -> null
                 usage == null || usage.source == ForegroundInfoSource.Unknown -> accessibility
                 usage.eventTimestampMillis > accessibility.eventTimestampMillis -> usage
                 usage.eventTimestampMillis == accessibility.eventTimestampMillis && usage.activityConfirmed -> usage
