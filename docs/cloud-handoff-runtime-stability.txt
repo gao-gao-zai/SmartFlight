@@ -1,0 +1,65 @@
+WIP: SmartFlight runtime stability handoff
+
+Repository: gao-gao-zai/SmartFlight
+Branch: codex/fix-runtime-stability
+Base: ac31d34a2202d6d15ae3b854181fa334ef035db8 (v0.0.17)
+
+This commit preserves unfinished fixes for cloud continuation. It is not a
+validated release. Do not deploy, publish, or change a device's network settings
+as part of setup. Continue cloud work with GPT-6.1 Sol, high reasoning.
+
+Implemented drafts:
+- Accept declared Activity evidence rather than foreign dialog/IME/overlay
+  candidates; isolate source caches and reconcile Accessibility with UsageStats.
+- Treat missing foreground evidence as unknown while preserving prior rule
+  history; handle source loss, lifecycle invalidation, and quiet Activities.
+- Give disconnect tasks generations and monotonic deadlines; recheck foreground
+  on expiry; rebuild screen-off tasks on restart and relevant settings changes.
+- Verify network state before and after writes; preserve unknown/failed restore
+  state; serialize actions and bound process execution/output collection.
+- Forward network callbacks to the runtime event queue without overwriting the
+  previous snapshot before external-change comparison.
+
+Validation status:
+- The base revision's 154 JVM tests passed before these fixes.
+- An isolated callback-monitor harness reported 13 assertions passing. That
+  harness is not a full Coordinator or Android-device validation and is not
+  included in this commit.
+- The changed source/tests have NOT completed compilation, JVM tests, lint,
+  localization checks, or an APK build. No fixed APK is available.
+- DisconnectAutomationHandlerTest.kt's interrupted edit is present with a
+  closing class body; its API consistency and compilation remain unverified.
+- Local foreground and Coordinator harnesses were unfinished/unrun and are not
+  included. Recreate portable validation in the cloud; do not treat old baseline
+  characterization passes as fixed-product passes.
+
+First cloud steps:
+1. Use JDK 17, Android SDK platform 35, build-tools 34.0.0, and Gradle wrapper 8.7.
+   Generate local.properties for the cloud SDK location; no signing credentials
+   are required for a debug build. Do not copy local keystores or caches.
+2. Check the combined detectForEvent, requireForegroundConfirmation, task-token,
+   register(callback), and Hilt constructor changes together before proceeding.
+3. Verify rapid queued online-return then offline-switch events preserve the
+   intermediate return and cannot reuse an old exit deadline. Also check stale
+   ForegroundProbeTick events: they still have no generation and may orphan a
+   newly scheduled probe reference, creating duplicate polling.
+4. Run targeted regression for all monitor modes, unknown/source loss and
+   recovery, quiet foreground, pause/stop, permission changes, old Due events,
+   screen restart/enable, rule edits, and network failure/UI consistency.
+5. Check fake-process compatibility, real cancellation/stream termination design,
+   delayed network readback, and retained mobile-data restore memory.
+6. Run :app:testDebugUnitTest :app:assembleDebug :app:lintDebug, then
+   python scripts/check_localization.py. Resolve dependencies normally in the
+   cloud; local offline lint previously lacked lint/androidTest dependencies.
+
+Limits to retain in the final report:
+- No real Android/OEM window events, Doze, binder/root execution, radios, or device
+  lifecycle were validated. Simulated IME events do not establish that a specific
+  watch emits them.
+- Mobile-data changes while Wi-Fi is the default network may not trigger the
+  default-network callback; there is no added mobile-data settings observer.
+- Pending delay-setting changes restart a full countdown in the current draft;
+  verify and document that policy.
+- Existing user documentation and .claude changes in the original checkout were
+  excluded from this branch. No credentials, local.properties, caches, or local
+  machine paths belong in the handoff commit.

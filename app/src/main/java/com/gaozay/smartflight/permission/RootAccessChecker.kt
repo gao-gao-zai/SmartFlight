@@ -3,8 +3,8 @@ package com.gaozay.smartflight.permission
 import android.util.Log
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.i18n.AppStrings
+import com.gaozay.smartflight.executor.BoundedProcessExecution
 import java.io.File
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -84,15 +84,11 @@ class RootAccessChecker @Inject constructor(
             val process = ProcessBuilder(suPath, "-c", "id")
                 .redirectErrorStream(true)
                 .start()
-            val finished = process.waitFor(1800, TimeUnit.MILLISECONDS)
-            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
-            if (!finished) {
-                process.destroy()
-            }
+            val result = BoundedProcessExecution.await(process, timeoutMillis = 1_800)
             RootCommandResult(
-                finished = finished,
-                exitCode = if (finished) process.exitValue() else null,
-                output = output,
+                finished = !result.timedOut,
+                exitCode = result.exitCode,
+                output = result.output,
             )
         }.getOrNull()
         Log.d(
@@ -173,13 +169,9 @@ class RootAccessChecker @Inject constructor(
         val process = ProcessBuilder("sh", "-c", command)
             .redirectErrorStream(true)
             .start()
-        val finished = process.waitFor(1200, TimeUnit.MILLISECONDS)
-        val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
-        if (!finished) {
-            process.destroy()
-            return@runCatching null
-        }
-        output.lineSequence()
+        val result = BoundedProcessExecution.await(process, timeoutMillis = 1_200)
+        if (result.timedOut) return@runCatching null
+        result.output.lineSequence()
             .map { it.trim() }
             .firstOrNull { it.startsWith("/") && it.endsWith("su") }
     }.getOrNull()

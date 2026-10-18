@@ -12,10 +12,9 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,71 +29,82 @@ class RuntimeEnvironmentMonitor @Inject constructor(
     private val bluetoothAdapter: BluetoothAdapter? =
         (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
 
+    @Volatile
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    @Volatile
     private var radioReceiver: BroadcastReceiver? = null
+    @Volatile
+    private var changeListener: (() -> Unit)? = null
 
     suspend fun refreshSnapshot() {
-        applySnapshot(
-            airplaneModeEnabled = null,
-        )
+        applySnapshot()
     }
 
-    fun register(scope: CoroutineScope) {
+    fun register(onNetworkChanged: () -> Unit) {
+        changeListener = onNetworkChanged
         if (networkCallback == null) {
-            networkCallback = object : ConnectivityManager.NetworkCallback() {
+            val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    scope.launch { applySnapshot() }
+                    notifyChanged(this)
                 }
 
                 override fun onLost(network: Network) {
-                    scope.launch { applySnapshot() }
+                    notifyChanged(this)
                 }
 
                 override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                    scope.launch { applySnapshot() }
+                    notifyChanged(this)
                 }
-            }.also { callback ->
-                connectivityManager.registerDefaultNetworkCallback(callback)
             }
+            networkCallback = callback
+            connectivityManager.registerDefaultNetworkCallback(callback)
         }
         if (radioReceiver == null) {
-            radioReceiver = object : BroadcastReceiver() {
+            val receiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
-                    val airplaneModeEnabled = when (intent?.action) {
-                        Intent.ACTION_AIRPLANE_MODE_CHANGED -> intent.getBooleanExtra("state", false)
-                        else -> null
-                    }
-                    scope.launch {
-                        applySnapshot(airplaneModeEnabled = airplaneModeEnabled)
+                    if (radioReceiver === this) {
+                        changeListener?.invoke()
                     }
                 }
-            }.also { receiver ->
-                ContextCompat.registerReceiver(
-                    context,
-                    receiver,
-                    IntentFilter().apply {
-                        addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
-                        addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
-                        addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
-                    },
-                    ContextCompat.RECEIVER_NOT_EXPORTED,
-                )
             }
+            radioReceiver = receiver
+            ContextCompat.registerReceiver(
+                context,
+                receiver,
+                IntentFilter().apply {
+                    addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
+                    addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+                    addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
+                },
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
         }
     }
 
     fun unregister() {
-        networkCallback?.let(connectivityManager::unregisterNetworkCallback)
+        changeListener = null
+        val previousCallback = networkCallback
+        val previousReceiver = radioReceiver
         networkCallback = null
-        radioReceiver?.let {
-            runCatching { context.unregisterReceiver(it) }
-        }
         radioReceiver = null
+        previousCallback?.let { runCatching { connectivityManager.unregisterNetworkCallback(it) } }
+        previousReceiver?.let { runCatching { context.unregisterReceiver(it) } }
     }
 
-    private suspend fun applySnapshot(
-        airplaneModeEnabled: Boolean? = null,
-    ) {
+    // Callbacks only enqueue work. Updating here would erase the coordinator's
+    // previous snapshot before it can check for an unexpected external change.
+    private fun notifyChanged(callback: ConnectivityManager.NetworkCallback) {
+        if (networkCallback === callback) {
+            changeListener?.invoke()
+        }
+    }
+
+    private suspend fun applySnapshot() {
+        val airplaneModeEnabled = Settings.Global.getInt(
+            context.contentResolver,
+            Settings.Global.AIRPLANE_MODE_ON,
+            0,
+        ) != 0
         val wifiConnected = isWifiConnected()
         val wifiEnabled = wifiManager.wifiState == WifiManager.WIFI_STATE_ENABLED
         val bluetoothReadable = canReadBluetoothState()
@@ -105,7 +115,7 @@ class RuntimeEnvironmentMonitor @Inject constructor(
         }
         runtimeStatusRepository.updateSnapshot { snapshot ->
             snapshot.copy(
-                isAirplaneModeEnabled = airplaneModeEnabled ?: snapshot.isAirplaneModeEnabled,
+                isAirplaneModeEnabled = airplaneModeEnabled,
                 isWifiConnected = wifiConnected,
                 isWifiEnabled = wifiEnabled,
                 isBluetoothEnabled = bluetoothEnabled,

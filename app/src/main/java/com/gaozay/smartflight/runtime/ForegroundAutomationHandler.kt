@@ -25,6 +25,7 @@ class ForegroundAutomationHandler @Inject constructor(
         triggerSource: TriggerSource = TriggerSource.AppForegroundChanged,
         allowReconnectWhenTargetAppAlreadyActive: Boolean = false,
         foregroundAppOverride: ForegroundAppInfo? = null,
+        requireForegroundConfirmation: Boolean = false,
     ): RuntimeState {
         var currentState = state
         val settings = currentState.settings
@@ -32,12 +33,20 @@ class ForegroundAutomationHandler @Inject constructor(
             LOG_TAG,
             "automationTick trigger=$triggerSource screenState=${currentState.screenState} allowWakeReconnect=$allowReconnectWhenTargetAppAlreadyActive monitorWhenScreenOff=${settings.monitorForegroundWhenScreenOff} reconnectOnLaunch=${settings.reconnectOnTargetAppLaunch}",
         )
-        if (!automationRuleEngine.shouldMonitorForeground(settings, currentState.screenState)) {
+        if (!requireForegroundConfirmation && !automationRuleEngine.shouldMonitorForeground(settings, currentState.screenState)) {
             Log.d(LOG_TAG, "automationTick skipped: shouldMonitorForeground=false screenState=${currentState.screenState}")
             reporter.markServiceRunning(currentState.screenState)
             return currentState
         }
         val candidate = foregroundAppOverride ?: foregroundAppSource.detect()
+        if (candidate == null) {
+            // Losing a source is not evidence of leaving an online app. Preserve
+            // the last rule state so a later confirmed switch is still evaluated.
+            val awaitingConfirmation = currentState.appExitAwaitingForegroundConfirmation || scheduler.isAppExitDisconnectActive
+            scheduler.cancelAppExitDisconnect(reporter, updateRuntimeState = true)
+            reporter.markForegroundApp(null, currentState.screenState)
+            return currentState.copy(lastKnownForegroundApp = null, appExitAwaitingForegroundConfirmation = awaitingConfirmation)
+        }
         val foregroundApp = chooseForegroundUpdate(currentState.lastKnownForegroundApp, candidate)
         currentState = currentState.copy(lastKnownForegroundApp = foregroundApp ?: currentState.lastKnownForegroundApp)
         reporter.markForegroundApp(foregroundApp, currentState.screenState)
@@ -83,7 +92,8 @@ class ForegroundAutomationHandler @Inject constructor(
                 onlineSource = appRuleInfo?.sourceTag,
                 isWifiConnected = runtimeSnapshot.isWifiConnected,
                 executorAvailable = executorAvailable,
-                previousTargetAppActive = currentState.lastTargetAppActive,
+                previousTargetAppActive = if (currentState.appExitAwaitingForegroundConfirmation && currentState.lastTargetAppActive == false)
+                    true else currentState.lastTargetAppActive,
                 isCurrentlyDisconnected = isDisconnected,
                 isAppExitDisconnectScheduled = scheduler.isAppExitDisconnectActive,
                 allowReconnectWhenTargetAppAlreadyActive = allowReconnectWhenTargetAppAlreadyActive,
@@ -117,7 +127,7 @@ class ForegroundAutomationHandler @Inject constructor(
                 append(decision.reason)
             },
         )
-        currentState = currentState.copy(lastTargetAppActive = decision.targetAppActive)
+        currentState = currentState.copy(lastTargetAppActive = decision.targetAppActive, appExitAwaitingForegroundConfirmation = false)
 
         when (val action = decision.action) {
             is ForegroundAction.None -> {
@@ -148,13 +158,14 @@ class ForegroundAutomationHandler @Inject constructor(
                 )
             }
             is ForegroundAction.ScheduleDisconnect -> {
-                val eventTimestampMillis = foregroundApp?.eventTimestampMillis ?: System.currentTimeMillis()
                 disconnectAutomationHandler.scheduleAppExitDisconnect(
                     state = currentState,
                     scheduler = scheduler,
                     reason = action.reason,
                     delaySeconds = action.delaySeconds,
-                    baseTimestampMillis = eventTimestampMillis,
+                    // Rule edits can change online status without a new resume.
+                    // Start the delay when that change is actually observed.
+                    baseTimestampMillis = System.currentTimeMillis(),
                 )
             }
             is ForegroundAction.CancelScheduledDisconnect -> {

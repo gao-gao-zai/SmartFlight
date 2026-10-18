@@ -2,7 +2,7 @@ package com.gaozay.smartflight.shizuku
 
 import android.content.Context
 import java.io.File
-import java.util.concurrent.TimeUnit
+import com.gaozay.smartflight.executor.BoundedProcessExecution
 
 class ShizukuCommandService() : IShizukuCommandService.Stub() {
     @Suppress("UNUSED_PARAMETER")
@@ -13,18 +13,14 @@ class ShizukuCommandService() : IShizukuCommandService.Stub() {
         val process = ProcessBuilder(shell, "-c", command)
             .redirectErrorStream(true)
             .start()
-        val finished = process.waitFor(2, TimeUnit.SECONDS)
-        val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
-        if (!finished) {
-            process.destroy()
-            return "timeout"
-        }
+        val result = BoundedProcessExecution.await(process, timeoutMillis = 2_000)
+        if (result.timedOut) return "timeout"
         return buildString {
             append("exit=")
-            append(process.exitValue())
-            if (output.isNotBlank()) {
+            append(result.exitCode)
+            if (result.output.isNotBlank()) {
                 append('\n')
-                append(output)
+                append(result.output)
             }
         }
     }

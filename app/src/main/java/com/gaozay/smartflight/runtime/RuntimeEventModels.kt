@@ -28,8 +28,8 @@ sealed interface RuntimeEvent {
     data class ActivityRulesChanged(val rules: List<ActivityRuntimeRule>) : RuntimeEvent
     data object NetworkChanged : RuntimeEvent
     data object TemporaryDisableExpired : RuntimeEvent
-    data object ScreenOffDisconnectDue : RuntimeEvent
-    data object AppExitDisconnectDue : RuntimeEvent
+    data class ScreenOffDisconnectDue(val task: DisconnectTaskToken) : RuntimeEvent
+    data class AppExitDisconnectDue(val task: DisconnectTaskToken) : RuntimeEvent
 }
 
 fun RuntimeEvent.nameForLog(): String = when (this) {
@@ -46,9 +46,12 @@ fun RuntimeEvent.nameForLog(): String = when (this) {
     is RuntimeEvent.ActivityRulesChanged -> "ActivityRulesChanged"
     RuntimeEvent.NetworkChanged -> "NetworkChanged"
     RuntimeEvent.TemporaryDisableExpired -> "TemporaryDisableExpired"
-    RuntimeEvent.ScreenOffDisconnectDue -> "ScreenOffDisconnectDue"
-    RuntimeEvent.AppExitDisconnectDue -> "AppExitDisconnectDue"
+    is RuntimeEvent.ScreenOffDisconnectDue -> "ScreenOffDisconnectDue"
+    is RuntimeEvent.AppExitDisconnectDue -> "AppExitDisconnectDue"
 }
+
+/** Identity and monotonic deadline of one disconnect attempt. */
+data class DisconnectTaskToken(val generation: Long, val deadlineMillis: Long)
 
 data class RuntimeState(
     val settings: UserSettings = UserSettings(),
@@ -57,6 +60,7 @@ data class RuntimeState(
     val appRulesByPackageName: Map<String, AppRuntimeRuleInfo> = emptyMap(),
     val activityRules: List<ActivityRuntimeRule> = emptyList(),
     val lastKnownForegroundApp: ForegroundAppInfo? = null,
+    val appExitAwaitingForegroundConfirmation: Boolean = false,
 )
 
 data class AppRuntimeRuleInfo(

@@ -45,8 +45,13 @@ class ActivityRuleResolverTest {
             assertEquals(ActivityMatchReason.Unknown, result.reason)
         }
     }
-    @Test fun staleAndPausedOrInvalidRulesReportTheirFallbackReasons() {
-        assertEquals(ActivityMatchReason.Stale, resolveActivityRule(info(verified = 1), offline, listOf(rule()), 31_002).reason)
+    @Test fun quietForegroundActivityKeepsItsOverrideUntilItsSourceInvalidatesIt() {
+        val quiet = info(verified = 1)
+        assertEquals(ActivityMatchReason.ActivityOverride, resolveActivityRule(quiet, offline, listOf(rule()), 600_001).reason)
+        assertEquals(ActivityMatchReason.ActivityOverride, resolveActivityRule(quiet, offline, listOf(rule()), 0).reason)
+        assertEquals(ActivityMatchReason.Unknown, resolveActivityRule(quiet.withoutActivityConfirmation(), offline, listOf(rule()), 600_001).reason)
+    }
+    @Test fun pausedOrInvalidRulesReportTheirFallbackReasons() {
         assertEquals(ActivityMatchReason.Paused, resolveActivityRule(info(), offline, listOf(rule(enabled = false)), 1000).reason)
         assertEquals(ActivityMatchReason.Invalid, resolveActivityRule(info(), offline, listOf(rule(valid = false)), 1000).reason)
     }

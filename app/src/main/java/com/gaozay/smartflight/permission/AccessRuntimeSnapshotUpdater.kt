@@ -97,28 +97,28 @@ class AccessRuntimeSnapshotUpdater @Inject constructor(
     ) {
         runtimeStatusRepository.updateSnapshot { current ->
             var updated = updateControlStateSnapshot(current, airplaneResult)
-            if (disconnected && airplaneExecutionResult != ExecutionResult.Failed) {
+            if (disconnected && airplaneResult.controlledEnabled == true &&
+                updated.rememberedMobileDataEnabledBeforeAirplaneMode == null
+            ) {
                 updated = updated.copy(
                     rememberedMobileDataEnabledBeforeAirplaneMode = mobileDataStateToRemember,
                 )
             }
             if (!disconnected) {
-                updated = when {
-                    restoreMobileDataResult?.controlledEnabled != null -> updated.copy(
-                        isMobileDataEnabled = restoreMobileDataResult.controlledEnabled,
-                    )
-                    finalResult != ExecutionResult.Failed && mobileDataStateToRemember != null -> updated.copy(
-                        isMobileDataEnabled = mobileDataStateToRemember,
-                    )
-                    else -> updated
+                if (restoreMobileDataResult != null) {
+                    updated = updateControlStateSnapshot(updated, restoreMobileDataResult)
                 }
-                if (restoreMobileDataResult == null || formatter.executionResultFor(restoreMobileDataResult) != ExecutionResult.Failed) {
+                if (airplaneResult.controlledEnabled == false &&
+                    restoreMobileDataResult?.controlledEnabled == mobileDataStateToRemember &&
+                    restoreMobileDataResult != null &&
+                    formatter.executionResultFor(restoreMobileDataResult) in setOf(ExecutionResult.Success, ExecutionResult.Skipped)
+                ) {
                     updated = updated.copy(
                         rememberedMobileDataEnabledBeforeAirplaneMode = null,
                     )
                 }
             }
-            updated.copy(
+            updated.withDerivedUnifiedNetworkState().copy(
                 activeExecutorType = airplaneResult.executorType,
                 lastAction = action,
                 lastTriggerSource = triggerSource,
@@ -140,10 +140,10 @@ class AccessRuntimeSnapshotUpdater @Inject constructor(
         val controlledEnabled = result.controlledEnabled
         return when (result.controlMode ?: NetworkControlMode.AirplaneMode) {
             NetworkControlMode.AirplaneMode -> snapshot.copy(
-                isAirplaneModeEnabled = controlledEnabled ?: snapshot.isAirplaneModeEnabled,
+                isAirplaneModeEnabled = controlledEnabled,
             ).withDerivedUnifiedNetworkState()
             NetworkControlMode.MobileData -> snapshot.copy(
-                isMobileDataEnabled = controlledEnabled ?: snapshot.isMobileDataEnabled,
+                isMobileDataEnabled = controlledEnabled,
             ).withDerivedUnifiedNetworkState()
         }
     }

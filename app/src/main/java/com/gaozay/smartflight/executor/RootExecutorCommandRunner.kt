@@ -8,6 +8,8 @@ import java.io.BufferedWriter
 import java.io.File
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -72,7 +74,7 @@ class RootExecutorCommandRunner @Inject constructor() : ExecutorCommandRunner {
     }
 }
 
-private class RootSession(
+internal class RootSession(
     private val process: Process,
 ) {
     private val writer = BufferedWriter(OutputStreamWriter(process.outputStream))
@@ -81,7 +83,24 @@ private class RootSession(
 
     fun isAlive(): Boolean = process.isAlive
 
-    fun execute(command: ExecutorCommand): ExecutorCommandResult {
+    fun execute(command: ExecutorCommand, timeoutMillis: Long = 5_000): ExecutorCommandResult {
+        val task = BoundedProcessExecution.daemonTask("SmartFlight-root-command") { executeBlocking(command) }
+        try {
+            return task.get(timeoutMillis, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) {
+            close()
+            return ExecutorCommandResult(
+                executorType = ExecutorType.Root,
+                executed = false,
+                summary = AppStrings.get(R.string.root_command_execution_error),
+                stderr = "Root command timed out",
+            )
+        } finally {
+            task.cancel(true)
+        }
+    }
+
+    private fun executeBlocking(command: ExecutorCommand): ExecutorCommandResult {
         val marker = "__SMARTFLIGHT_EXIT_${commandIndex++}__"
         writer.write("${command.rawCommand}\n")
         writer.write("printf \"$marker:%s\\n\" \$?\n")
@@ -105,7 +124,7 @@ private class RootSession(
                     },
                 )
             }
-            outputLines += line
+            if (outputLines.sumOf { it.length } < 64 * 1024) outputLines += line.take(2048)
         }
 
         close()
@@ -118,12 +137,6 @@ private class RootSession(
     }
 
     fun close() {
-        runCatching {
-            writer.write("exit\n")
-            writer.flush()
-        }
-        runCatching { writer.close() }
-        runCatching { reader.close() }
-        runCatching { process.destroy() }
+        BoundedProcessExecution.terminate(process)
     }
 }

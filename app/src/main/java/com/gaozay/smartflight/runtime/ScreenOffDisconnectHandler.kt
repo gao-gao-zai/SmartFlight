@@ -4,6 +4,7 @@ import android.util.Log
 import com.gaozay.smartflight.R
 import com.gaozay.smartflight.domain.model.ExecutionAction
 import com.gaozay.smartflight.domain.model.ExecutionResult
+import com.gaozay.smartflight.domain.model.ScreenState
 import com.gaozay.smartflight.domain.model.TriggerSource
 import com.gaozay.smartflight.i18n.AppStrings
 import com.gaozay.smartflight.permission.AccessRepository
@@ -22,7 +23,7 @@ class ScreenOffDisconnectHandler @Inject constructor(
         scheduler: RuntimeTaskScheduler,
     ) {
         val settings = state.settings
-        if (!settings.isAutomationEffectivelyEnabled()) {
+        if (state.screenState != ScreenState.ScreenOff || !settings.isAutomationEffectivelyEnabled()) {
             Log.d(LOG_TAG, "skip screen-off schedule: automation temporarily disabled")
             scheduler.cancelScreenOffDisconnect(state, reporter, updateRuntimeState = true)
             return
@@ -70,8 +71,9 @@ class ScreenOffDisconnectHandler @Inject constructor(
     suspend fun handleDue(
         state: RuntimeState,
         scheduler: RuntimeTaskScheduler,
+        event: RuntimeEvent.ScreenOffDisconnectDue,
     ) {
-        scheduler.markScreenOffDisconnectConsumed()
+        if (!scheduler.markScreenOffDisconnectConsumed(event)) return
         val latestSettings = state.settings
         if (!latestSettings.isAutomationEffectivelyEnabled()) {
             Log.d(LOG_TAG, "skip screen-off execution after delay: automation temporarily disabled")

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="executor_command_timeout">执行“%1$s”超时</string>
     <string name="app_name">"自动飞行"</string>
     <string name="automation_notification_title">"自动飞行正在运行"</string>
     <string name="automation_notification_text">"正在监控白名单应用前台状态"</string>

@@ -12,9 +12,88 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ForegroundAutomationHandlerTest : LocalizedStringsTest() {
+    @Test
+    fun unknownForegroundPreservesOnlineHistoryAndConfirmedExitStillGetsFullDelay() = runTest {
+        val fixture = fixture(null, RuntimeSnapshot(isAirplaneModeEnabled = false))
+        val settings = UserSettings(automationEnabled = true, appExitDisconnectEnabled = true, appExitDelaySeconds = 60)
+        var state = RuntimeState(settings = settings, lastTargetAppActive = true,
+            lastKnownForegroundApp = ForegroundAppInfo("online.app", "Online", 1000))
+        state = fixture.handler.automationTick(state, fixture.scheduler)
+        assertEquals(true, state.lastTargetAppActive)
+        assertNull(state.lastKnownForegroundApp)
+        assertTrue(!fixture.scheduler.isAppExitDisconnectActive)
+        fixture.foregroundAppSource.app = ForegroundAppInfo("other.app", "Other", 1000)
+        val before = System.currentTimeMillis()
+        state = fixture.handler.automationTick(state, fixture.scheduler)
+        assertEquals(false, state.lastTargetAppActive)
+        assertTrue(fixture.scheduler.isAppExitDisconnectActive)
+        assertTrue(requireNotNull(fixture.runtimeStatusRepository.currentSnapshot.pendingAppExitDisconnectAtMillis) >= before + 59_000)
+        assertTrue(fixture.accessRepository.disconnectedRequests.isEmpty())
+        fixture.scheduler.cancelAll()
+    }
+
+    @Test
+    fun unknownThenConfirmedOnlineReconnectsWhenRadioIsDisconnected() = runTest {
+        val fixture = fixture(null, RuntimeSnapshot(isAirplaneModeEnabled = true))
+        var state = RuntimeState(settings = UserSettings(automationEnabled = true), lastTargetAppActive = true,
+            appRulesByPackageName = mapOf("online.app" to AppRuntimeRuleInfo(true, false, AppOnlineSourceTag.Manual)))
+        state = fixture.handler.automationTick(state, fixture.scheduler)
+        fixture.foregroundAppSource.app = ForegroundAppInfo("online.app", "Online", 1000)
+        fixture.handler.automationTick(state, fixture.scheduler)
+        assertEquals(listOf(false), fixture.accessRepository.disconnectedRequests)
+    }
+
+    @Test
+    fun coldUnknownDoesNotBecomeAnInitialOfflineSynchronization() = runTest {
+        val fixture = fixture(null, RuntimeSnapshot(isAirplaneModeEnabled = false))
+        val state = fixture.handler.automationTick(RuntimeState(settings = UserSettings(automationEnabled = true)), fixture.scheduler)
+        assertNull(state.lastTargetAppActive)
+        assertTrue(fixture.accessRepository.disconnectedRequests.isEmpty())
+    }
+
+    @Test
+    fun pendingExitIsPausedDuringUnknownAndRestartsAfterConfirmedOfflineRecovery() = runTest {
+        val fixture = fixture(ForegroundAppInfo("other.app", "Other", 1000), RuntimeSnapshot(isAirplaneModeEnabled = false))
+        var state = RuntimeState(settings = UserSettings(automationEnabled = true,
+            appExitDisconnectEnabled = true, appExitDelaySeconds = 60), lastTargetAppActive = true)
+        state = fixture.handler.automationTick(state, fixture.scheduler)
+        assertTrue(fixture.scheduler.isAppExitDisconnectActive)
+        fixture.foregroundAppSource.app = null
+        state = fixture.handler.automationTick(state, fixture.scheduler)
+        assertEquals(false, state.lastTargetAppActive)
+        assertTrue(state.appExitAwaitingForegroundConfirmation)
+        assertTrue(!fixture.scheduler.isAppExitDisconnectActive)
+        fixture.foregroundAppSource.app = ForegroundAppInfo("other.app", "Other", 1000)
+        val before = System.currentTimeMillis()
+        state = fixture.handler.automationTick(state, fixture.scheduler)
+        assertTrue(fixture.scheduler.isAppExitDisconnectActive)
+        assertTrue(!state.appExitAwaitingForegroundConfirmation)
+        assertTrue(requireNotNull(fixture.runtimeStatusRepository.currentSnapshot.pendingAppExitDisconnectAtMillis) >= before + 59_000)
+        assertTrue(fixture.accessRepository.disconnectedRequests.isEmpty())
+        fixture.scheduler.cancelAll()
+    }
+
+    @Test
+    fun aNewClockEpochReplacesFutureDatedStateInStoreAndHandler() = runTest {
+        val now = System.currentTimeMillis()
+        val old = ForegroundAppInfo("old.app", "Old", now + 60_000,
+            "old.app.Main", ForegroundInfoSource.Accessibility, true, now + 60_000)
+        val current = ForegroundAppInfo("new.app", "New", now,
+            "new.app.Main", ForegroundInfoSource.Accessibility, true, now)
+        val store = ForegroundObservationStore()
+        store.accept(old)
+        assertEquals(current, store.accept(current))
+        val fixture = fixture(current, RuntimeSnapshot(isAirplaneModeEnabled = false))
+        val state = fixture.handler.automationTick(RuntimeState(settings = UserSettings(automationEnabled = true),
+            lastKnownForegroundApp = old), fixture.scheduler)
+        assertEquals(current, state.lastKnownForegroundApp)
+        assertEquals("new.app", fixture.runtimeStatusRepository.currentSnapshot.currentForegroundPackageName)
+    }
+
     @Test
     fun firstSyncUpdatesTargetStateWithoutNetworkRequest() = runTest {
         val fixture = fixture(
@@ -180,7 +259,7 @@ class ForegroundAutomationHandlerTest : LocalizedStringsTest() {
     }
 
     private fun fixture(
-        foregroundApp: ForegroundAppInfo,
+        foregroundApp: ForegroundAppInfo?,
         snapshot: RuntimeSnapshot,
     ): Fixture {
         val runtimeStatusRepository = FakeRuntimeStatusRepository(snapshot)

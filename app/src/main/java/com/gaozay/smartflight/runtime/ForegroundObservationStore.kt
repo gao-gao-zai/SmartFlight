@@ -36,7 +36,9 @@ class ForegroundObservationStore @Inject constructor() {
 }
 
 fun ForegroundAppInfo.confirmedActivity(nowMillis: Long = System.currentTimeMillis()): String? =
-    activityName?.takeIf { activityConfirmed && verifiedAtMillis > 0 && nowMillis - verifiedAtMillis in 0..30_000L }
+    // Confirmation follows the source lifecycle, not the amount of time spent in
+    // an Activity. A quiet foreground Activity remains active until contrary evidence.
+    activityName?.takeIf { activityConfirmed && verifiedAtMillis > 0 }
 
 fun ForegroundAppInfo.withoutActivityConfirmation(): ForegroundAppInfo = copy(
     activityName = null, activityConfirmed = false, source = ForegroundInfoSource.Unknown, verifiedAtMillis = 0,
@@ -44,6 +46,10 @@ fun ForegroundAppInfo.withoutActivityConfirmation(): ForegroundAppInfo = copy(
 
 internal fun chooseForegroundUpdate(old: ForegroundAppInfo?, candidate: ForegroundAppInfo?): ForegroundAppInfo? {
     if (old == null || candidate == null || candidate.eventTimestampMillis >= old.eventTimestampMillis) return candidate
+    if (old.verifiedAtMillis > System.currentTimeMillis()) return candidate
+    // The configured source has already arbitrated between source-local caches.
+    // An older resume event from the selected source can be verified right now.
+    if (candidate.source != old.source && candidate.source != ForegroundInfoSource.Unknown) return candidate
     if (candidate.source == ForegroundInfoSource.Unknown && candidate.packageName == old.packageName) {
         return old.copy(activityName = null, activityConfirmed = false, source = ForegroundInfoSource.Unknown, verifiedAtMillis = 0)
     }
